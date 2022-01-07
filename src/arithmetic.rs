@@ -8,7 +8,7 @@ use group::{
     Group as _,
 };
 
-pub use pasta_curves::arithmetic::*;
+pub use pairing::arithmetic::*;
 
 fn multiexp_serial<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut C::Curve) {
     let coeffs: Vec<_> = coeffs.iter().map(|a| a.to_repr()).collect();
@@ -406,7 +406,7 @@ pub fn lagrange_interpolate<F: FieldExt>(points: &[F], evals: &[F]) -> Vec<F> {
 use rand::rngs::OsRng;
 
 #[cfg(test)]
-use crate::pasta::Fp;
+use pairing::bn256::Fr as Fp;
 
 #[test]
 fn test_lagrange_interpolate() {

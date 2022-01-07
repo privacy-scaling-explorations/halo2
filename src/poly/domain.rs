@@ -557,7 +557,7 @@ fn test_rotate() {
     use rand::rngs::OsRng;
 
     use crate::arithmetic::eval_polynomial;
-    use crate::pasta::pallas::Scalar;
+    use pairing::bn256::Fr as Scalar;
 
     let domain = EvaluationDomain::<Scalar>::new(1, 3);
     let rng = OsRng;
@@ -597,8 +597,9 @@ fn test_rotate() {
 fn test_l_i() {
     use rand::rngs::OsRng;
 
-    use crate::arithmetic::{eval_polynomial, lagrange_interpolate};
-    use crate::pasta::pallas::Scalar;
+    use crate::arithmetic::{eval_polynomial, lagrange_interpolate, BaseExt};
+    use pairing::bn256::Fr as Scalar;
+
     let domain = EvaluationDomain::<Scalar>::new(1, 3);
 
     let mut l = vec![];

@@ -2,23 +2,29 @@
 extern crate criterion;
 
 extern crate halo2;
-use group::ff::Field;
-use halo2::arithmetic::FieldExt;
+use criterion::Criterion;
+use halo2::arithmetic::{BaseExt, FieldExt};
 use halo2::circuit::{Cell, Layouter, SimpleFloorPlanner};
-use halo2::pasta::{EqAffine, Fp};
 use halo2::plonk::*;
-use halo2::poly::{commitment::Params, Rotation};
+use halo2::poly::{commitment::Setup, Rotation};
 use halo2::transcript::{Blake2bRead, Blake2bWrite, Challenge255};
-use rand::rngs::OsRng;
-
+use pairing::bn256::{Bn256, Fr as Fp};
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 use std::marker::PhantomData;
 
-use criterion::{BenchmarkId, Criterion};
-
-fn criterion_benchmark(c: &mut Criterion) {
+fn bench_with_k(name: &str, k: u32, c: &mut Criterion) {
     /// This represents an advice column at a certain row in the ConstraintSystem
     #[derive(Copy, Clone, Debug)]
     pub struct Variable(Column<Advice>, usize);
+
+    // Initialize the polynomial commitment parameters
+    let mut rng = XorShiftRng::from_seed([
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
+        0xe5,
+    ]);
+    let params = Setup::<Bn256>::new(k, &mut rng);
+    let verifier_params = Setup::<Bn256>::verifier_params(&params, 0).unwrap();
 
     #[derive(Clone)]
     struct PlonkConfig {
@@ -246,76 +252,58 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    fn keygen(k: u32) -> (Params<EqAffine>, ProvingKey<EqAffine>) {
-        let params: Params<EqAffine> = Params::new(k);
-        let empty_circuit: MyCircuit<Fp> = MyCircuit { a: None, k };
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
-        (params, pk)
-    }
+    let empty_circuit: MyCircuit<Fp> = MyCircuit { a: None, k };
 
-    fn prover(k: u32, params: &Params<EqAffine>, pk: &ProvingKey<EqAffine>) -> Vec<u8> {
-        let rng = OsRng;
+    // Initialize the proving key
+    let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
-        let circuit: MyCircuit<Fp> = MyCircuit {
-            a: Some(Fp::random(rng)),
-            k,
-        };
+    let prover_name = name.to_string() + "-prover";
+    let verifier_name = name.to_string() + "-verifier";
 
-        let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
-        create_proof(params, pk, &[circuit], &[&[]], rng, &mut transcript)
-            .expect("proof generation should not fail");
-        transcript.finalize()
-    }
+    c.bench_function(&prover_name, |b| {
+        b.iter(|| {
+            let circuit: MyCircuit<Fp> = MyCircuit {
+                a: Some(Fp::rand()),
+                k,
+            };
 
-    fn verifier(params: &Params<EqAffine>, vk: &VerifyingKey<EqAffine>, proof: &[u8]) {
-        let msm = params.empty_msm();
-        let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(proof);
-        let guard = verify_proof(params, vk, msm, &[&[]], &mut transcript).unwrap();
-        let msm = guard.clone().use_challenges();
-        assert!(msm.eval());
-    }
-
-    let k_range = 8..=16;
-
-    let mut keygen_group = c.benchmark_group("plonk-keygen");
-    keygen_group.sample_size(10);
-    for k in k_range.clone() {
-        keygen_group.bench_with_input(BenchmarkId::from_parameter(k), &k, |b, &k| {
-            b.iter(|| keygen(k));
+            // Create a proof
+            let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+            create_proof(&params, &pk, &[circuit], &[&[]], &mut rng, &mut transcript)
+                .expect("proof generation should not fail")
         });
-    }
-    keygen_group.finish();
+    });
 
-    let mut prover_group = c.benchmark_group("plonk-prover");
-    prover_group.sample_size(10);
-    for k in k_range.clone() {
-        let (params, pk) = keygen(k);
+    let circuit: MyCircuit<Fp> = MyCircuit {
+        a: Some(Fp::rand()),
+        k,
+    };
 
-        prover_group.bench_with_input(
-            BenchmarkId::from_parameter(k),
-            &(k, &params, &pk),
-            |b, &(k, params, pk)| {
-                b.iter(|| prover(k, params, pk));
-            },
-        );
-    }
-    prover_group.finish();
+    // Create a proof
+    let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+    create_proof(&params, &pk, &[circuit], &[&[]], &mut rng, &mut transcript)
+        .expect("proof generation should not fail");
+    let proof = transcript.finalize();
 
-    let mut verifier_group = c.benchmark_group("plonk-verifier");
-    for k in k_range {
-        let (params, pk) = keygen(k);
-        let proof = prover(k, &params, &pk);
+    c.bench_function(&verifier_name, |b| {
+        b.iter(|| {
+            let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
+            let _ = verify_proof(&verifier_params, pk.get_vk(), &[&[]], &mut transcript).unwrap();
+        });
+    });
+}
 
-        verifier_group.bench_with_input(
-            BenchmarkId::from_parameter(k),
-            &(&params, pk.get_vk(), &proof[..]),
-            |b, &(params, vk, proof)| {
-                b.iter(|| verifier(params, vk, proof));
-            },
-        );
-    }
-    verifier_group.finish();
+fn criterion_benchmark(c: &mut Criterion) {
+    bench_with_k("plonk-k=8", 8, c);
+    bench_with_k("plonk-k=9", 9, c);
+    bench_with_k("plonk-k=10", 10, c);
+    bench_with_k("plonk-k=11", 11, c);
+    bench_with_k("plonk-k=12", 12, c);
+    bench_with_k("plonk-k=13", 13, c);
+    bench_with_k("plonk-k=14", 14, c);
+    bench_with_k("plonk-k=15", 15, c);
+    bench_with_k("plonk-k=16", 16, c);
 }
 
 criterion_group!(benches, criterion_benchmark);

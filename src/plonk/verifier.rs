@@ -1,26 +1,33 @@
 use ff::Field;
 use group::Curve;
 use std::iter;
+use subtle::Choice;
 
 use super::{
     vanishing, ChallengeBeta, ChallengeGamma, ChallengeTheta, ChallengeX, ChallengeY, Error,
     VerifyingKey,
 };
-use crate::arithmetic::{CurveAffine, FieldExt};
+use crate::arithmetic::{BaseExt, CurveAffine, FieldExt};
+use crate::poly::commitment::ParamsVerifier;
 use crate::poly::{
-    commitment::{Blind, Guard, Params, MSM},
+    commitment::{Blind, Params},
     multiopen::{self, VerifierQuery},
 };
 use crate::transcript::{read_n_points, read_n_scalars, EncodedChallenge, TranscriptRead};
+use pairing::arithmetic::MultiMillerLoop;
 
 /// Returns a boolean indicating whether or not the proof is valid
-pub fn verify_proof<'params, C: CurveAffine, E: EncodedChallenge<C>, T: TranscriptRead<C, E>>(
-    params: &'params Params<C>,
-    vk: &VerifyingKey<C>,
-    msm: MSM<'params, C>,
+pub fn verify_proof<
+    'params,
+    C: MultiMillerLoop,
+    E: EncodedChallenge<C::G1Affine>,
+    T: TranscriptRead<C::G1Affine, E>,
+>(
+    params: &'params ParamsVerifier<C>,
+    vk: &VerifyingKey<C::G1Affine>,
     instances: &[&[&[C::Scalar]]],
     transcript: &mut T,
-) -> Result<Guard<'params, C, E>, Error> {
+) -> Result<Choice, Error> {
     // Check that instances matches the expected number of instance columns
     for instances in instances.iter() {
         if instances.len() != vk.cs.num_instance_columns {
@@ -37,11 +44,11 @@ pub fn verify_proof<'params, C: CurveAffine, E: EncodedChallenge<C>, T: Transcri
                     if instance.len() > params.n as usize - (vk.cs.blinding_factors() + 1) {
                         return Err(Error::InstanceTooLarge);
                     }
-                    let mut poly = instance.to_vec();
-                    poly.resize(params.n as usize, C::Scalar::zero());
-                    let poly = vk.domain.lagrange_from_vec(poly);
+                    // let mut poly = instance.to_vec();
+                    // poly.resize(params.n as usize, C::Scalar::zero());
+                    // let poly = vk.domain.lagrange_from_vec(poly);
 
-                    Ok(params.commit_lagrange(&poly, Blind::default()).to_affine())
+                    Ok(params.commit_lagrange(instance.to_vec()).to_affine())
                 })
                 .collect::<Result<Vec<_>, _>>()
         })
@@ -221,7 +228,7 @@ pub fn verify_proof<'params, C: CurveAffine, E: EncodedChallenge<C>, T: Transcri
                     )
             });
 
-        vanishing.verify(params, expressions, y, xn)
+        vanishing.verify(expressions, y, xn)
     };
 
     let queries = instance_commitments
@@ -285,5 +292,5 @@ pub fn verify_proof<'params, C: CurveAffine, E: EncodedChallenge<C>, T: Transcri
 
     // We are now convinced the circuit is satisfied so long as the
     // polynomial commitments open to the correct values.
-    multiopen::verify_proof(params, transcript, queries, msm).map_err(|_| Error::Opening)
+    multiopen::verify_proof(params, transcript, queries).map_err(|_| Error::Opening)
 }

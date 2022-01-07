@@ -1,6 +1,7 @@
 use super::super::{util::*, AssignedBits, BlockWord, SpreadVar, SpreadWord, Table16Assignment};
 use super::{schedule_util::*, MessageScheduleConfig};
-use halo2::{circuit::Region, pasta::pallas, plonk::Error};
+use halo2::{circuit::Region, plonk::Error};
+use pairing::bn256::Fr as Fp;
 use std::convert::TryInto;
 
 // A word in subregion 1
@@ -73,7 +74,7 @@ impl Subregion1Word {
 impl MessageScheduleConfig {
     pub fn assign_subregion1(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         input: &[BlockWord],
     ) -> Result<Vec<(AssignedBits<16>, AssignedBits<16>)>, Error> {
         assert_eq!(input.len(), SUBREGION_1_LEN);
@@ -99,7 +100,7 @@ impl MessageScheduleConfig {
     /// Pieces of length [3, 4, 11, 14]
     fn decompose_subregion1_word(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         word: Option<[bool; 32]>,
         index: usize,
     ) -> Result<Subregion1Word, Error> {
@@ -149,7 +150,7 @@ impl MessageScheduleConfig {
     // (3, 4, 11, 14)-bit chunks
     fn lower_sigma_0(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         word: Subregion1Word,
     ) -> Result<(AssignedBits<16>, AssignedBits<16>), Error> {
         let a_3 = self.extras[0];

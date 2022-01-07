@@ -2,10 +2,10 @@ use ff::Field;
 use halo2::{
     arithmetic::FieldExt,
     circuit::{Cell, Layouter, Region, SimpleFloorPlanner},
-    pasta::Fp,
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, TableColumn},
     poly::Rotation,
 };
+use pairing::bn256::Fr as Fp;
 use rand::rngs::OsRng;
 use std::marker::PhantomData;
 

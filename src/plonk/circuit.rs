@@ -204,7 +204,7 @@ impl TryFrom<Column<Any>> for Column<Instance> {
 /// Selectors can be used to conditionally enable (portions of) gates:
 /// ```
 /// use halo2::poly::Rotation;
-/// # use halo2::pasta::Fp;
+/// # use pairing::bn256::Fr as Fp;
 /// # use halo2::plonk::ConstraintSystem;
 ///
 /// # let mut meta = ConstraintSystem::<Fp>::default();

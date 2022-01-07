@@ -1,12 +1,13 @@
 use super::super::{AssignedBits, RoundWord, RoundWordA, RoundWordE, StateWord, ROUND_CONSTANTS};
 use super::{compression_util::*, CompressionConfig, State};
-use halo2::{circuit::Region, pasta::pallas, plonk::Error};
+use halo2::{circuit::Region, plonk::Error};
+use pairing::bn256::Fr as Fp;
 
 impl CompressionConfig {
     #[allow(clippy::many_single_char_names)]
     pub fn assign_round(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         round_idx: RoundIdx,
         state: State,
         schedule_word: &(AssignedBits<16>, AssignedBits<16>),

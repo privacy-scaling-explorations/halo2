@@ -4,9 +4,10 @@ use std::marker::PhantomData;
 use super::Sha256Instructions;
 use halo2::{
     circuit::{AssignedCell, Chip, Layouter, Region},
-    pasta::pallas,
     plonk::{Advice, Any, Assigned, Column, ConstraintSystem, Error},
 };
+
+use pairing::bn256::Fr as Fp;
 
 mod compression;
 mod gates;
@@ -80,10 +81,10 @@ impl<const LEN: usize> From<&Bits<LEN>> for [bool; LEN] {
     }
 }
 
-impl<const LEN: usize> From<&Bits<LEN>> for Assigned<pallas::Base> {
-    fn from(bits: &Bits<LEN>) -> Assigned<pallas::Base> {
+impl<const LEN: usize> From<&Bits<LEN>> for Assigned<Fp> {
+    fn from(bits: &Bits<LEN>) -> Assigned<Fp> {
         assert!(LEN <= 64);
-        pallas::Base::from(lebs2ip(&bits.0)).into()
+        Fp::from(lebs2ip(&bits.0)).into()
     }
 }
 
@@ -112,10 +113,10 @@ impl From<u32> for Bits<32> {
 }
 
 #[derive(Clone, Debug)]
-pub struct AssignedBits<const LEN: usize>(AssignedCell<Bits<LEN>, pallas::Base>);
+pub struct AssignedBits<const LEN: usize>(AssignedCell<Bits<LEN>, Fp>);
 
 impl<const LEN: usize> std::ops::Deref for AssignedBits<LEN> {
-    type Target = AssignedCell<Bits<LEN>, pallas::Base>;
+    type Target = AssignedCell<Bits<LEN>, Fp>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -124,7 +125,7 @@ impl<const LEN: usize> std::ops::Deref for AssignedBits<LEN> {
 
 impl<const LEN: usize> AssignedBits<LEN> {
     fn assign_bits<A, AR, T: TryInto<[bool; LEN]> + std::fmt::Debug + Clone>(
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         annotation: A,
         column: impl Into<Column<Any>>,
         offset: usize,
@@ -162,7 +163,7 @@ impl AssignedBits<16> {
     }
 
     fn assign<A, AR>(
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         annotation: A,
         column: impl Into<Column<Any>>,
         offset: usize,
@@ -197,7 +198,7 @@ impl AssignedBits<32> {
     }
 
     fn assign<A, AR>(
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         annotation: A,
         column: impl Into<Column<Any>>,
         offset: usize,
@@ -238,10 +239,10 @@ pub struct Table16Config {
 #[derive(Clone, Debug)]
 pub struct Table16Chip {
     config: Table16Config,
-    _marker: PhantomData<pallas::Base>,
+    _marker: PhantomData<Fp>,
 }
 
-impl Chip<pallas::Base> for Table16Chip {
+impl Chip<Fp> for Table16Chip {
     type Config = Table16Config;
     type Loaded = ();
 
@@ -255,7 +256,7 @@ impl Chip<pallas::Base> for Table16Chip {
 }
 
 impl Table16Chip {
-    pub fn construct(config: <Self as Chip<pallas::Base>>::Config) -> Self {
+    pub fn construct(config: <Self as Chip<Fp>>::Config) -> Self {
         Self {
             config,
             _marker: PhantomData,
@@ -263,8 +264,8 @@ impl Table16Chip {
     }
 
     pub fn configure(
-        meta: &mut ConstraintSystem<pallas::Base>,
-    ) -> <Self as Chip<pallas::Base>>::Config {
+        meta: &mut ConstraintSystem<Fp>,
+    ) -> <Self as Chip<Fp>>::Config {
         // Columns required by this chip:
         let message_schedule = meta.advice_column();
         let extras = [
@@ -316,26 +317,26 @@ impl Table16Chip {
 
     pub fn load(
         config: Table16Config,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<Fp>,
     ) -> Result<(), Error> {
         SpreadTableChip::load(config.lookup, layouter)
     }
 }
 
-impl Sha256Instructions<pallas::Base> for Table16Chip {
+impl Sha256Instructions<Fp> for Table16Chip {
     type State = State;
     type BlockWord = BlockWord;
 
     fn initialization_vector(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<Fp>,
     ) -> Result<State, Error> {
         self.config().compression.initialize_with_iv(layouter, IV)
     }
 
     fn initialization(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<Fp>,
         init_state: &Self::State,
     ) -> Result<Self::State, Error> {
         self.config()
@@ -347,7 +348,7 @@ impl Sha256Instructions<pallas::Base> for Table16Chip {
     // message block and return the final state.
     fn compress(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<Fp>,
         initialized_state: &Self::State,
         input: [Self::BlockWord; super::BLOCK_SIZE],
     ) -> Result<Self::State, Error> {
@@ -360,7 +361,7 @@ impl Sha256Instructions<pallas::Base> for Table16Chip {
 
     fn digest(
         &self,
-        layouter: &mut impl Layouter<pallas::Base>,
+        layouter: &mut impl Layouter<Fp>,
         state: &Self::State,
     ) -> Result<[Self::BlockWord; super::DIGEST_SIZE], Error> {
         // Copy the dense forms of the state variable chunks down to this gate.
@@ -376,7 +377,7 @@ trait Table16Assignment {
     #[allow(clippy::type_complexity)]
     fn assign_spread_outputs(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         lookup: &SpreadInputs,
         a_3: Column<Advice>,
         row: usize,
@@ -428,7 +429,7 @@ trait Table16Assignment {
     #[allow(clippy::too_many_arguments)]
     fn assign_sigma_outputs(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         lookup: &SpreadInputs,
         a_3: Column<Advice>,
         row: usize,
@@ -461,7 +462,7 @@ mod tests {
         use plotters::prelude::*;
         struct MyCircuit {}
 
-        impl Circuit<pallas::Base> for MyCircuit {
+        impl Circuit<Fp> for MyCircuit {
             type Config = Table16Config;
             type FloorPlanner = SimpleFloorPlanner;
 
@@ -469,14 +470,14 @@ mod tests {
                 MyCircuit {}
             }
 
-            fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
                 Table16Chip::configure(meta)
             }
 
             fn synthesize(
                 &self,
                 config: Self::Config,
-                mut layouter: impl Layouter<pallas::Base>,
+                mut layouter: impl Layouter<Fp>,
             ) -> Result<(), Error> {
                 let table16_chip = Table16Chip::construct(config.clone());
                 Table16Chip::load(config, &mut layouter)?;
@@ -505,7 +506,7 @@ mod tests {
 
         let circuit = MyCircuit {};
         halo2::dev::CircuitLayout::default()
-            .render::<pallas::Base, _, _>(17, &circuit, &root)
+            .render::<Fp, _, _>(17, &circuit, &root)
             .unwrap();
     }
 }

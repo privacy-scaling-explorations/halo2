@@ -1,14 +1,18 @@
 use halo2::{
     circuit::{Layouter, SimpleFloorPlanner},
-    pasta::{pallas, EqAffine},
     plonk::{
         create_proof, keygen_pk, keygen_vk, verify_proof, Circuit, ConstraintSystem, Error,
         VerifyingKey,
     },
-    poly::commitment::Params,
+    poly::commitment::{Params, ParamsVerifier, Setup},
     transcript::{Blake2bRead, Blake2bWrite, Challenge255},
 };
 use rand::rngs::OsRng;
+
+use pairing::bn256::Fr as Fp;
+use pairing::bn256::{Bn256, G1Affine};
+use rand::SeedableRng;
+use rand_xorshift::XorShiftRng;
 
 use std::{
     fs::File,
@@ -25,7 +29,7 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
     #[derive(Default)]
     struct MyCircuit {}
 
-    impl Circuit<pallas::Base> for MyCircuit {
+    impl Circuit<Fp> for MyCircuit {
         type Config = Table16Config;
         type FloorPlanner = SimpleFloorPlanner;
 
@@ -33,14 +37,14 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
             Self::default()
         }
 
-        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+        fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
             Table16Chip::configure(meta)
         }
 
         fn synthesize(
             &self,
             config: Self::Config,
-            mut layouter: impl Layouter<pallas::Base>,
+            mut layouter: impl Layouter<Fp>,
         ) -> Result<(), Error> {
             Table16Chip::load(config.clone(), &mut layouter)?;
             let table16_chip = Table16Chip::construct(config);
@@ -77,10 +81,16 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
         }
     }
 
+    let mut rng = XorShiftRng::from_seed([
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
+        0xe5,
+    ]);
+
     // Initialize the polynomial commitment parameters
     let params_path = Path::new("./benches/sha256_assets/sha256_params");
     if File::open(&params_path).is_err() {
-        let params: Params<EqAffine> = Params::new(k);
+        let params = Setup::<Bn256>::new(k, &mut rng);
+
         let mut buf = Vec::new();
 
         params.write(&mut buf).expect("Failed to write params");
@@ -91,8 +101,27 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
     }
 
     let params_fs = File::open(&params_path).expect("couldn't load sha256_params");
-    let params: Params<EqAffine> =
+    let params: Params<G1Affine> =
         Params::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
+
+    let params_verifier_path = Path::new("./benches/sha256_assets/sha256_verifier_params");
+    if File::open(&params_verifier_path).is_err() {
+        let params_verifier = Setup::<Bn256>::verifier_params(&params, 0).unwrap();
+
+        let mut buf = Vec::new();
+
+        params_verifier
+            .write(&mut buf)
+            .expect("Failed to write params");
+        let mut file = File::create(&params_verifier_path).expect("Failed to create sha256_params");
+
+        file.write_all(&buf[..])
+            .expect("Failed to write params to file");
+    }
+
+    let params_fs = File::open(&params_verifier_path).expect("couldn't load sha256_params");
+    let params_verifier: ParamsVerifier<Bn256> =
+        ParamsVerifier::read::<_>(&mut BufReader::new(params_fs)).expect("Failed to read params");
 
     let empty_circuit: MyCircuit = MyCircuit {};
 
@@ -110,8 +139,8 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
     }
 
     let vk_fs = File::open(&vk_path).expect("couldn't load sha256_vk");
-    let vk: VerifyingKey<EqAffine> =
-        VerifyingKey::<EqAffine>::read::<_, MyCircuit>(&mut BufReader::new(vk_fs), &params)
+    let vk: VerifyingKey<G1Affine> =
+        VerifyingKey::<G1Affine>::read::<_, MyCircuit>(&mut BufReader::new(vk_fs), &params)
             .expect("Failed to read vk");
 
     let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
@@ -150,11 +179,10 @@ fn bench(name: &str, k: u32, c: &mut Criterion) {
 
     c.bench_function(&verifier_name, |b| {
         b.iter(|| {
-            let msm = params.empty_msm();
             let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-            let guard = verify_proof(&params, pk.get_vk(), msm, &[], &mut transcript).unwrap();
-            let msm = guard.clone().use_challenges();
-            assert!(msm.eval());
+            assert!(bool::from(
+                verify_proof(&params_verifier, pk.get_vk(), &[], &mut transcript).unwrap()
+            ));
         });
     });
 }

@@ -6,7 +6,7 @@ use crate::arithmetic::parallelize;
 use crate::plonk::Assigned;
 
 use group::ff::{BatchInvert, Field};
-use pasta_curves::arithmetic::FieldExt;
+use pairing::arithmetic::FieldExt;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, Neg, RangeFrom, RangeFull, Sub};
@@ -16,6 +16,10 @@ mod domain;
 pub mod multiopen;
 
 pub use domain::*;
+
+mod msm;
+
+pub use msm::MSM;
 
 /// This is an error that could occur during proving or circuit synthesis.
 // TODO: these errors need to be cleaned up
@@ -265,6 +269,16 @@ impl<'a, F: Field> Polynomial<F, LagrangeCoeff> {
             values,
             _marker: PhantomData,
         }
+    }
+}
+
+impl<'a, F: Field, B: Basis> Sub<F> for &'a Polynomial<F, B> {
+    type Output = Polynomial<F, B>;
+
+    fn sub(self, rhs: F) -> Polynomial<F, B> {
+        let mut res = self.clone();
+        res.values[0] -= rhs;
+        res
     }
 }
 

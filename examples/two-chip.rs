@@ -514,7 +514,8 @@ impl<F: FieldExt> Circuit<F> for MyCircuit<F> {
 #[allow(clippy::many_single_char_names)]
 fn main() {
     use group::ff::Field;
-    use halo2::{dev::MockProver, pasta::Fp};
+    use halo2::dev::MockProver;
+    use pairing::bn256::Fr as Fp;
     use rand::rngs::OsRng;
 
     // ANCHOR: test-circuit

@@ -2,10 +2,10 @@ use super::{util::*, AssignedBits};
 use halo2::{
     arithmetic::FieldExt,
     circuit::{Chip, Layouter, Region},
-    pasta::pallas,
     plonk::{Advice, Column, ConstraintSystem, Error, TableColumn},
     poly::Rotation,
 };
+use pairing::bn256::Fr as Fp;
 use std::convert::TryInto;
 use std::marker::PhantomData;
 
@@ -75,7 +75,7 @@ pub(super) struct SpreadVar<const DENSE: usize, const SPREAD: usize> {
 
 impl<const DENSE: usize, const SPREAD: usize> SpreadVar<DENSE, SPREAD> {
     pub(super) fn with_lookup(
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         cols: &SpreadInputs,
         row: usize,
         word: Option<SpreadWord<DENSE, SPREAD>>,
@@ -88,10 +88,7 @@ impl<const DENSE: usize, const SPREAD: usize> SpreadVar<DENSE, SPREAD> {
             || "tag",
             cols.tag,
             row,
-            || {
-                tag.map(|tag| pallas::Base::from(tag as u64))
-                    .ok_or(Error::Synthesis)
-            },
+            || tag.map(|tag| Fp::from(tag as u64)).ok_or(Error::Synthesis),
         )?;
 
         let dense =
@@ -104,7 +101,7 @@ impl<const DENSE: usize, const SPREAD: usize> SpreadVar<DENSE, SPREAD> {
     }
 
     pub(super) fn without_lookup(
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         dense_col: Column<Advice>,
         dense_row: usize,
         spread_col: Column<Advice>,
@@ -294,9 +291,10 @@ mod tests {
         arithmetic::FieldExt,
         circuit::{Layouter, SimpleFloorPlanner},
         dev::MockProver,
-        pasta::Fp,
         plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
     };
+
+    use pairing::bn256::Fr as Fp;
 
     #[test]
     fn lookup_table() {

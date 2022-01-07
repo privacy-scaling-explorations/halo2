@@ -2,15 +2,16 @@ use super::super::{super::DIGEST_SIZE, BlockWord, RoundWordDense};
 use super::{compression_util::*, CompressionConfig, State};
 use halo2::{
     circuit::Region,
-    pasta::pallas,
     plonk::{Advice, Column, Error},
 };
+
+use pairing::bn256::Fr as Fp;
 
 impl CompressionConfig {
     #[allow(clippy::many_single_char_names)]
     pub fn assign_digest(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         state: State,
     ) -> Result<[BlockWord; DIGEST_SIZE], Error> {
         let a_3 = self.extras[0];
@@ -40,7 +41,7 @@ impl CompressionConfig {
             a_5,
             abcd_row,
             || {
-                a.map(|a| pallas::Base::from(a as u64))
+                a.map(|a| Fp::from(a as u64))
                     .ok_or(Error::Synthesis)
             },
         )?;
@@ -62,7 +63,7 @@ impl CompressionConfig {
             a_5,
             efgh_row,
             || {
-                e.map(|e| pallas::Base::from(e as u64))
+                e.map(|e| Fp::from(e as u64))
                     .ok_or(Error::Synthesis)
             },
         )?;
@@ -85,7 +86,7 @@ impl CompressionConfig {
 
     fn assign_digest_word(
         &self,
-        region: &mut Region<'_, pallas::Base>,
+        region: &mut Region<'_, Fp>,
         row: usize,
         lo_col: Column<Advice>,
         hi_col: Column<Advice>,
@@ -101,7 +102,7 @@ impl CompressionConfig {
             word_col,
             row,
             || {
-                val.map(|val| pallas::Base::from(val as u64))
+                val.map(|val| Fp::from(val as u64))
                     .ok_or(Error::Synthesis)
             },
         )?;
