@@ -33,7 +33,7 @@ backtrace = { version = "0.3", optional = true }
 rayon = "1.5.1"
 ff = "0.11"
 group = "0.11"
-pairing = { path = '../pairing', package = "pairing_bn256" }
+pairing = { git = 'https://github.com/appliedzkp/pairing', package = "pairing_bn256" }
 rand = "0.8"
 blake2b_simd = "1"
 subtle = "2.3"
