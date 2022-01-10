@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use halo2::{
     arithmetic::FieldExt,
     circuit::{Layouter, SimpleFloorPlanner},
-    dev::{MockProver, VerifyFailure},
+    dev::MockProver,
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance, Selector},
     poly::Rotation,
 };
@@ -113,16 +113,13 @@ fn lookup_any() {
             layouter.assign_region(
                 || "load values for even lookup table",
                 |mut region| {
-                    let mut offset = 0;
-                    for value in values.iter() {
+                    for (offset, value) in values.iter().enumerate() {
                         region.assign_advice(
                             || "even table value",
                             self.table_even,
                             offset,
                             || Ok(*value),
                         )?;
-
-                        offset += 1;
                     }
 
                     Ok(())
@@ -205,7 +202,7 @@ fn lookup_any() {
     };
 
     // Given the correct public input, our circuit will verify.
-    let prover = MockProver::run(k, &circuit, vec![odd_lookup.clone()]).unwrap();
+    let prover = MockProver::run(k, &circuit, vec![odd_lookup]).unwrap();
     assert_eq!(prover.verify(), Ok(()));
 
     // If we pass in a public input containing only even numbers,

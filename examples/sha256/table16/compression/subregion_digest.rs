@@ -40,10 +40,7 @@ impl CompressionConfig {
             || "a",
             a_5,
             abcd_row,
-            || {
-                a.map(|a| Fp::from(a as u64))
-                    .ok_or(Error::Synthesis)
-            },
+            || a.map(|a| Fp::from(a as u64)).ok_or(Error::Synthesis),
         )?;
 
         let b = self.assign_digest_word(region, abcd_row, a_6, a_7, a_8, b.dense_halves)?;
@@ -62,10 +59,7 @@ impl CompressionConfig {
             || "e",
             a_5,
             efgh_row,
-            || {
-                e.map(|e| Fp::from(e as u64))
-                    .ok_or(Error::Synthesis)
-            },
+            || e.map(|e| Fp::from(e as u64)).ok_or(Error::Synthesis),
         )?;
 
         let f = self.assign_digest_word(region, efgh_row, a_6, a_7, a_8, f.dense_halves)?;
@@ -101,10 +95,7 @@ impl CompressionConfig {
             || "word",
             word_col,
             row,
-            || {
-                val.map(|val| Fp::from(val as u64))
-                    .ok_or(Error::Synthesis)
-            },
+            || val.map(|val| Fp::from(val as u64)).ok_or(Error::Synthesis),
         )?;
 
         Ok(val)

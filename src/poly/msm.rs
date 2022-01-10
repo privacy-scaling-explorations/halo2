@@ -50,7 +50,7 @@ impl<'a, C: CurveAffine> MSM<C> {
     pub fn eval(self) -> C {
         best_multiexp(&self.scalars, &self.bases).into()
     }
-    
+
     /// Check if eval is equal to identity
     pub fn check(self) -> bool {
         bool::from(self.eval().is_identity())

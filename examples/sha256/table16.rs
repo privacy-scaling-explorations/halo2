@@ -263,9 +263,7 @@ impl Table16Chip {
         }
     }
 
-    pub fn configure(
-        meta: &mut ConstraintSystem<Fp>,
-    ) -> <Self as Chip<Fp>>::Config {
+    pub fn configure(meta: &mut ConstraintSystem<Fp>) -> <Self as Chip<Fp>>::Config {
         // Columns required by this chip:
         let message_schedule = meta.advice_column();
         let extras = [
@@ -315,10 +313,7 @@ impl Table16Chip {
         }
     }
 
-    pub fn load(
-        config: Table16Config,
-        layouter: &mut impl Layouter<Fp>,
-    ) -> Result<(), Error> {
+    pub fn load(config: Table16Config, layouter: &mut impl Layouter<Fp>) -> Result<(), Error> {
         SpreadTableChip::load(config.lookup, layouter)
     }
 }
@@ -327,10 +322,7 @@ impl Sha256Instructions<Fp> for Table16Chip {
     type State = State;
     type BlockWord = BlockWord;
 
-    fn initialization_vector(
-        &self,
-        layouter: &mut impl Layouter<Fp>,
-    ) -> Result<State, Error> {
+    fn initialization_vector(&self, layouter: &mut impl Layouter<Fp>) -> Result<State, Error> {
         self.config().compression.initialize_with_iv(layouter, IV)
     }
 
