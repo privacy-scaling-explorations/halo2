@@ -207,22 +207,6 @@ fn lookup_any() {
 
     // If we pass in a public input containing only even numbers,
     // the odd number lookup will fail.
-    let _prover = MockProver::run(k, &circuit, vec![even_lookup]).unwrap();
-    // assert_eq!(
-    //     prover.verify(),
-    //     Err(vec![
-    //         VerifyFailure::Lookup {
-    //             lookup_index: 1,
-    //             row: 3
-    //         },
-    //         VerifyFailure::Lookup {
-    //             lookup_index: 1,
-    //             row: 4
-    //         },
-    //         VerifyFailure::Lookup {
-    //             lookup_index: 1,
-    //             row: 5
-    //         }
-    //     ])
-    // );
+    let prover = MockProver::run(k, &circuit, vec![even_lookup]).unwrap();
+    assert!(prover.verify().is_err())
 }
