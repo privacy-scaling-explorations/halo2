@@ -1,4 +1,5 @@
 use crate::arithmetic::{best_multiexp, parallelize};
+use ff::Field;
 use pairing::arithmetic::CurveAffine;
 
 /// A multiscalar multiplication in the polynomial commitment scheme
@@ -46,8 +47,19 @@ impl<'a, C: CurveAffine> MSM<C> {
         }
     }
 
+    /// Prepares all scalars in the MSM to linear combination
+    pub fn combine_with_base(&mut self, base: C::Scalar) {
+        let mut acc = C::Scalar::one();
+        if !self.scalars.is_empty() {
+            for scalar in self.scalars.iter_mut().rev() {
+                *scalar *= &acc;
+                acc *= base;
+            }
+        }
+    }
+
     /// Perform multiexp and check that it results in zero
-    pub fn eval(self) -> C {
+    pub fn eval(&self) -> C {
         best_multiexp(&self.scalars, &self.bases).into()
     }
 

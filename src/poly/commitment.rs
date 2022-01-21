@@ -285,7 +285,6 @@ impl<E: Engine> ParamsVerifier<E> {
     pub fn commit_lagrange(&self, scalars: Vec<E::Scalar>) -> E::G1 {
         let bases = &self.g_lagrange;
         let size = scalars.len();
-        println!("{} {}", bases.len(), size);
         assert!(bases.len() >= size);
         best_multiexp(&scalars, &bases[0..size])
     }

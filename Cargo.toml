@@ -37,6 +37,7 @@ pairing = { git = 'https://github.com/appliedzkp/pairing', package = "pairing_bn
 rand = "0.8"
 blake2b_simd = "1"
 subtle = "2.3"
+cfg-if = "0.1"
 
 # Developer tooling dependencies
 plotters = { version = "0.3.0", optional = true }
@@ -50,9 +51,12 @@ proptest = "1"
 rand_xorshift = "0.3"
 
 [features]
+default = ["gwc"]
 dev-graph = ["plotters", "tabbycat"]
 gadget-traces = ["backtrace"]
 sanity-checks = []
+shplonk = []
+gwc = []
 
 [lib]
 bench = false

@@ -465,7 +465,6 @@ fn plonk_api() {
 
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        println!("here");
         assert!(bool::from(
             verify_proof(
                 &params_verifier,

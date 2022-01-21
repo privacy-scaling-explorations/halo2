@@ -11,9 +11,19 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, Neg, RangeFrom, RangeFull, Sub};
 
+cfg_if::cfg_if! {
+
+    if #[cfg(feature = "shplonk")] {
+        pub mod shplonk;
+        pub use shplonk as multiopen;
+    } else {
+        pub mod gwc;
+        pub use gwc as multiopen;
+    }
+}
+
 pub mod commitment;
 mod domain;
-pub mod multiopen;
 
 pub use domain::*;
 

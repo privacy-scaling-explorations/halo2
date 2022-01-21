@@ -402,6 +402,28 @@ pub fn lagrange_interpolate<F: FieldExt>(points: &[F], evals: &[F]) -> Vec<F> {
     }
 }
 
+/// Given roots [a_0, a_1, ... a_n] returns vanising polynomials
+/// (x - a_0) * (x - a_1) * ... * (x - a_n)
+pub fn vanishing_polynomial<F: FieldExt>(roots: &[F]) -> Vec<F> {
+    fn mul_with<F: FieldExt>(coeffs: Vec<F>, root: &F) -> Vec<F> {
+        let mut ret = vec![F::zero(); coeffs.len() + 1];
+
+        for (i, coeff) in coeffs.iter().enumerate() {
+            ret[i] -= *coeff * root;
+            ret[i + 1] += coeff;
+        }
+
+        ret
+    }
+
+    let mut coeffs = vec![F::one()];
+    for root in roots {
+        coeffs = mul_with(coeffs, root);
+    }
+
+    coeffs
+}
+
 #[cfg(test)]
 use rand::rngs::OsRng;
 
@@ -425,5 +447,24 @@ fn test_lagrange_interpolate() {
         for (point, eval) in points.iter().zip(evals) {
             assert_eq!(eval_polynomial(&poly, *point), *eval);
         }
+    }
+}
+
+#[test]
+fn test_vanishing_polynomial() {
+    let rng = OsRng;
+    let n = 100usize;
+    let roots = (0..n).map(|_| Fp::random(rng)).collect::<Vec<_>>();
+    let poly = vanishing_polynomial(&roots[..]);
+
+    assert_eq!(poly.len(), n + 1);
+
+    for coeff in poly.iter() {
+        // with high probablity
+        assert_ne!(*coeff, Fp::zero());
+    }
+
+    for root in roots.iter() {
+        assert_eq!(eval_polynomial(&poly[..], *root), Fp::zero());
     }
 }
