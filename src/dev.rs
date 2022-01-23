@@ -65,6 +65,8 @@ pub enum VerifyFailure {
     },
     /// A lookup input did not exist in its corresponding table.
     Lookup {
+        /// The name of the lookup that is not satisfied.
+        name: &'static str,
         /// The index of the lookup that is not satisfied. These indices are assigned in
         /// the order in which `ConstraintSystem::lookup` is called during
         /// `Circuit::configure`.
@@ -114,8 +116,16 @@ impl fmt::Display for VerifyFailure {
                     constraint
                 )
             }
-            Self::Lookup { lookup_index, row } => {
-                write!(f, "Lookup {} is not satisfied on row {}", lookup_index, row)
+            Self::Lookup {
+                name,
+                lookup_index,
+                row,
+            } => {
+                write!(
+                    f,
+                    "Lookup {}(index:{}) is not satisfied on row {}",
+                    name, lookup_index, row
+                )
             }
             Self::Permutation { column, row } => {
                 write!(
@@ -817,6 +827,7 @@ impl<F: FieldExt> MockProver<F> {
                             None
                         } else {
                             Some(VerifyFailure::Lookup {
+                                name: lookup.name,
                                 lookup_index,
                                 row: input_row as usize,
                             })

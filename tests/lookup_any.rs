@@ -39,7 +39,7 @@ fn lookup_any() {
             };
 
             // Lookup on even numbers
-            meta.lookup_any(|meta| {
+            meta.lookup_any("even number", |meta| {
                 let input = meta.query_advice(config.input, Rotation::cur());
 
                 let q_even = meta.query_selector(config.q_even);
@@ -49,7 +49,7 @@ fn lookup_any() {
             });
 
             // Lookup on odd numbers
-            meta.lookup_any(|meta| {
+            meta.lookup_any("odd number", |meta| {
                 let input = meta.query_advice(config.input, Rotation::cur());
 
                 let q_odd = meta.query_selector(config.q_odd);
@@ -212,14 +212,17 @@ fn lookup_any() {
         prover.verify(),
         Err(vec![
             VerifyFailure::Lookup {
+                name: "odd number",
                 lookup_index: 1,
                 row: 3
             },
             VerifyFailure::Lookup {
+                name: "odd number",
                 lookup_index: 1,
                 row: 4
             },
             VerifyFailure::Lookup {
+                name: "odd number",
                 lookup_index: 1,
                 row: 5
             }
