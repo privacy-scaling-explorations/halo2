@@ -36,7 +36,7 @@ group = "0.11"
 rand = "0.8"
 blake2b_simd = "0.5"
 # pairing = { path = '../pairing', package = "pairing_bn256" }
-pairing = { git = 'https://github.com/appliedzkp/pairing', package = "pairing_bn256" }
+pairing = { git = 'https://github.com/appliedzkp/pairing', package = "pairing_bn256", rev = "3f668ba2eab444ad9f4c6396db8292fada6feb42" }
 rand_core = { version = "0.6", default-features = false }
 subtle = "2.3"
 
