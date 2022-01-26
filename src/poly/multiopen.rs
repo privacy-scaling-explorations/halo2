@@ -16,6 +16,7 @@ mod verifier;
 
 pub use prover::create_proof;
 pub use verifier::verify_proof;
+use crate::plonk::create_domain;
 
 use super::msm::MSM;
 
@@ -30,8 +31,8 @@ type ChallengeV<F> = ChallengeScalar<F, V>;
 /// A polynomial query at a point
 #[derive(Debug, Clone, Copy)]
 pub struct ProverQuery<'a, C: CurveAffine> {
-    /// point at which polynomial is queried
-    pub point: C::Scalar,
+    /// rotation at which polynomial is queried
+    pub rot: Rotation,
     /// coefficients of polynomial
     pub poly: &'a Polynomial<C::Scalar, Coeff>,
 }
@@ -39,8 +40,8 @@ pub struct ProverQuery<'a, C: CurveAffine> {
 /// A polynomial query at a point
 #[derive(Debug, Clone, Copy)]
 pub struct VerifierQuery<'r, C: CurveAffine> {
-    /// point at which polynomial is queried
-    point: C::Scalar,
+    /// rotation at which polynomial is queried
+    rot: Rotation,
     /// commitment to polynomial
     commitment: CommitmentReference<'r, C>,
     /// evaluation of polynomial at query point
@@ -49,18 +50,18 @@ pub struct VerifierQuery<'r, C: CurveAffine> {
 
 impl<'r, 'params: 'r, C: CurveAffine> VerifierQuery<'r, C> {
     /// Create a new verifier query based on a commitment
-    pub fn new_commitment(commitment: &'r C, point: C::Scalar, eval: C::Scalar) -> Self {
+    pub fn new_commitment(commitment: &'r C, rot: Rotation, eval: C::Scalar) -> Self {
         VerifierQuery {
-            point,
+            rot,
             eval,
             commitment: CommitmentReference::Commitment(commitment),
         }
     }
 
     /// Create a new verifier query based on a linear combination of commitments
-    pub fn new_msm(msm: &'r MSM<C>, point: C::Scalar, eval: C::Scalar) -> Self {
+    pub fn new_msm(msm: &'r MSM<C>, rot: Rotation, eval: C::Scalar) -> Self {
         VerifierQuery {
-            point,
+            rot,
             eval,
             commitment: CommitmentReference::MSM(msm),
         }
@@ -87,7 +88,7 @@ impl<'r, 'params: 'r, C: CurveAffine> PartialEq for CommitmentReference<'r, C> {
 
 struct CommitmentData<F, Q: Query<F>> {
     queries: Vec<Q>,
-    point: Q::Scalar,
+    rot: Rotation,
     _marker: PhantomData<F>,
 }
 
@@ -95,8 +96,8 @@ trait Query<F>: Sized + Copy {
     type Commitment: PartialEq + Copy;
     type Scalar: Clone + Default + Ord + Copy;
 
-    fn get_point(&self) -> Self::Scalar;
-    fn get_eval(&self) -> Self::Scalar;
+    fn get_rot(&self) -> Rotation;
+    fn get_eval(&self, point: Self::Scalar) -> Self::Scalar;
     fn get_commitment(&self) -> Self::Commitment;
 }
 
@@ -104,22 +105,22 @@ fn construct_intermediate_sets<F: FieldExt, I, Q: Query<F>>(queries: I) -> Vec<C
 where
     I: IntoIterator<Item = Q> + Clone,
 {
-    let mut point_query_map: BTreeMap<Q::Scalar, Vec<Q>> = BTreeMap::new();
+    let mut point_query_map: BTreeMap<Rotation, Vec<Q>> = BTreeMap::new();
     for query in queries.clone() {
-        if let Some(queries) = point_query_map.get_mut(&query.get_point()) {
+        if let Some(queries) = point_query_map.get_mut(&query.get_rot()) {
             queries.push(query);
         } else {
-            point_query_map.insert(query.get_point(), vec![query]);
+            point_query_map.insert(query.get_rot(), vec![query]);
         }
     }
 
     point_query_map
         .keys()
-        .map(|point| {
-            let queries = point_query_map.get(point).unwrap();
+        .map(|rot| {
+            let queries = point_query_map.get(rot).unwrap();
             CommitmentData {
                 queries: queries.clone(),
-                point: *point,
+                rot: rot.clone(),
                 _marker: PhantomData,
             }
         })
@@ -180,7 +181,8 @@ fn test_multiopen() {
     transcript.write_point(p4).unwrap();
 
     let z0: ChallengeZ<_> = transcript.squeeze_challenge_scalar();
-    let z1: ChallengeZ<_> = transcript.squeeze_challenge_scalar();
+    let domain = EvaluationDomain::new(2, params.k);
+    let z1 = domain.rotate_omega(z0.deref().clone(), Rotation::next());
 
     let e01 = eval_polynomial(&p1_x, *z0);
     transcript.write_scalar(e01).unwrap();
@@ -191,38 +193,38 @@ fn test_multiopen() {
     let e04 = eval_polynomial(&p4_x, *z0);
     transcript.write_scalar(e04).unwrap();
 
-    let e13 = eval_polynomial(&p3_x, *z1);
+    let e13 = eval_polynomial::<Fr>(&p3_x, z1);
     transcript.write_scalar(e13).unwrap();
-    let e14 = eval_polynomial(&p4_x, *z1);
+    let e14 = eval_polynomial::<Fr>(&p4_x, z1);
     transcript.write_scalar(e14).unwrap();
 
     let q0 = ProverQuery {
         poly: &p1_x,
-        point: *z0,
+        rot: Rotation::cur(),
     };
     let q1 = ProverQuery {
         poly: &p2_x,
-        point: *z0,
+        rot: Rotation::cur(),
     };
     let q2 = ProverQuery {
         poly: &p3_x,
-        point: *z0,
+        rot: Rotation::cur(),
     };
     let q3 = ProverQuery {
         poly: &p4_x,
-        point: *z0,
+        rot: Rotation::cur(),
     };
     let q4 = ProverQuery {
         poly: &p3_x,
-        point: *z1,
+        rot: Rotation::next(),
     };
     let q5 = ProverQuery {
         poly: &p4_x,
-        point: *z1,
+        rot: Rotation::next(),
     };
 
     let queries: Vec<ProverQuery<G1Affine>> = vec![q0, q1, q2, q3, q4, q5];
-    create_proof(&params, &mut transcript, queries).unwrap();
+    create_proof(&params, &domain, z0.deref().clone(), &mut transcript, queries).unwrap();
     let proof = transcript.finalize();
 
     // verifier
@@ -234,7 +236,8 @@ fn test_multiopen() {
     let p4 = &transcript.read_point().unwrap();
 
     let z0: ChallengeZ<_> = transcript.squeeze_challenge_scalar();
-    let z1: ChallengeZ<_> = transcript.squeeze_challenge_scalar();
+    let r0 = Rotation::cur();
+    let r1 = Rotation::next();
 
     let e01 = transcript.read_scalar().unwrap();
     let e02 = transcript.read_scalar().unwrap();
@@ -243,15 +246,15 @@ fn test_multiopen() {
     let e13 = transcript.read_scalar().unwrap();
     let e14 = transcript.read_scalar().unwrap();
 
-    let q0 = VerifierQuery::new_commitment(p1, *z0, e01);
-    let q1 = VerifierQuery::new_commitment(p2, *z0, e02);
-    let q2 = VerifierQuery::new_commitment(p3, *z0, e03);
-    let q3 = VerifierQuery::new_commitment(p4, *z0, e04);
-    let q4 = VerifierQuery::new_commitment(p3, *z1, e13);
-    let q5 = VerifierQuery::new_commitment(p4, *z1, e14);
+    let q0 = VerifierQuery::new_commitment(p1, r0, e01);
+    let q1 = VerifierQuery::new_commitment(p2, r0, e02);
+    let q2 = VerifierQuery::new_commitment(p3, r0, e03);
+    let q3 = VerifierQuery::new_commitment(p4, r0, e04);
+    let q4 = VerifierQuery::new_commitment(p3, r1, e13);
+    let q5 = VerifierQuery::new_commitment(p4, r1, e14);
 
     let queries: Vec<VerifierQuery<G1Affine>> = vec![q0, q1, q2, q3, q4, q5];
     assert!(bool::from(
-        verify_proof(&params_verifier, &mut transcript, queries).unwrap()
+        verify_proof(&params_verifier, &domain, z0.deref().clone(), &mut transcript, queries).unwrap()
     ));
 }

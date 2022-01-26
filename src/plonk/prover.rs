@@ -563,7 +563,7 @@ pub fn create_proof<
                         .instance_queries
                         .iter()
                         .map(move |&(column, at)| ProverQuery {
-                            point: domain.rotate_omega(*x, at),
+                            rot: at,
                             poly: &instance.instance_polys[column.index()],
                         }),
                 )
@@ -573,7 +573,7 @@ pub fn create_proof<
                         .advice_queries
                         .iter()
                         .map(move |&(column, at)| ProverQuery {
-                            point: domain.rotate_omega(*x, at),
+                            rot: at,
                             poly: &advice.advice_polys[column.index()],
                         }),
                 )
@@ -586,7 +586,7 @@ pub fn create_proof<
                 .fixed_queries
                 .iter()
                 .map(|&(column, at)| ProverQuery {
-                    point: domain.rotate_omega(*x, at),
+                    rot: at,
                     poly: &pk.fixed_polys[column.index()],
                 }),
         )
@@ -594,5 +594,6 @@ pub fn create_proof<
         // We query the h(X) polynomial at x
         .chain(vanishing.open(x));
 
-    multiopen::create_proof(params, transcript, instances).map_err(|_| Error::Opening)
+    multiopen::create_proof(params, pk.vk.get_domain(), *x, transcript, instances)
+        .map_err(|_| Error::Opening)
 }

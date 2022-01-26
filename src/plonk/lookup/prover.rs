@@ -529,36 +529,36 @@ impl<C: CurveAffine> Constructed<C> {
 impl<C: CurveAffine> Evaluated<C> {
     pub(in crate::plonk) fn open<'a>(
         &'a self,
-        pk: &'a ProvingKey<C>,
-        x: ChallengeX<C>,
+        _pk: &'a ProvingKey<C>,
+        _x: ChallengeX<C>,
     ) -> impl Iterator<Item = ProverQuery<'a, C>> + Clone {
-        let x_inv = pk.vk.domain.rotate_omega(*x, Rotation::prev());
-        let x_next = pk.vk.domain.rotate_omega(*x, Rotation::next());
+        // let x_inv = pk.vk.domain.rotate_omega(*x, Rotation::prev());
+        // let x_next = pk.vk.domain.rotate_omega(*x, Rotation::next());
 
         iter::empty()
             // Open lookup product commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                rot: Rotation::cur(),
                 poly: &self.constructed.product_poly,
             }))
             // Open lookup input commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                rot: Rotation::cur(),
                 poly: &self.constructed.permuted_input_poly,
             }))
             // Open lookup table commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                rot: Rotation::cur(),
                 poly: &self.constructed.permuted_table_poly,
             }))
             // Open lookup input commitments at x_inv
             .chain(Some(ProverQuery {
-                point: x_inv,
+                rot: Rotation::prev(),
                 poly: &self.constructed.permuted_input_poly,
             }))
             // Open lookup product commitments at x_next
             .chain(Some(ProverQuery {
-                point: x_next,
+                rot: Rotation::next(),
                 poly: &self.constructed.product_poly,
             }))
     }

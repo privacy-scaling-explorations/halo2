@@ -2,6 +2,7 @@ use group::Curve;
 use std::iter;
 
 use super::Argument;
+use crate::poly::Rotation;
 use crate::{
     arithmetic::{eval_polynomial, BaseExt, CurveAffine},
     plonk::{ChallengeX, ChallengeY, Error},
@@ -125,11 +126,11 @@ impl<C: CurveAffine> Evaluated<C> {
     ) -> impl Iterator<Item = ProverQuery<'_, C>> + Clone {
         iter::empty()
             .chain(Some(ProverQuery {
-                point: *x,
+                rot: Rotation::cur(),
                 poly: &self.h_poly,
             }))
             .chain(Some(ProverQuery {
-                point: *x,
+                rot: Rotation::cur(),
                 poly: &self.committed.random_poly,
             }))
     }

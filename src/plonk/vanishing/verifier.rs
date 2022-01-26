@@ -2,6 +2,7 @@ use std::iter;
 
 use ff::Field;
 
+use crate::poly::Rotation;
 use crate::{
     arithmetic::CurveAffine,
     plonk::{Error, VerifyingKey},
@@ -120,12 +121,14 @@ impl<C: CurveAffine> Evaluated<C> {
         iter::empty()
             .chain(Some(VerifierQuery::new_msm(
                 &self.h_commitment,
-                *x,
+                // *x,
+                Rotation::cur(),
                 self.expected_h_eval,
             )))
             .chain(Some(VerifierQuery::new_commitment(
                 &self.random_poly_commitment,
-                *x,
+                // *x,
+                Rotation::cur(),
                 self.random_eval,
             )))
     }

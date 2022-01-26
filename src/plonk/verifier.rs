@@ -247,7 +247,8 @@ pub fn verify_proof<
                         move |(query_index, &(column, at))| {
                             VerifierQuery::new_commitment(
                                 &instance_commitments[column.index()],
-                                vk.domain.rotate_omega(*x, at),
+                                // vk.domain.rotate_omega(*x, at),
+                                at,
                                 instance_evals[query_index],
                             )
                         },
@@ -256,7 +257,8 @@ pub fn verify_proof<
                         move |(query_index, &(column, at))| {
                             VerifierQuery::new_commitment(
                                 &advice_commitments[column.index()],
-                                vk.domain.rotate_omega(*x, at),
+                                // vk.domain.rotate_omega(*x, at),
+                                at,
                                 advice_evals[query_index],
                             )
                         },
@@ -278,7 +280,8 @@ pub fn verify_proof<
                 .map(|(query_index, &(column, at))| {
                     VerifierQuery::new_commitment(
                         &vk.fixed_commitments[column.index()],
-                        vk.domain.rotate_omega(*x, at),
+                        // vk.domain.rotate_omega(*x, at),
+                        at,
                         fixed_evals[query_index],
                     )
                 }),
@@ -288,5 +291,6 @@ pub fn verify_proof<
 
     // We are now convinced the circuit is satisfied so long as the
     // polynomial commitments open to the correct values.
-    multiopen::verify_proof(params, transcript, queries).map_err(|_| Error::Opening)
+    multiopen::verify_proof(params, vk.get_domain(), *x, transcript, queries)
+        .map_err(|_| Error::Opening)
 }

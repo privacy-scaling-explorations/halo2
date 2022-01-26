@@ -5,6 +5,7 @@ use super::{construct_intermediate_sets, ChallengeV, ProverQuery, Query};
 use crate::arithmetic::{eval_polynomial, kate_division, CurveAffine};
 use crate::transcript::{EncodedChallenge, TranscriptWrite};
 
+use crate::poly::{EvaluationDomain, Rotation};
 use ff::Field;
 use group::Curve;
 use std::io;
@@ -20,6 +21,8 @@ struct CommitmentData<C: CurveAffine> {
 /// Create a multi-opening proof
 pub fn create_proof<'a, I, C: CurveAffine, E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
     params: &Params<C>,
+    domain: &EvaluationDomain<C::ScalarExt>,
+    x: C::ScalarExt,
     transcript: &mut T,
     queries: I,
 ) -> io::Result<()>
@@ -37,12 +40,13 @@ where
     for commitment_at_a_point in commitment_data.iter() {
         let mut poly_batch = zero();
         let mut eval_batch = C::Scalar::zero();
-        let z = commitment_at_a_point.point;
+        let rot = commitment_at_a_point.rot;
+        let z = domain.rotate_omega(x, rot);
         for query in commitment_at_a_point.queries.iter() {
-            assert_eq!(query.get_point(), z);
+            assert_eq!(query.get_rot(), rot);
 
             let poly = query.get_commitment().poly;
-            let eval = query.get_eval();
+            let eval = query.get_eval(z);
             poly_batch = poly_batch * *v + poly;
             eval_batch = eval_batch * *v + eval;
         }
@@ -74,11 +78,11 @@ impl<'a, C: CurveAffine> Query<C::Scalar> for ProverQuery<'a, C> {
     type Commitment = PolynomialPointer<'a, C>;
     type Scalar = C::Scalar;
 
-    fn get_point(&self) -> C::Scalar {
-        self.point
+    fn get_rot(&self) -> Rotation {
+        self.rot
     }
-    fn get_eval(&self) -> C::Scalar {
-        eval_polynomial(self.poly, self.get_point())
+    fn get_eval(&self, point: C::Scalar) -> C::Scalar {
+        eval_polynomial(self.poly, point)
     }
     fn get_commitment(&self) -> Self::Commitment {
         PolynomialPointer { poly: self.poly }
