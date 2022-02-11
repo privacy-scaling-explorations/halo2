@@ -35,5 +35,5 @@ jobs:
            -X POST \
            -H "Accept: application/vnd.github.v3+json" \
            -u ${{ env.GH_USER }}:${{ env.TOKEN }} \
-           https://api.github.com/repos/AronisAt79/zkevm-circuits/actions/workflows/ProverBenchFromHalo2.yml/dispatches \
+           https://api.github.com/repos/appliedzkp/zkevm-circuits/actions/workflows/ProverBenchFromHalo2.yml/dispatches \
            -d "{\"ref\":\"main\",\"inputs\":{\"halo2pr\":\"${{ env.PR_NUMBER }}\",\"revision\":\"${{ env.REVISION }}\",\"event-type\":\"halo2_wfdispatch\",\"ghuser\": \"${{ env.GH_USER }}\"}}"
