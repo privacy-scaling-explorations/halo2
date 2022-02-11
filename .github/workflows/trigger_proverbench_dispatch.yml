@@ -11,7 +11,7 @@ jobs:
       TOKEN: ${{ secrets.PAT2 }}
       #REVISION: ${{ github.sha }}
       REVISION: ${{ github.event.pull_request.head.sha }}
-      BRANCH: ${GITHUB_REF#refs/heads/})
+      BRANCH: ${{ GITHUB_REF#refs/heads/})
       REPO: ${{ github.event.repository.name }}
       PR_NUMBER: ${{ github.event.number }}
     steps:
