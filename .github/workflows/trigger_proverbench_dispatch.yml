@@ -9,7 +9,6 @@ jobs:
     env:
       GH_USER: ${{ github.actor }}
       TOKEN: ${{ secrets.PAT2 }}
-      #REVISION: ${{ github.sha }}
       REVISION: ${{ github.event.pull_request.head.sha }}
       BRANCH: ${{ GITHUB_REF#refs/heads/})
       REPO: ${{ github.event.repository.name }}
