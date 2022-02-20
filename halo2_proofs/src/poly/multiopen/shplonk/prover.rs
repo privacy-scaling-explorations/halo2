@@ -1,5 +1,6 @@
 use super::{
-    construct_intermediate_sets, ChallengeU, ChallengeV, ChallengeY, Commitment, Query, RotationSet,
+    construct_intermediate_sets, ChallengeU, ChallengeV, ChallengeY, Commitment, IntermediateSets,
+    Query, RotationSet,
 };
 use crate::arithmetic::{
     eval_polynomial, kate_division, lagrange_interpolate, vanishing_polynomial, CurveAffine,
@@ -28,27 +29,10 @@ struct CommitmentExtension<'a, C: CurveAffine> {
     low_degree_equivalent: Polynomial<C::Scalar, Coeff>,
 }
 
-impl<'a, C: CurveAffine> Commitment<C::Scalar, PolynomialPointer<'a, C>> {
-    fn extend(&self, n: u64, points: Vec<C::Scalar>) -> CommitmentExtension<'a, C> {
-        let mut poly = lagrange_interpolate(&points[..], &self.evals()[..]);
-        poly.resize(n as usize, C::Scalar::zero());
-
-        let low_degree_equivalent = Polynomial {
-            values: poly,
-            _marker: PhantomData,
-        };
-
-        CommitmentExtension {
-            commitment: self.clone(),
-            low_degree_equivalent,
-        }
-    }
-}
-
 impl<'a, C: CurveAffine> CommitmentExtension<'a, C> {
     fn linearisation_contribution(&self, u: C::Scalar) -> Polynomial<C::Scalar, Coeff> {
         let p_x = self.commitment.get().poly;
-        let r_eval = eval_polynomial(&self.low_degree_equivalent.values[..], u);
+        let r_eval = eval_polynomial(&self.low_degree_equivalent.values, u);
         p_x - r_eval
     }
 
@@ -65,11 +49,31 @@ struct RotationSetExtension<'a, C: CurveAffine> {
 }
 
 impl<'a, C: CurveAffine> RotationSet<C::Scalar, PolynomialPointer<'a, C>> {
-    fn extend(&self, commitments: Vec<CommitmentExtension<'a, C>>) -> RotationSetExtension<'a, C> {
+    fn extend(&self, super_point_set: &[C::Scalar]) -> RotationSetExtension<'a, C> {
+        let points = self.points(super_point_set);
+        let diffs = self.diffs(super_point_set);
+        let commitments = self
+            .commitments
+            .iter()
+            .map(|commitment| {
+                let mut poly = lagrange_interpolate(&points, &commitment.evals());
+                poly.resize(commitment.get().poly.len(), C::Scalar::zero());
+                let low_degree_equivalent = Polynomial {
+                    values: poly,
+                    _marker: PhantomData,
+                };
+
+                CommitmentExtension {
+                    commitment: commitment.clone(),
+                    low_degree_equivalent,
+                }
+            })
+            .collect();
+
         RotationSetExtension {
             commitments,
-            points: self.points.clone(),
-            diffs: self.diffs.clone(),
+            points,
+            diffs,
         }
     }
 }
@@ -109,12 +113,10 @@ where
             let n_x: Polynomial<C::Scalar, Coeff> =
                 numerators.iter().fold(zero(), |acc, q_x| (acc * *y) + q_x);
 
-            let points = &rotation_set.points[..];
-
             // quotient contribution of this evaluation set is
             // Q_i(X) = N_i(X) / Z_i(X) where
             // Z_i(X) = (x - r_i_0) * (x - r_i_1) * ...
-            let mut poly = div_by_vanishing(n_x, points);
+            let mut poly = div_by_vanishing(n_x, &rotation_set.points);
             poly.resize(params.n as usize, C::Scalar::zero());
 
             Polynomial {
@@ -123,24 +125,14 @@ where
             }
         };
 
-    let intermediate_sets = construct_intermediate_sets(queries);
-    let (rotation_sets, super_point_set) = (
-        intermediate_sets.rotation_sets,
-        intermediate_sets.super_point_set,
-    );
+    let IntermediateSets {
+        rotation_sets,
+        super_point_set,
+    } = construct_intermediate_sets(queries);
 
     let rotation_sets: Vec<RotationSetExtension<C>> = rotation_sets
         .iter()
-        .map(|rotation_set| {
-            let commitments: Vec<CommitmentExtension<C>> = rotation_set
-                .commitments
-                .iter()
-                .map(|commitment_data| {
-                    commitment_data.extend(params.n, rotation_set.points.clone())
-                })
-                .collect();
-            rotation_set.extend(commitments)
-        })
+        .map(|rotation_set| rotation_set.extend(&super_point_set))
         .collect();
 
     let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
@@ -156,14 +148,14 @@ where
     transcript.write_point(h)?;
     let u: ChallengeU<_> = transcript.squeeze_challenge_scalar();
 
-    let zt_x = vanishing_polynomial(&super_point_set[..]);
-    let zt_eval = eval_polynomial(&zt_x[..], *u);
+    let zt_x = vanishing_polynomial(&super_point_set);
+    let zt_eval = eval_polynomial(&zt_x, *u);
 
     let linearisation_contribution =
         |rotation_set: RotationSetExtension<C>| -> Polynomial<C::Scalar, Coeff> {
             // calculate difference vanishing polynomial evaluation
-            let z_diff = vanishing_polynomial(&rotation_set.diffs[..]);
-            let z_i = eval_polynomial(&z_diff[..], *u);
+            let z_diff = vanishing_polynomial(&rotation_set.diffs);
+            let z_i = eval_polynomial(&z_diff, *u);
 
             // inner linearisation contibutions are
             // [P_i_0(X) - r_i_0, P_i_1(X) - r_i_1, ... ] where
@@ -201,7 +193,7 @@ where
 
     // sanity check
     {
-        let must_be_zero = eval_polynomial(&l_x.values[..], *u);
+        let must_be_zero = eval_polynomial(&l_x.values, *u);
         assert_eq!(must_be_zero, C::Scalar::zero());
     }
 

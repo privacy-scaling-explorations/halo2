@@ -38,24 +38,22 @@ fn construct_intermediate_sets<F: FieldExt, I, Q: Query<F>>(queries: I) -> Vec<C
 where
     I: IntoIterator<Item = Q> + Clone,
 {
-    let mut point_query_map: BTreeMap<F, Vec<Q>> = BTreeMap::new();
-    for query in queries.clone() {
-        if let Some(queries) = point_query_map.get_mut(&query.get_point()) {
-            queries.push(query);
+    let mut commitment_map: Vec<CommitmentData<F, Q>> = vec![];
+
+    for query in queries {
+        if let Some(pos) = commitment_map
+            .iter()
+            .position(|commitment_data| commitment_data.point == query.get_point())
+        {
+            commitment_map[pos].queries.push(query)
         } else {
-            point_query_map.insert(query.get_point(), vec![query]);
+            commitment_map.push(CommitmentData {
+                point: query.get_point(),
+                queries: vec![query],
+                _marker: PhantomData,
+            });
         }
     }
 
-    point_query_map
-        .keys()
-        .map(|point| {
-            let queries = point_query_map.get(point).unwrap();
-            CommitmentData {
-                queries: queries.clone(),
-                point: *point,
-                _marker: PhantomData,
-            }
-        })
-        .collect()
+    commitment_map
 }

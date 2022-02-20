@@ -47,21 +47,24 @@ where
     let u: ChallengeU<_> = transcript.squeeze_challenge_scalar();
     let h2 = transcript.read_point().map_err(|_| Error::SamplingError)?;
 
-    let zt_x = vanishing_polynomial(&super_point_set[..]);
-    let zt_eval = eval_polynomial(&zt_x[..], *u);
+    let zt_x = vanishing_polynomial(&super_point_set);
+    let zt_eval = eval_polynomial(&zt_x, *u);
 
     let mut outer_msm: PreMSM<C> = PreMSM::new();
 
     for rotation_set in rotation_sets.iter() {
-        let z_diff = vanishing_polynomial(&rotation_set.diffs[..]);
-        let z_i = eval_polynomial(&z_diff[..], *u);
+        let z_diff = vanishing_polynomial(&rotation_set.diffs(&super_point_set));
+        let z_i = eval_polynomial(&z_diff, *u);
 
         let mut inner_msm: ProjectiveMSM<C> = ProjectiveMSM::new();
         for commitment_data in rotation_set.commitments.iter() {
             // calculate low degree equivalent
-            let r_x = lagrange_interpolate(&rotation_set.points[..], &commitment_data.evals()[..]);
+            let r_x = lagrange_interpolate(
+                &rotation_set.points(&super_point_set),
+                &commitment_data.evals(),
+            );
             // soft commit to low degree equivalent
-            let r_eval = eval_polynomial(&r_x[..], *u);
+            let r_eval = eval_polynomial(&r_x, *u);
             let r = params.g1 * r_eval;
 
             let inner_contrib = match commitment_data.get() {
