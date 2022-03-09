@@ -69,6 +69,8 @@ gadget-traces = ["backtrace"]
 sanity-checks = []
 shplonk = []
 gwc = []
+asm = ["pairing/asm"]
+prefetch = ["pairing/prefetch"]
 
 [lib]
 bench = false

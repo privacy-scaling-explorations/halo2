@@ -18,16 +18,22 @@ use group::{
 
 pub use pairing::arithmetic::*;
 
+const FIELD_NUM_BITS: usize = 254;
+
 fn num_bits(value: usize) -> usize {
     (0usize.leading_zeros() - value.leading_zeros()) as usize
 }
 
+fn div_up(a: usize, b: usize) -> usize {
+    (a + (b - 1)) / b
+}
+
 fn get_wnaf_size_bits(num_bits: usize, w: usize) -> usize {
-    (num_bits + w - 1) / w
+    div_up(num_bits, w)
 }
 
 fn get_wnaf_size(w: usize) -> usize {
-    get_wnaf_size_bits(127, w)
+    get_wnaf_size_bits(div_up(FIELD_NUM_BITS, 2), w)
 }
 
 fn get_num_rounds(c: usize) -> usize {
@@ -38,6 +44,12 @@ fn get_num_buckets(c: usize) -> usize {
     (1 << c) + 1
 }
 
+fn get_max_tree_size(num_points: usize, c: usize) -> usize {
+    num_points * 2 + get_num_buckets(c)
+}
+
+/// Returns the signed digit representation of value with the specified window size.
+/// The result is written to the wnaf slice with the specified stride.
 fn get_wnaf(value: u128, w: usize, num_rounds: usize, wnaf: &mut [u32], stride: usize) {
     fn get_bits_at(v: u128, pos: usize, num: usize) -> usize {
         ((v >> pos) & ((1 << num) - 1)) as usize
@@ -58,6 +70,7 @@ fn get_wnaf(value: u128, w: usize, num_rounds: usize, wnaf: &mut [u32], stride: 
     assert_eq!(borrow, 0);
 }
 
+/// Returns the best bucket width for the given number of points.
 fn get_best_c(num_points: usize) -> usize {
     if num_points >= 262144 {
         15
@@ -73,14 +86,26 @@ fn get_best_c(num_points: usize) -> usize {
 }
 
 /// MultiExp
-#[derive(Debug, Default)]
-pub struct MultiExp<'a, C: CurveAffine> {
+#[derive(Clone, Debug, Default)]
+pub struct MultiExp<C: CurveAffine> {
     /// The bases
     bases: Vec<C>,
+}
+
+/// MultiExp context object
+#[derive(Clone, Debug, Default)]
+pub struct MultiExpContext<C: CurveAffine> {
     /// Memory to store the points in the addition tree
     points: Vec<C>,
     /// Memory to store wnafs
     wnafs: Vec<u32>,
+    /// Memory split up between rounds
+    rounds: SharedRoundData,
+}
+
+/// SharedRoundData
+#[derive(Clone, Debug, Default)]
+struct SharedRoundData {
     /// Memory to store bucket sizes
     bucket_sizes: Vec<usize>,
     /// Memory to store bucket offsets
@@ -89,12 +114,10 @@ pub struct MultiExp<'a, C: CurveAffine> {
     point_data: Vec<u32>,
     /// Memory to store the output indices
     output_indices: Vec<u32>,
-    /// Memory to store the base positions
+    /// Memory to store the base positions (on the first level)
     base_positions: Vec<u32>,
     /// Memory to store the scatter maps
     scatter_map: Vec<ScatterData>,
-    /// Data used in the different rounds
-    rounds: Vec<RoundData<'a>>,
 }
 
 /// RoundData
@@ -115,7 +138,7 @@ struct RoundData<'a> {
     /// The output index in the point array for each pair addition
     pub output_indices: &'a mut [u32],
     /// The point to use on the first level in the addition tree
-    pub point_locations: &'a mut [u32],
+    pub base_positions: &'a mut [u32],
     /// List of points that are scattered to the addition tree
     pub scatter_map: &'a mut [ScatterData],
     /// The length of scatter_map
@@ -131,7 +154,7 @@ struct ScatterData {
     pub point_data: u32,
 }
 
-impl<'a, C: CurveAffine> MultiExp<'a, C> {
+impl<C: CurveAffine> MultiExp<C> {
     /// Create a new MultiExp instance with the specified bases
     pub fn new(bases: &[C]) -> Self {
         let mut endo_bases = vec![C::identity(); bases.len() * 2];
@@ -139,7 +162,7 @@ impl<'a, C: CurveAffine> MultiExp<'a, C> {
         // Generate the endomorphism bases
         let num_threads = multicore::current_num_threads();
         multicore::scope(|scope| {
-            let num_points_per_thread = (bases.len() + num_threads - 1) / num_threads;
+            let num_points_per_thread = div_up(bases.len(), num_threads);
             for (endo_bases, bases) in endo_bases
                 .chunks_mut(num_points_per_thread * 2)
                 .zip(bases.chunks(num_points_per_thread))
@@ -153,139 +176,36 @@ impl<'a, C: CurveAffine> MultiExp<'a, C> {
             }
         });
 
-        Self {
-            bases: endo_bases,
-            ..Default::default()
-        }
-    }
-
-    /// Allocate memory for the msm evalution
-    fn allocate(&mut self, num_points: usize, c: usize) {
-        let num_points = num_points * 2;
-        let num_buckets = get_num_buckets(c);
-        let num_rounds = get_num_rounds(c);
-        let tree_size = num_points * 2 + num_buckets;
-        let num_points_all_rounds = num_rounds * num_points;
-        let num_buckets_all_rounds = num_rounds * num_buckets;
-        let tree_size_all_rounds = num_rounds * tree_size;
-
-        // Allocate memory when necessary
-        if self.points.len() < tree_size {
-            self.points.resize(tree_size, C::generator());
-        }
-        if self.wnafs.len() < num_points_all_rounds {
-            self.wnafs.resize(num_points_all_rounds, 0u32);
-        }
-        if self.bucket_sizes.len() < num_buckets_all_rounds {
-            self.bucket_sizes.resize(num_buckets_all_rounds, 0usize);
-        }
-        if self.bucket_offsets.len() < num_buckets_all_rounds {
-            self.bucket_offsets.resize(num_buckets_all_rounds, 0usize);
-        }
-        if self.point_data.len() < num_points_all_rounds {
-            self.point_data.resize(num_points_all_rounds, 0u32);
-        }
-        if self.output_indices.len() < tree_size_all_rounds {
-            self.output_indices.resize(tree_size_all_rounds, 0u32);
-        }
-        if self.base_positions.len() < num_points_all_rounds {
-            self.base_positions.resize(num_points_all_rounds, 0u32);
-        }
-        if self.scatter_map.len() < num_buckets_all_rounds {
-            self.scatter_map
-                .resize(num_buckets_all_rounds, ScatterData::default());
-        }
-
-        // Use the allocated memory above to init the memory used for each round.
-        // This way the we don't need to reallocate memory for each msm with
-        // a different configuration (different number of points or different bucket width)
-        self.rounds = Vec::with_capacity(num_rounds);
-        for round_idx in 0..num_rounds {
-            #[allow(unsafe_code)]
-            let bucket_sizes = unsafe {
-                slice::from_raw_parts_mut(
-                    self.bucket_sizes
-                        .as_mut_ptr()
-                        .offset((round_idx * num_buckets) as isize),
-                    num_buckets,
-                )
-            };
-            #[allow(unsafe_code)]
-            let bucket_offsets = unsafe {
-                slice::from_raw_parts_mut(
-                    self.bucket_offsets
-                        .as_mut_ptr()
-                        .offset((round_idx * num_buckets) as isize),
-                    num_buckets,
-                )
-            };
-            #[allow(unsafe_code)]
-            let point_data = unsafe {
-                slice::from_raw_parts_mut(
-                    self.point_data
-                        .as_mut_ptr()
-                        .offset((round_idx * num_points) as isize),
-                    num_points,
-                )
-            };
-            #[allow(unsafe_code)]
-            let output_indices = unsafe {
-                slice::from_raw_parts_mut(
-                    self.output_indices
-                        .as_mut_ptr()
-                        .offset((round_idx * tree_size) as isize),
-                    tree_size,
-                )
-            };
-            #[allow(unsafe_code)]
-            let point_locations = unsafe {
-                slice::from_raw_parts_mut(
-                    self.base_positions
-                        .as_mut_ptr()
-                        .offset((round_idx * num_points) as isize),
-                    num_points,
-                )
-            };
-            #[allow(unsafe_code)]
-            let scatter_map = unsafe {
-                slice::from_raw_parts_mut(
-                    self.scatter_map
-                        .as_mut_ptr()
-                        .offset((round_idx * num_buckets) as isize),
-                    num_buckets,
-                )
-            };
-            self.rounds.push(RoundData {
-                num_levels: 0,
-                level_sizes: vec![],
-                level_offset: vec![],
-                bucket_sizes,
-                bucket_offsets,
-                point_data,
-                output_indices,
-                point_locations,
-                scatter_map,
-                scatter_map_len: 0,
-            });
-        }
+        Self { bases: endo_bases }
     }
 
     /// Performs a multi-exponentiation operation.
-    pub fn allocate_for(&mut self, num_points: usize, c: usize) {
-        self.allocate(num_points, c);
+    /// Set complete to true if the bases are not guaranteed linearly independent.
+    pub fn evaluate(
+        &self,
+        ctx: &mut MultiExpContext<C>,
+        coeffs: &[C::Scalar],
+        complete: bool,
+    ) -> C::Curve {
+        self.evaluate_with(ctx, coeffs, complete, get_best_c(coeffs.len()))
     }
 
-    /// Performs a multi-exponentiation operation.
-    pub fn evaluate(&mut self, coeffs: &[C::Scalar]) -> C::Curve {
-        self.evaluate_with(coeffs, get_best_c(coeffs.len()))
-    }
-
-    /// Performs a multi-exponentiation operation.
-    pub fn evaluate_with(&mut self, coeffs: &[C::Scalar], c: usize) -> C::Curve {
+    /// Performs a multi-exponentiation operation with the given bucket width.
+    /// Set complete to true if the bases are not guaranteed linearly independent.
+    pub fn evaluate_with(
+        &self,
+        ctx: &mut MultiExpContext<C>,
+        coeffs: &[C::Scalar],
+        complete: bool,
+        c: usize,
+    ) -> C::Curve {
         assert!(coeffs.len() * 2 <= self.bases.len());
 
         // Allocate more memory if required
-        self.allocate(coeffs.len(), c);
+        ctx.allocate(coeffs.len(), c);
+
+        // Get the data for each round
+        let mut rounds = ctx.rounds.get_rounds(coeffs.len(), c);
 
         // Get the bases for the coefficients
         let bases = &self.bases[..coeffs.len() * 2];
@@ -297,45 +217,144 @@ impl<'a, C: CurveAffine> MultiExp<'a, C> {
             let num_rounds = get_num_rounds(c);
 
             // Prepare WNAFs of all coefficients for all rounds
-            calculate_wnafs::<C>(coeffs, &mut self.wnafs, c);
+            calculate_wnafs::<C>(coeffs, &mut ctx.wnafs, c);
             // Sort WNAFs into buckets for all rounds
-            sort::<C>(
-                &mut self.wnafs[0..num_rounds * num_points],
-                &mut self.rounds,
-                c,
-            );
+            sort::<C>(&mut ctx.wnafs[0..num_rounds * num_points], &mut rounds, c);
             // Calculate addition trees for all rounds
-            create_addition_tree(&mut self.rounds, c);
+            create_addition_trees(&mut rounds, c);
 
             // Now process each round individually
             let mut partials = vec![C::Curve::identity(); num_rounds];
             for (round_idx, acc) in partials.iter_mut().enumerate() {
                 // Scatter the odd points in the odd length buckets to the addition tree
-                do_point_scatter::<C>(&self.rounds[round_idx], &bases, &mut self.points);
+                do_point_scatter::<C>(&rounds[round_idx], bases, &mut ctx.points);
                 // Do all bucket additions
-                do_batch_additions::<C>(&self.rounds[round_idx], &bases, &mut self.points);
+                do_batch_additions::<C>(&rounds[round_idx], bases, &mut ctx.points, complete);
                 // Get the final result of the round
-                *acc = calculate_round_result::<C>(&self.rounds[round_idx], &mut self.points, c);
+                *acc = accumulate_buckets::<C>(&rounds[round_idx], &mut ctx.points, c);
             }
 
             // Accumulate round results
-            let mut res = partials[num_rounds - 1];
-            for i in (0..num_rounds - 1).rev() {
-                for _ in 0..w {
-                    res = res.double();
-                }
-                res = res + partials[i];
-            }
+            let res =
+                partials
+                    .iter()
+                    .rev()
+                    .skip(1)
+                    .fold(partials[num_rounds - 1], |acc, partial| {
+                        let mut res = acc;
+                        for _ in 0..w {
+                            res = res.double();
+                        }
+                        res + partial
+                    });
             stop_measure(start);
+
             res
         } else {
+            // Just do a naive msm
             let mut acc = C::Curve::identity();
-            for idx in 0..coeffs.len() {
-                acc += bases[idx * 2] * coeffs[idx];
+            for (idx, coeff) in coeffs.iter().enumerate() {
+                // Skip over endomorphism bases
+                acc += bases[idx * 2] * coeff;
             }
             stop_measure(start);
             acc
         }
+    }
+}
+
+impl<C: CurveAffine> MultiExpContext<C> {
+    /// Allocate memory for the msm evalution
+    fn allocate(&mut self, num_points: usize, c: usize) {
+        let num_points = num_points * 2;
+        let num_buckets = get_num_buckets(c);
+        let num_rounds = get_num_rounds(c);
+        let tree_size = get_max_tree_size(num_points, c);
+        let num_points_total = num_rounds * num_points;
+        let num_buckets_total = num_rounds * num_buckets;
+        let tree_size_total = num_rounds * tree_size;
+
+        // Allocate memory when necessary
+        if self.points.len() < tree_size {
+            self.points.resize(tree_size, C::identity());
+        }
+        if self.wnafs.len() < num_points_total {
+            self.wnafs.resize(num_points_total, 0u32);
+        }
+        if self.rounds.bucket_sizes.len() < num_buckets_total {
+            self.rounds.bucket_sizes.resize(num_buckets_total, 0usize);
+        }
+        if self.rounds.bucket_offsets.len() < num_buckets_total {
+            self.rounds.bucket_offsets.resize(num_buckets_total, 0usize);
+        }
+        if self.rounds.point_data.len() < num_points_total {
+            self.rounds.point_data.resize(num_points_total, 0u32);
+        }
+        if self.rounds.output_indices.len() < tree_size_total {
+            self.rounds.output_indices.resize(tree_size_total, 0u32);
+        }
+        if self.rounds.base_positions.len() < num_points_total {
+            self.rounds.base_positions.resize(num_points_total, 0u32);
+        }
+        if self.rounds.scatter_map.len() < num_buckets_total {
+            self.rounds
+                .scatter_map
+                .resize(num_buckets_total, ScatterData::default());
+        }
+    }
+
+    /// Performs a multi-exponentiation operation.
+    pub fn allocate_for(&mut self, num_points: usize, c: usize) {
+        self.allocate(num_points, c);
+    }
+}
+
+impl SharedRoundData {
+    fn get_rounds(&mut self, num_points: usize, c: usize) -> Vec<RoundData> {
+        let num_points = num_points * 2;
+        let num_buckets = get_num_buckets(c);
+        let num_rounds = get_num_rounds(c);
+        let tree_size = num_points * 2 + num_buckets;
+
+        let mut bucket_sizes_rest = self.bucket_sizes.as_mut_slice();
+        let mut bucket_offsets_rest = self.bucket_offsets.as_mut_slice();
+        let mut point_data_rest = self.point_data.as_mut_slice();
+        let mut output_indices_rest = self.output_indices.as_mut_slice();
+        let mut base_positions_rest = self.base_positions.as_mut_slice();
+        let mut scatter_map_rest = self.scatter_map.as_mut_slice();
+
+        // Use the allocated memory above to init the memory used for each round.
+        // This way the we don't need to reallocate memory for each msm with
+        // a different configuration (different number of points or different bucket width)
+        let mut rounds: Vec<RoundData> = Vec::with_capacity(num_rounds);
+        for _ in 0..num_rounds {
+            let (bucket_sizes, rest) = bucket_sizes_rest.split_at_mut(num_buckets);
+            bucket_sizes_rest = rest;
+            let (bucket_offsets, rest) = bucket_offsets_rest.split_at_mut(num_buckets);
+            bucket_offsets_rest = rest;
+            let (point_data, rest) = point_data_rest.split_at_mut(num_points);
+            point_data_rest = rest;
+            let (output_indices, rest) = output_indices_rest.split_at_mut(tree_size);
+            output_indices_rest = rest;
+            let (base_positions, rest) = base_positions_rest.split_at_mut(num_points);
+            base_positions_rest = rest;
+            let (scatter_map, rest) = scatter_map_rest.split_at_mut(num_buckets);
+            scatter_map_rest = rest;
+
+            rounds.push(RoundData {
+                num_levels: 0,
+                level_sizes: vec![],
+                level_offset: vec![],
+                bucket_sizes,
+                bucket_offsets,
+                point_data,
+                output_indices,
+                base_positions,
+                scatter_map,
+                scatter_map_len: 0,
+            });
+        }
+        rounds
     }
 }
 
@@ -352,7 +371,7 @@ impl<T> ThreadBox<T> {
         Self(data.as_mut_ptr(), data.len())
     }
 
-    fn unwrap(&self) -> &mut [T] {
+    fn unwrap(&mut self) -> &mut [T] {
         #[allow(unsafe_code)]
         unsafe {
             slice::from_raw_parts_mut(self.0, self.1)
@@ -366,9 +385,9 @@ fn calculate_wnafs<C: CurveAffine>(coeffs: &[C::Scalar], wnafs: &mut [u32], c: u
     let num_rounds = get_num_rounds(c);
     let w = c + 1;
 
-    let start = start_measure(format!("wnaf {} ({})", coeffs.len(), num_threads), false);
-    let wnafs_box = ThreadBox::from(wnafs);
-    let chunk_size = (coeffs.len() + num_threads - 1) / num_threads;
+    let start = start_measure("calculate wnafs".to_string(), false);
+    let mut wnafs_box = ThreadBox::from(wnafs);
+    let chunk_size = div_up(coeffs.len(), num_threads);
     multicore::scope(|scope| {
         for (thread_idx, coeffs) in coeffs.chunks(chunk_size).enumerate() {
             scope.spawn(move |_| {
@@ -426,7 +445,7 @@ fn sort<C: CurveAffine>(wnafs: &mut [u32], rounds: &mut [RoundData], c: usize) {
     let num_points = wnafs.len() / num_rounds;
 
     // Sort per bucket for each round separately
-    let start = start_measure(format!("radix sort"), false);
+    let start = start_measure("radix sort".to_string(), false);
     multicore::scope(|scope| {
         for (round, wnafs) in rounds.chunks_mut(1).zip(wnafs.chunks_mut(num_points)) {
             scope.spawn(move |_| {
@@ -455,7 +474,7 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
     let mut level_offset = vec![0usize; num_levels];
     let output_indices = &mut round.output_indices;
     let scatter_map = &mut round.scatter_map;
-    let point_locations = &mut round.point_locations;
+    let base_positions = &mut round.base_positions;
     let mut point_idx = bucket_sizes[0];
 
     if !PREPROCESS {
@@ -536,7 +555,7 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
                     if !PREPROCESS {
                         // Just write all points (except the odd length one)
                         let pos = level_offset[level] + level_sizes[level];
-                        point_locations[pos..pos + length]
+                        base_positions[pos..pos + length]
                             .copy_from_slice(&point_data[point_idx..point_idx + length]);
                         point_idx += length + is_level_odd;
                     }
@@ -591,6 +610,7 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
         }
     }
 
+    // Store the tree level data
     round.level_sizes = level_sizes;
     round.level_offset = level_offset;
 }
@@ -600,8 +620,8 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
 /// And so we try to add as many points together on each level of the tree, writing the result of the addition
 /// to a lower level. Each level thus contains independent point additions, with only requiring a single inversion
 /// per level in the tree.
-fn create_addition_tree(rounds: &mut [RoundData], c: usize) {
-    let start = start_measure(format!("create addition trees"), false);
+fn create_addition_trees(rounds: &mut [RoundData], c: usize) {
+    let start = start_measure("create addition trees".to_string(), false);
     multicore::scope(|scope| {
         for round in rounds.chunks_mut(1) {
             scope.spawn(move |_| {
@@ -621,11 +641,11 @@ fn create_addition_tree(rounds: &mut [RoundData], c: usize) {
 fn do_point_scatter<C: CurveAffine>(round: &RoundData, bases: &[C], points: &mut [C]) {
     let num_threads = multicore::current_num_threads();
     let scatter_map = &round.scatter_map[..round.scatter_map_len];
-    let points_box = ThreadBox::from(points);
-    let start = start_measure(format!("point scatter"), false);
-    if scatter_map.len() > 0 {
+    let mut points_box = ThreadBox::from(points);
+    let start = start_measure("point scatter".to_string(), false);
+    if !scatter_map.is_empty() {
         multicore::scope(|scope| {
-            let num_copies_per_thread = (scatter_map.len() + num_threads - 1) / num_threads;
+            let num_copies_per_thread = div_up(scatter_map.len(), num_threads);
             for scatter_map in scatter_map.chunks(num_copies_per_thread) {
                 scope.spawn(move |_| {
                     let points = points_box.unwrap();
@@ -647,22 +667,28 @@ fn do_point_scatter<C: CurveAffine>(round: &RoundData, bases: &[C], points: &mut
 }
 
 /// Finally do all additions using the addition tree we've setup.
-fn do_batch_additions<C: CurveAffine>(round: &RoundData, bases: &[C], points: &mut [C]) {
+fn do_batch_additions<C: CurveAffine>(
+    round: &RoundData,
+    bases: &[C],
+    points: &mut [C],
+    complete: bool,
+) {
     let num_threads = multicore::current_num_threads();
 
     let num_levels = round.num_levels;
     let level_counter = &round.level_sizes;
     let level_offset = &round.level_offset;
     let output_indices = &round.output_indices;
-    let point_locations = &round.point_locations;
-    let points_box = ThreadBox::from(points);
+    let base_positions = &round.base_positions;
+    let mut points_box = ThreadBox::from(points);
 
-    let start = start_measure(format!("batch additions"), false);
+    let start = start_measure("batch additions".to_string(), false);
     for i in 0..num_levels - 1 {
         let start = level_offset[i];
         let num_points = level_counter[i];
         multicore::scope(|scope| {
-            let num_points_per_thread = (((num_points / 2) + num_threads - 1) / num_threads) * 2;
+            // We have to make sure we have an even amount here so we don't split within a pair
+            let num_points_per_thread = div_up(num_points / 2, num_threads) * 2;
             for thread_idx in 0..num_threads {
                 scope.spawn(move |_| {
                     let points = points_box.unwrap();
@@ -679,23 +705,47 @@ fn do_batch_additions<C: CurveAffine>(round: &RoundData, bases: &[C], points: &m
                         let output_indices = &output_indices[(start + thread_start / 2)..];
                         let offset = start + thread_start;
                         if i == 0 {
-                            C::batch_add::<false, true>(
-                                points,
-                                output_indices,
-                                thread_num_points,
-                                offset,
-                                &bases,
-                                &point_locations[(start + thread_start)..],
-                            );
+                            let base_positions = &base_positions[(start + thread_start)..];
+                            if complete {
+                                C::batch_add::<true, true>(
+                                    points,
+                                    output_indices,
+                                    thread_num_points,
+                                    offset,
+                                    bases,
+                                    base_positions,
+                                );
+                            } else {
+                                C::batch_add::<false, true>(
+                                    points,
+                                    output_indices,
+                                    thread_num_points,
+                                    offset,
+                                    bases,
+                                    base_positions,
+                                );
+                            }
                         } else {
-                            C::batch_add::<false, false>(
-                                points,
-                                output_indices,
-                                thread_num_points,
-                                offset,
-                                &bases,
-                                &point_locations,
-                            );
+                            #[allow(collapsible-else-if)]
+                            if complete {
+                                C::batch_add::<true, false>(
+                                    points,
+                                    output_indices,
+                                    thread_num_points,
+                                    offset,
+                                    &[],
+                                    &[],
+                                );
+                            } else {
+                                C::batch_add::<false, false>(
+                                    points,
+                                    output_indices,
+                                    thread_num_points,
+                                    offset,
+                                    &[],
+                                    &[],
+                                );
+                            }
                         }
                     }
                 });
@@ -706,11 +756,7 @@ fn do_batch_additions<C: CurveAffine>(round: &RoundData, bases: &[C], points: &m
 }
 
 /// Accumulate all bucket results to get the result of the round
-fn calculate_round_result<C: CurveAffine>(
-    round: &RoundData,
-    points: &mut [C],
-    c: usize,
-) -> C::Curve {
+fn accumulate_buckets<C: CurveAffine>(round: &RoundData, points: &mut [C], c: usize) -> C::Curve {
     let num_threads = multicore::current_num_threads();
     let num_buckets = get_num_buckets(c);
 
@@ -718,7 +764,7 @@ fn calculate_round_result<C: CurveAffine>(
     let bucket_sizes = &round.bucket_sizes;
     let level_offset = &round.level_offset;
 
-    let start_time = start_measure(format!("add buckets together"), false);
+    let start_time = start_measure("accumulate buckets".to_string(), false);
     let start = level_offset[num_levels - 1];
     let buckets = &mut points[start..(start + num_buckets)];
     let mut results: Vec<C::Curve> = vec![C::Curve::identity(); num_threads];
@@ -801,7 +847,7 @@ fn get_random_data<const INDEPENDENT: bool>(n: usize) -> (Vec<G1Affine>, Vec<Fp>
 }
 
 #[test]
-fn test_multiexp_single() {
+fn test_multiexp_simple() {
     let n = 1 << env_value("K", 15);
 
     let (bases, coeffs) = get_random_data::<true>(n);
@@ -809,40 +855,79 @@ fn test_multiexp_single() {
     let res_base = best_multiexp(&coeffs, &bases);
     let res_base_affine: pairing::bn256::G1Affine = res_base.into();
 
-    let mut ctx = MultiExp::new(&bases);
-    let res = ctx.evaluate(&coeffs);
+    let msm = MultiExp::new(&bases);
+    let mut ctx = MultiExpContext::default();
+    let res = msm.evaluate(&mut ctx, &coeffs, false);
     let res_affine: pairing::bn256::G1Affine = res.into();
 
     assert_eq!(res_base_affine, res_affine);
 }
 
 #[test]
+fn test_multiexp_complete_simple() {
+    let n = 1 << env_value("K", 15);
+
+    let (bases, coeffs) = get_random_data::<false>(n);
+
+    let res_base = best_multiexp(&coeffs, &bases);
+    let res_base_affine: pairing::bn256::G1Affine = res_base.into();
+
+    let msm = MultiExp::new(&bases);
+    let mut ctx = MultiExpContext::default();
+    let res = msm.evaluate(&mut ctx, &coeffs, true);
+    let res_affine: pairing::bn256::G1Affine = res.into();
+
+    assert_eq!(res_base_affine, res_affine);
+}
+
+#[test]
+fn test_multiexp_small() {
+    let n = 5;
+
+    let (bases, coeffs) = get_random_data::<true>(n);
+
+    let res_base = best_multiexp(&coeffs, &bases);
+    let res_base_affine: pairing::bn256::G1Affine = res_base.into();
+
+    let msm = MultiExp::new(&bases);
+    let mut ctx = MultiExpContext::default();
+    let res = msm.evaluate(&mut ctx, &coeffs, false);
+    let res_affine: pairing::bn256::G1Affine = res.into();
+
+    assert_eq!(res_base_affine, res_affine);
+}
+
+#[test]
+#[ignore]
 fn test_multiexp_bench() {
     let min_k = 10;
     let max_k = 20;
     let n = 1 << max_k;
     let (bases, coeffs) = get_random_data::<true>(n);
-    let mut ctx = MultiExp::new(&bases);
+    let msm = MultiExp::new(&bases);
+    let mut ctx = MultiExpContext::default();
     for k in min_k..=max_k {
         let n = 1 << k;
         let coeffs = &coeffs[..n];
 
         let start = start_measure("msm".to_string(), false);
-        ctx.evaluate(&coeffs);
+        msm.evaluate(&mut ctx, coeffs, false);
         let duration = stop_measure(start);
 
-        println!("{}: {}ms", n, duration / 1000);
+        println!("{}: {}s", n, (duration as f32) / 1000000.0);
     }
 }
 
 #[test]
+#[ignore]
 fn test_multiexp_best_c() {
     let max_k = 21;
     let n = 1 << max_k;
 
     let (bases, coeffs) = get_random_data::<true>(n);
 
-    let mut ctx = MultiExp::new(&bases);
+    let msm = MultiExp::new(&bases);
+    let mut ctx = MultiExpContext::default();
     for k in 4..=max_k {
         let n = 1 << k;
         let coeffs = &coeffs[..n];
@@ -858,7 +943,7 @@ fn test_multiexp_best_c() {
             ctx.allocate_for(n, c);
 
             let start = start_measure("measure performance".to_string(), false);
-            let res = ctx.evaluate_with(&coeffs, c);
+            let res = msm.evaluate_with(&mut ctx, coeffs, false, c);
             let duration = stop_measure(start);
 
             if duration < best_duration {
