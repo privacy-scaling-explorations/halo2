@@ -34,7 +34,7 @@ pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
 
 impl<C: CurveAffine> Argument<C> {
     pub(in crate::plonk) fn commit<E: EncodedChallenge<C>, R: RngCore, T: TranscriptWrite<C, E>>(
-        params: &Params<C>,
+        params: &mut Params<C>,
         domain: &EvaluationDomain<C::Scalar>,
         mut rng: R,
         transcript: &mut T,
@@ -60,7 +60,7 @@ impl<C: CurveAffine> Committed<C> {
         T: TranscriptWrite<C, E>,
     >(
         self,
-        params: &Params<C>,
+        params: &mut Params<C>,
         domain: &EvaluationDomain<C::Scalar>,
         evaluator: poly::Evaluator<Ev, C::Scalar, ExtendedLagrangeCoeff>,
         expressions: impl Iterator<Item = poly::Ast<Ev, C::Scalar, ExtendedLagrangeCoeff>>,

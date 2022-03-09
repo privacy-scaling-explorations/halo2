@@ -7,6 +7,7 @@ use super::{Coeff, LagrangeCoeff, Polynomial, MSM};
 use crate::arithmetic::{
     best_fft, best_multiexp, parallelize, CurveAffine, CurveExt, Engine, FieldExt, Group,
 };
+use crate::arithmetic_msm::{MultiExp, MultiExpContext};
 use crate::helpers::CurveRead;
 
 use ff::{Field, PrimeField};
@@ -18,13 +19,16 @@ use std::ops::{Add, AddAssign, Mul, MulAssign};
 use std::io;
 
 /// These are the prover parameters for the polynomial commitment scheme.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Params<C: CurveAffine> {
     pub(crate) k: u32,
     pub(crate) n: u64,
     pub(crate) g: Vec<C>,
     pub(crate) g_lagrange: Vec<C>,
     pub(crate) additional_data: Vec<u8>,
+    pub(crate) msm_ctx: MultiExpContext<C>,
+    pub(crate) msm_g: MultiExp<C>,
+    pub(crate) msm_g_lagrange: MultiExp<C>,
 }
 
 /// These are the verifier parameters for the polynomial commitment scheme.
@@ -107,37 +111,36 @@ impl<C: CurveAffine> Params<C> {
         let g2 = <E::G2Affine as PrimeCurveAffine>::generator();
         let s_g2 = g2 * s;
         let additional_data = Vec::from(s_g2.to_bytes().as_ref());
+
+        let msm_ctx = MultiExpContext::default();
+        let msm_g = MultiExp::new(&g);
+        let msm_g_lagrange = MultiExp::new(&g_lagrange);
+
         Params {
             k,
             n,
             g,
             g_lagrange,
             additional_data,
+            msm_ctx,
+            msm_g,
+            msm_g_lagrange,
         }
     }
 
     /// This computes a commitment to a polynomial described by the provided
     /// slice of coefficients. The commitment will be blinded by the blinding
     /// factor `r`.
-    pub fn commit(&self, poly: &Polynomial<C::Scalar, Coeff>) -> C::Curve {
-        let mut scalars = Vec::with_capacity(poly.len());
-        scalars.extend(poly.iter());
-        let bases = &self.g;
-        let size = scalars.len();
-        assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size])
+    pub fn commit(&mut self, poly: &Polynomial<C::Scalar, Coeff>) -> C::Curve {
+        self.msm_g.evaluate(&mut self.msm_ctx, &poly.values, false)
     }
 
     /// This commits to a polynomial using its evaluations over the $2^k$ size
     /// evaluation domain. The commitment will be blinded by the blinding factor
     /// `r`.
-    pub fn commit_lagrange(&self, poly: &Polynomial<C::Scalar, LagrangeCoeff>) -> C::Curve {
-        let mut scalars = Vec::with_capacity(poly.len());
-        scalars.extend(poly.iter());
-        let bases = &self.g_lagrange;
-        let size = scalars.len();
-        assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size])
+    pub fn commit_lagrange(&mut self, poly: &Polynomial<C::Scalar, LagrangeCoeff>) -> C::Curve {
+        self.msm_g_lagrange
+            .evaluate(&mut self.msm_ctx, &poly.values, false)
     }
 
     /// Generates an empty multiscalar multiplication struct using the
@@ -187,12 +190,19 @@ impl<C: CurveAffine> Params<C> {
 
         reader.read_exact(&mut additional_data[..])?;
 
+        let msm_ctx = MultiExpContext::default();
+        let msm_g = MultiExp::new(&g);
+        let msm_g_lagrange = MultiExp::new(&g_lagrange);
+
         Ok(Params {
             k,
             n,
             g,
             g_lagrange,
             additional_data,
+            msm_ctx,
+            msm_g,
+            msm_g_lagrange,
         })
     }
 
@@ -384,7 +394,7 @@ fn test_parameter_serialization() {
 fn test_commit_lagrange() {
     const K: u32 = 6;
 
-    let params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
+    let mut params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
     let domain = super::EvaluationDomain::new(1, K);
 
     let mut a = domain.empty_lagrange();

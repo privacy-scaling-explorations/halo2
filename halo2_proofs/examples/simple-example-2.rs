@@ -245,11 +245,11 @@ fn main() {
     let empty_circuit: MyCircuit<Fp> = MyCircuit { a: None, k };
 
     // Initialize the polynomial commitment parameters
-    let params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(k);
+    let mut params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(k);
     let params_verifier: ParamsVerifier<Bn256> = params.verifier(public_inputs_size).unwrap();
 
     // Initialize the proving key
-    let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
+    let vk = keygen_vk(&mut params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
     let circuit: MyCircuit<Fp> = MyCircuit {
@@ -263,7 +263,7 @@ fn main() {
     use std::time::Instant;
     let _dur = Instant::now();
 
-    create_proof(&params, &pk, &[circuit], &[&[]], OsRng, &mut transcript)
+    create_proof(&mut params, &pk, &[circuit], &[&[]], OsRng, &mut transcript)
         .expect("proof generation should not fail");
 
     println!("proving period: {:?}", _dur.elapsed());

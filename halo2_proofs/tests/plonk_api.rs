@@ -31,7 +31,7 @@ fn plonk_api() {
     pub struct Variable(Column<Advice>, usize);
 
     // Initialize the polynomial commitment parameters
-    let params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
+    let mut params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
     let params_verifier: ParamsVerifier<Bn256> = params.verifier(public_inputs_size).unwrap();
 
     #[derive(Clone)]
@@ -406,9 +406,9 @@ fn plonk_api() {
 
     // Check that we get an error if we try to initialize the proving key with a value of
     // k that is too small for the minimum required number of rows.
-    let much_too_small_params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(1);
+    let mut much_too_small_params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(1);
     assert_matches!(
-        keygen_vk(&much_too_small_params, &empty_circuit),
+        keygen_vk(&mut much_too_small_params, &empty_circuit),
         Err(Error::NotEnoughRowsAvailable {
             current_k,
         }) if current_k == 1
@@ -416,17 +416,17 @@ fn plonk_api() {
 
     // Check that we get an error if we try to initialize the proving key with a value of
     // k that is too small for the number of rows the circuit uses.
-    let slightly_too_small_params: Params<G1Affine> =
+    let mut slightly_too_small_params: Params<G1Affine> =
         Params::<G1Affine>::unsafe_setup::<Bn256>(K - 1);
     assert_matches!(
-        keygen_vk(&slightly_too_small_params, &empty_circuit),
+        keygen_vk(&mut slightly_too_small_params, &empty_circuit),
         Err(Error::NotEnoughRowsAvailable {
             current_k,
         }) if current_k == K - 1
     );
 
     // Initialize the proving key
-    let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
+    let vk = keygen_vk(&mut params, &empty_circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
     let pubinputs = vec![instance];
@@ -442,7 +442,7 @@ fn plonk_api() {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
         // Create a proof
         create_proof(
-            &params,
+            &mut params,
             &pk,
             &[circuit.clone(), circuit.clone()],
             &[&[&[instance]], &[&[instance]]],

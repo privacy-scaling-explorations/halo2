@@ -255,16 +255,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         ParamsVerifier<Bn256>,
         ProvingKey<G1Affine>,
     ) {
-        let params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(k);
+        let mut params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(k);
         let params_verifier: ParamsVerifier<Bn256> = params.verifier(0).unwrap();
 
         let empty_circuit: MyCircuit<Fp> = MyCircuit { a: None, k };
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
+        let vk = keygen_vk(&mut params, &empty_circuit).expect("keygen_vk should not fail");
         let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
         (params, params_verifier, pk)
     }
 
-    fn prover(k: u32, params: &Params<G1Affine>, pk: &ProvingKey<G1Affine>) -> Vec<u8> {
+    fn prover(k: u32, params: &mut Params<G1Affine>, pk: &ProvingKey<G1Affine>) -> Vec<u8> {
         let rng = OsRng;
 
         let circuit: MyCircuit<Fp> = MyCircuit {
@@ -304,7 +304,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             BenchmarkId::from_parameter(k),
             &(k, &params, &pk),
             |b, &(k, params, pk)| {
-                b.iter(|| prover(k, params, pk));
+                b.iter(|| prover(k, &mut params.clone(), pk));
             },
         );
     }
@@ -312,8 +312,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut verifier_group = c.benchmark_group("plonk-verifier");
     for k in k_range {
-        let (params, params_verifier, pk) = keygen(k);
-        let proof = prover(k, &params, &pk);
+        let (mut params, params_verifier, pk) = keygen(k);
+        let proof = prover(k, &mut params, &pk);
 
         verifier_group.bench_with_input(
             BenchmarkId::from_parameter(k),

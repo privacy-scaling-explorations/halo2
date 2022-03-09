@@ -76,7 +76,7 @@ impl<F: FieldExt> Argument<F> {
     >(
         &self,
         pk: &ProvingKey<C>,
-        params: &Params<C>,
+        params: &mut Params<C>,
         domain: &EvaluationDomain<C::Scalar>,
         value_evaluator: &poly::Evaluator<Ev, C::Scalar, LagrangeCoeff>,
         coset_evaluator: &mut poly::Evaluator<Ec, C::Scalar, ExtendedLagrangeCoeff>,
@@ -178,7 +178,7 @@ impl<F: FieldExt> Argument<F> {
         )?;
 
         // Closure to construct commitment to vector of values
-        let commit_values = |values: &Polynomial<C::Scalar, LagrangeCoeff>| {
+        let mut commit_values = |values: &Polynomial<C::Scalar, LagrangeCoeff>| {
             let poly = pk.vk.domain.lagrange_to_coeff(values.clone());
             let commitment = params.commit_lagrange(values).to_affine();
             (poly, commitment)
@@ -231,7 +231,7 @@ impl<C: CurveAffine, Ev: Copy + Send + Sync> Permuted<C, Ev> {
     >(
         self,
         pk: &ProvingKey<C>,
-        params: &Params<C>,
+        params: &mut Params<C>,
         theta: ChallengeTheta<C>,
         beta: ChallengeBeta<C>,
         gamma: ChallengeGamma<C>,

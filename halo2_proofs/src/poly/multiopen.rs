@@ -181,7 +181,7 @@ mod tests {
 
         const K: u32 = 4;
 
-        let params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
+        let mut params: Params<G1Affine> = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
         let params_verifier: ParamsVerifier<Bn256> = params.verifier(0).unwrap();
 
         let domain = EvaluationDomain::new(1, K);
@@ -216,7 +216,7 @@ mod tests {
 
         let mut transcript = crate::transcript::Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
         create_proof(
-            &params,
+            &mut params,
             &mut transcript,
             std::iter::empty()
                 .chain(Some(ProverQuery {
@@ -282,7 +282,7 @@ mod tests {
     fn test_multiopen() {
         const K: u32 = 3;
 
-        let params = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
+        let mut params = Params::<G1Affine>::unsafe_setup::<Bn256>(K);
         let params_verifier: ParamsVerifier<Bn256> = params.verifier(0).unwrap();
 
         let rotation_sets_init = vec![
@@ -358,7 +358,7 @@ mod tests {
         // prover
         let proof = {
             let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-            create_proof(&params, &mut transcript, prover_queries).unwrap();
+            create_proof(&mut params, &mut transcript, prover_queries).unwrap();
             transcript.finalize()
         };
 

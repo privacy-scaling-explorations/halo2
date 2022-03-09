@@ -99,7 +99,7 @@ impl Assembly {
 
     pub(crate) fn build_vk<C: CurveAffine>(
         self,
-        params: &Params<C>,
+        params: &mut Params<C>,
         domain: &EvaluationDomain<C::Scalar>,
         p: &Argument,
     ) -> VerifyingKey<C> {

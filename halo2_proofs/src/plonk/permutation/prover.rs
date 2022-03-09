@@ -49,7 +49,7 @@ impl Argument {
         T: TranscriptWrite<C, E>,
     >(
         &self,
-        params: &Params<C>,
+        params: &mut Params<C>,
         pk: &plonk::ProvingKey<C>,
         pkey: &ProvingKey<C>,
         advice: &[Polynomial<C::Scalar, LagrangeCoeff>],

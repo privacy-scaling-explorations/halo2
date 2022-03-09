@@ -38,7 +38,7 @@ pub fn create_proof<
     T: TranscriptWrite<C, E>,
     ConcreteCircuit: Circuit<C::Scalar>,
 >(
-    params: &Params<C>,
+    params: &mut Params<C>,
     pk: &ProvingKey<C>,
     circuits: &[ConcreteCircuit],
     instances: &[&[&[C::Scalar]]],

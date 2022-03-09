@@ -74,15 +74,16 @@ impl<'a, C: CurveAffine> RotationSet<C::Scalar, PolynomialPointer<'a, C>> {
 
 /// Create a multi-opening proof
 pub fn create_proof<'a, I, C: CurveAffine, E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
-    params: &Params<C>,
+    params: &mut Params<C>,
     transcript: &mut T,
     queries: I,
 ) -> io::Result<()>
 where
     I: IntoIterator<Item = ProverQuery<'a, C>> + Clone,
 {
+    let n = params.n;
     let zero = || Polynomial::<C::Scalar, Coeff> {
-        values: vec![C::Scalar::zero(); params.n as usize],
+        values: vec![C::Scalar::zero(); n as usize],
         _marker: PhantomData,
     };
 
@@ -113,7 +114,7 @@ where
             // Q_i(X) = N_i(X) / Z_i(X) where
             // Z_i(X) = (x - r_i_0) * (x - r_i_1) * ...
             let mut poly = div_by_vanishing(n_x, points);
-            poly.resize(params.n as usize, C::Scalar::zero());
+            poly.resize(n as usize, C::Scalar::zero());
 
             Polynomial {
                 values: poly,
@@ -133,9 +134,7 @@ where
             let commitments: Vec<CommitmentExtension<C>> = rotation_set
                 .commitments
                 .iter()
-                .map(|commitment_data| {
-                    commitment_data.extend(params.n, rotation_set.points.clone())
-                })
+                .map(|commitment_data| commitment_data.extend(n, rotation_set.points.clone()))
                 .collect();
             rotation_set.extend(commitments)
         })
