@@ -1,4 +1,30 @@
 //! This module implements a fast method for multi-scalar multiplications.
+//!
+//! Generally it works like pippenger with a couple of tricks to make if faster.
+//!
+//! - First the coefficients are split into two parts (using the endomorphism). This
+//! reduces the number of rounds by half, but doubles the number of points per round.
+//! This is faster because half the rounds also means only needing to add all bucket
+//! results together half the number of times.
+//!
+//! - The coefficients are then sorted in buckets. Instead of using
+//! the binary representation to do this, a signed digit representation is
+//! used instead (WNAF). Unfortunately this doesn't directly reduce the number of additions
+//! in a bucket, but it does reduce the number of buckets in half, which halves the
+//! work required to accumulate the results of the buckets.
+//!
+//! - We then need to add all the points in each bucket together. To do this
+//! the affine addition formulas are used. If the points are linearly independent the
+//! incomplete version of the formula can be used which is quite a bit faster than
+//! the full one because some checks can be skipped.
+//! The affine formula is only fast if a lot of independent points can be added
+//! together. This is because to get the actual result of an addition an inversion is
+//! needed which is very expensive, but it's cheap when batched inversion can be used.
+//! So the idea is to add a lot of pairs of points together using a single batched inversion.
+//! We then have the results of all those additions, and can do a new batch of additions on those
+//! results. This process is repeated as many times as needed until all additions for each bucket
+//! are done. To do this efficiently we first build up an addition tree that sets everything
+//! up correctly per round. We then process each addition tree per round.
 
 use core::slice;
 use std::{
@@ -18,8 +44,6 @@ use group::{
 
 pub use pairing::arithmetic::*;
 
-const FIELD_NUM_BITS: usize = 254;
-
 fn num_bits(value: usize) -> usize {
     (0usize.leading_zeros() - value.leading_zeros()) as usize
 }
@@ -32,12 +56,12 @@ fn get_wnaf_size_bits(num_bits: usize, w: usize) -> usize {
     div_up(num_bits, w)
 }
 
-fn get_wnaf_size(w: usize) -> usize {
-    get_wnaf_size_bits(div_up(FIELD_NUM_BITS, 2), w)
+fn get_wnaf_size<C: CurveAffine>(w: usize) -> usize {
+    get_wnaf_size_bits(div_up(C::Scalar::NUM_BITS as usize, 2), w)
 }
 
-fn get_num_rounds(c: usize) -> usize {
-    get_wnaf_size(c + 1)
+fn get_num_rounds<C: CurveAffine>(c: usize) -> usize {
+    get_wnaf_size::<C>(c + 1)
 }
 
 fn get_num_buckets(c: usize) -> usize {
@@ -46,6 +70,10 @@ fn get_num_buckets(c: usize) -> usize {
 
 fn get_max_tree_size(num_points: usize, c: usize) -> usize {
     num_points * 2 + get_num_buckets(c)
+}
+
+fn get_num_tree_levels(num_points: usize) -> usize {
+    1 + num_bits(num_points - 1)
 }
 
 /// Returns the signed digit representation of value with the specified window size.
@@ -60,6 +88,8 @@ fn get_wnaf(value: u128, w: usize, num_rounds: usize, wnaf: &mut [u32], stride: 
     for idx in 0..num_rounds {
         let b = get_bits_at(value, idx * w, w) + borrow;
         if b >= max {
+            // Set the highest bit to 1 to represent a negative value.
+            // This way the lower bits directly represent the bucket index.
             wnaf[idx * stride] = (0x80000000 | ((1 << w) - b)) as u32;
             borrow = 1;
         } else {
@@ -74,11 +104,13 @@ fn get_wnaf(value: u128, w: usize, num_rounds: usize, wnaf: &mut [u32], stride: 
 fn get_best_c(num_points: usize) -> usize {
     if num_points >= 262144 {
         15
-    } else if num_points >= 32768 {
+    } else if num_points >= 65536 {
         12
+    } else if num_points >= 16384 {
+        11
     } else if num_points >= 8192 {
         10
-    } else if num_points >= 2048 {
+    } else if num_points >= 1024 {
         9
     } else {
         7
@@ -200,38 +232,43 @@ impl<C: CurveAffine> MultiExp<C> {
         c: usize,
     ) -> C::Curve {
         assert!(coeffs.len() * 2 <= self.bases.len());
+        assert!(c >= 4);
 
         // Allocate more memory if required
         ctx.allocate(coeffs.len(), c);
 
         // Get the data for each round
-        let mut rounds = ctx.rounds.get_rounds(coeffs.len(), c);
+        let mut rounds = ctx.rounds.get_rounds::<C>(coeffs.len(), c);
 
         // Get the bases for the coefficients
         let bases = &self.bases[..coeffs.len() * 2];
 
-        let start = start_measure(format!("multiexp {} ({})", coeffs.len(), c), false);
+        let num_threads = multicore::current_num_threads();
+        let start = start_measure(
+            format!("msm {} ({}) ({} threads)", coeffs.len(), c, num_threads),
+            false,
+        );
         if coeffs.len() >= 16 {
             let num_points = coeffs.len() * 2;
             let w = c + 1;
-            let num_rounds = get_num_rounds(c);
+            let num_rounds = get_num_rounds::<C>(c);
 
             // Prepare WNAFs of all coefficients for all rounds
             calculate_wnafs::<C>(coeffs, &mut ctx.wnafs, c);
             // Sort WNAFs into buckets for all rounds
             sort::<C>(&mut ctx.wnafs[0..num_rounds * num_points], &mut rounds, c);
             // Calculate addition trees for all rounds
-            create_addition_trees(&mut rounds, c);
+            create_addition_trees(&mut rounds);
 
             // Now process each round individually
             let mut partials = vec![C::Curve::identity(); num_rounds];
-            for (round_idx, acc) in partials.iter_mut().enumerate() {
+            for (round, acc) in rounds.iter().zip(partials.iter_mut()) {
                 // Scatter the odd points in the odd length buckets to the addition tree
-                do_point_scatter::<C>(&rounds[round_idx], bases, &mut ctx.points);
+                do_point_scatter::<C>(round, bases, &mut ctx.points);
                 // Do all bucket additions
-                do_batch_additions::<C>(&rounds[round_idx], bases, &mut ctx.points, complete);
+                do_batch_additions::<C>(round, bases, &mut ctx.points, complete);
                 // Get the final result of the round
-                *acc = accumulate_buckets::<C>(&rounds[round_idx], &mut ctx.points, c);
+                *acc = accumulate_buckets::<C>(round, &mut ctx.points, c);
             }
 
             // Accumulate round results
@@ -264,11 +301,11 @@ impl<C: CurveAffine> MultiExp<C> {
 }
 
 impl<C: CurveAffine> MultiExpContext<C> {
-    /// Allocate memory for the msm evalution
-    fn allocate(&mut self, num_points: usize, c: usize) {
+    /// Allocate memory for the evalution
+    pub fn allocate(&mut self, num_points: usize, c: usize) {
         let num_points = num_points * 2;
         let num_buckets = get_num_buckets(c);
-        let num_rounds = get_num_rounds(c);
+        let num_rounds = get_num_rounds::<C>(c);
         let tree_size = get_max_tree_size(num_points, c);
         let num_points_total = num_rounds * num_points;
         let num_buckets_total = num_rounds * num_buckets;
@@ -290,8 +327,8 @@ impl<C: CurveAffine> MultiExpContext<C> {
         if self.rounds.point_data.len() < num_points_total {
             self.rounds.point_data.resize(num_points_total, 0u32);
         }
-        if self.rounds.output_indices.len() < tree_size_total {
-            self.rounds.output_indices.resize(tree_size_total, 0u32);
+        if self.rounds.output_indices.len() < tree_size_total / 2 {
+            self.rounds.output_indices.resize(tree_size_total / 2, 0u32);
         }
         if self.rounds.base_positions.len() < num_points_total {
             self.rounds.base_positions.resize(num_points_total, 0u32);
@@ -302,18 +339,13 @@ impl<C: CurveAffine> MultiExpContext<C> {
                 .resize(num_buckets_total, ScatterData::default());
         }
     }
-
-    /// Performs a multi-exponentiation operation.
-    pub fn allocate_for(&mut self, num_points: usize, c: usize) {
-        self.allocate(num_points, c);
-    }
 }
 
 impl SharedRoundData {
-    fn get_rounds(&mut self, num_points: usize, c: usize) -> Vec<RoundData> {
+    fn get_rounds<C: CurveAffine>(&mut self, num_points: usize, c: usize) -> Vec<RoundData> {
         let num_points = num_points * 2;
         let num_buckets = get_num_buckets(c);
-        let num_rounds = get_num_rounds(c);
+        let num_rounds = get_num_rounds::<C>(c);
         let tree_size = num_points * 2 + num_buckets;
 
         let mut bucket_sizes_rest = self.bucket_sizes.as_mut_slice();
@@ -334,7 +366,7 @@ impl SharedRoundData {
             bucket_offsets_rest = rest;
             let (point_data, rest) = point_data_rest.split_at_mut(num_points);
             point_data_rest = rest;
-            let (output_indices, rest) = output_indices_rest.split_at_mut(tree_size);
+            let (output_indices, rest) = output_indices_rest.split_at_mut(tree_size / 2);
             output_indices_rest = rest;
             let (base_positions, rest) = base_positions_rest.split_at_mut(num_points);
             base_positions_rest = rest;
@@ -365,9 +397,10 @@ unsafe impl<T> Send for ThreadBox<T> {}
 #[allow(unsafe_code)]
 unsafe impl<T> Sync for ThreadBox<T> {}
 
-/// Wraps an array so it can be passed into a thread without borrow checks.
+/// Wraps a mutable slice so it can be passed into a thread without
+/// hard to fix borrow checks caused by difficult data access patterns.
 impl<T> ThreadBox<T> {
-    fn from(data: &mut [T]) -> Self {
+    fn wrap(data: &mut [T]) -> Self {
         Self(data.as_mut_ptr(), data.len())
     }
 
@@ -382,18 +415,18 @@ impl<T> ThreadBox<T> {
 fn calculate_wnafs<C: CurveAffine>(coeffs: &[C::Scalar], wnafs: &mut [u32], c: usize) {
     let num_threads = multicore::current_num_threads();
     let num_points = coeffs.len() * 2;
-    let num_rounds = get_num_rounds(c);
+    let num_rounds = get_num_rounds::<C>(c);
     let w = c + 1;
 
     let start = start_measure("calculate wnafs".to_string(), false);
-    let mut wnafs_box = ThreadBox::from(wnafs);
+    let mut wnafs_box = ThreadBox::wrap(wnafs);
     let chunk_size = div_up(coeffs.len(), num_threads);
     multicore::scope(|scope| {
         for (thread_idx, coeffs) in coeffs.chunks(chunk_size).enumerate() {
             scope.spawn(move |_| {
                 let wnafs = &mut wnafs_box.unwrap()[thread_idx * chunk_size * 2..];
-                for idx in 0..coeffs.len() {
-                    let (p0, p1) = C::get_endomorphism_scalars(&coeffs[idx]);
+                for (idx, coeff) in coeffs.iter().enumerate() {
+                    let (p0, p1) = C::get_endomorphism_scalars(coeff);
                     get_wnaf(p0, w, num_rounds, &mut wnafs[idx * 2..], num_points);
                     get_wnaf(p1, w, num_rounds, &mut wnafs[idx * 2 + 1..], num_points);
                 }
@@ -407,7 +440,7 @@ fn radix_sort(wnafs: &mut [u32], round: &mut RoundData) {
     let bucket_sizes = &mut round.bucket_sizes;
     let bucket_offsets = &mut round.bucket_offsets;
 
-    // Calculate bucket sizes
+    // Calculate bucket sizes, first resetting all sizes to 0
     bucket_sizes.fill_with(|| 0);
     for wnaf in wnafs.iter() {
         bucket_sizes[(wnaf & 0x7FFFFFFF) as usize] += 1;
@@ -428,7 +461,7 @@ fn radix_sort(wnafs: &mut [u32], round: &mut RoundData) {
         max_bucket_size = max_bucket_size.max(*bucket_size);
     }
     // Number of levels we need in our addition tree
-    round.num_levels = 1 + num_bits(max_bucket_size - 1);
+    round.num_levels = get_num_tree_levels(max_bucket_size);
 
     // Fill in point data grouped in buckets
     let point_data = &mut round.point_data;
@@ -441,7 +474,7 @@ fn radix_sort(wnafs: &mut [u32], round: &mut RoundData) {
 
 /// Sorts the points so they are grouped per bucket
 fn sort<C: CurveAffine>(wnafs: &mut [u32], rounds: &mut [RoundData], c: usize) {
-    let num_rounds = get_num_rounds(c);
+    let num_rounds = get_num_rounds::<C>(c);
     let num_points = wnafs.len() / num_rounds;
 
     // Sort per bucket for each round separately
@@ -458,14 +491,12 @@ fn sort<C: CurveAffine>(wnafs: &mut [u32], rounds: &mut [RoundData], c: usize) {
 
 /// Creates the addition tree.
 /// When PREPROCESS is false we just calculate the size of each level.
-/// All points in a bucket needs to be added to each other. Because the affine formulas
+/// All points in a bucket need to be added to each other. Because the affine formulas
 /// are used we need to add points together in pairs. So we have to make sure that
 /// on each level we have an even number of points for each level. Odd points are
-/// added on lower levels where the lenght of the addition results is odd (which then
+/// added to lower levels where the length of the addition results is odd (which then
 /// makes the length even).
-fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize) {
-    let num_buckets = get_num_buckets(c);
-
+fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData) {
     let num_levels = round.num_levels;
     let bucket_sizes = &round.bucket_sizes;
     let point_data = &round.point_data;
@@ -485,12 +516,15 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
         }
     }
 
+    // The level where all bucket results will be stored
     let bucket_level = num_levels - 1;
-    for b in 1..num_buckets {
-        let mut length = bucket_sizes[b];
-        if length == 0 {
+
+    // Run over all buckets
+    for bucket_size in bucket_sizes.iter().skip(1) {
+        let mut size = *bucket_size;
+        if size == 0 {
             level_sizes[bucket_level] += 1;
-        } else if length == 1 {
+        } else if size == 1 {
             if !PREPROCESS {
                 scatter_map[round.scatter_map_len] = ScatterData {
                     position: (level_offset[bucket_level] + level_sizes[bucket_level]) as u32,
@@ -501,111 +535,124 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
             }
             level_sizes[bucket_level] += 1;
         } else {
-            let num_levels_bucket = 1 + num_bits(length - 1);
-            let mut is_odd_point = false;
-            let mut is_odd = false;
-            let mut odd_position = 0usize;
+            #[derive(Clone, Copy, PartialEq)]
+            enum State {
+                Even,
+                OddPoint(usize),
+                OddResult(usize),
+            }
+            let mut state = State::Even;
+            let num_levels_bucket = get_num_tree_levels(size);
 
-            let mut sub_level_pos = level_sizes[0];
-            for l in 0..num_levels_bucket - 1 {
-                let level = l;
-                let is_level_odd = length & 1;
-                let first_level = l == 0;
-                let last_level = l == num_levels_bucket - 2;
+            let mut start_level_size = level_sizes[0];
+            for level in 0..num_levels_bucket - 1 {
+                let is_level_odd = size & 1;
+                let first_level = level == 0;
+                let last_level = level == num_levels_bucket - 2;
 
-                // If this level has odd length we have to handle it
+                // If this level has odd size we have to handle it
                 if is_level_odd == 1 {
                     // If we already have a point saved from a previous odd level, use it
-                    if is_odd {
+                    // to make the current level even
+                    if state != State::Even {
                         if !PREPROCESS {
-                            let pos = level_offset[level] + level_sizes[level];
-                            if is_odd_point {
-                                scatter_map[round.scatter_map_len] = ScatterData {
-                                    position: pos as u32,
-                                    point_data: point_data[odd_position],
-                                };
-                                round.scatter_map_len += 1;
-                                is_odd_point = false;
-                            } else {
-                                output_indices[odd_position] = pos as u32;
-                            }
+                            let pos = (level_offset[level] + level_sizes[level]) as u32;
+                            match state {
+                                State::OddPoint(point_idx) => {
+                                    scatter_map[round.scatter_map_len] = ScatterData {
+                                        position: pos,
+                                        point_data: point_data[point_idx],
+                                    };
+                                    round.scatter_map_len += 1;
+                                }
+                                State::OddResult(output_idx) => {
+                                    output_indices[output_idx] = pos;
+                                }
+                                _ => unreachable!(),
+                            };
                         }
                         level_sizes[level] += 1;
-                        is_odd = false;
-                        length += 1;
+                        size += 1;
+                        state = State::Even;
                     } else {
-                        // Not odd yet, so that state is now odd
+                        // Not odd yet, so the state is now odd
                         // Store the point we have to add later
                         if !PREPROCESS {
                             if first_level {
-                                is_odd_point = true;
-                                odd_position = point_idx + length - 1;
+                                state = State::OddPoint(point_idx + size - 1);
                             } else {
-                                odd_position =
-                                    (level_offset[level] + level_sizes[level] + length) >> 1;
+                                state = State::OddResult(
+                                    (level_offset[level] + level_sizes[level] + size) >> 1,
+                                );
                             }
+                        } else {
+                            // Just mark it as odd, we won't use the actual value anywhere
+                            state = State::OddPoint(0);
                         }
-                        is_odd = true;
-                        length -= 1;
+                        size -= 1;
                     }
                 }
 
-                // Write initial points
+                // Write initial points on the first level
                 if first_level {
                     if !PREPROCESS {
-                        // Just write all points (except the odd length one)
+                        // Just write all points (except the odd size one)
                         let pos = level_offset[level] + level_sizes[level];
-                        base_positions[pos..pos + length]
-                            .copy_from_slice(&point_data[point_idx..point_idx + length]);
-                        point_idx += length + is_level_odd;
+                        base_positions[pos..pos + size]
+                            .copy_from_slice(&point_data[point_idx..point_idx + size]);
+                        point_idx += size + is_level_odd;
                     }
-                    level_sizes[level] += length;
+                    level_sizes[level] += size;
                 }
 
                 // Write output indices
-                // If the next level is odd, we have to make it even
-                // by writing the last result of this level to the next odd level
-                let next_level_length = length >> 1;
-                let next_level_odd = next_level_length & 1 == 1;
-                let redirect = if next_level_odd && !is_odd && level < num_levels_bucket - 2 {
-                    1usize
-                } else {
-                    0usize
-                };
-                let next_level_offset = level_offset[level] + (sub_level_pos >> 1);
+                // If the next level would be odd, we have to make it even
+                // by writing the last result of this level to the next level that is odd
+                // (unless we are writing the final result to the bucket level)
+                let next_level_size = size >> 1;
+                let next_level_odd = next_level_size & 1 == 1;
+                let redirect =
+                    if next_level_odd && state == State::Even && level < num_levels_bucket - 2 {
+                        1usize
+                    } else {
+                        0usize
+                    };
+                // An addition works on two points and has one result, so this takes only half the size
+                let sub_level_offset = (level_offset[level] + start_level_size) >> 1;
                 // Cache the start position of the next level
-                sub_level_pos = level_sizes[level + 1];
+                start_level_size = level_sizes[level + 1];
                 if !PREPROCESS {
-                    // Write the output positions of the additions
-                    let src_pos = level_offset[level + 1] + level_sizes[level + 1];
+                    // Write the destination positions of the addition results in the tree
+                    let dst_pos = level_offset[level + 1] + level_sizes[level + 1];
                     for (idx, output_index) in output_indices
-                        [next_level_offset..next_level_offset + next_level_length]
+                        [sub_level_offset..sub_level_offset + next_level_size]
                         .iter_mut()
                         .enumerate()
                     {
-                        *output_index = (src_pos + idx) as u32;
+                        *output_index = (dst_pos + idx) as u32;
                     }
                 }
                 if last_level {
                     // The result of the last addition for this bucket is written
-                    // to the last level (so all bucket additions are nicely after each other).
+                    // to the last level (so all bucket results are nicely after each other).
+                    // Overwrite the output locations of the last result here.
                     if !PREPROCESS {
-                        output_indices[next_level_offset] =
+                        output_indices[sub_level_offset] =
                             (level_offset[bucket_level] + level_sizes[bucket_level]) as u32;
                     }
                     level_sizes[bucket_level] += 1;
                 } else {
-                    level_sizes[level + 1] += next_level_length - redirect;
-                    length -= redirect;
-                    // We have to redirect a result to a lower level
+                    // Update the sizes
+                    level_sizes[level + 1] += next_level_size - redirect;
+                    size -= redirect;
+                    // We have to redirect the last result to a lower level
                     if redirect == 1 {
-                        odd_position = next_level_offset + next_level_length - 1;
-                        is_odd = true;
+                        state = State::OddResult(sub_level_offset + next_level_size - 1);
                     }
                 }
 
-                // We haved added 2 points together so the next level has half the length
-                length >>= 1;
+                // We added pairs of points together so the next level has half the size
+                size >>= 1;
             }
         }
     }
@@ -620,15 +667,15 @@ fn process_addition_tree<const PREPROCESS: bool>(round: &mut RoundData, c: usize
 /// And so we try to add as many points together on each level of the tree, writing the result of the addition
 /// to a lower level. Each level thus contains independent point additions, with only requiring a single inversion
 /// per level in the tree.
-fn create_addition_trees(rounds: &mut [RoundData], c: usize) {
+fn create_addition_trees(rounds: &mut [RoundData]) {
     let start = start_measure("create addition trees".to_string(), false);
     multicore::scope(|scope| {
         for round in rounds.chunks_mut(1) {
             scope.spawn(move |_| {
                 // Collect tree levels sizes
-                process_addition_tree::<true>(&mut round[0], c);
+                process_addition_tree::<true>(&mut round[0]);
                 // Construct the tree
-                process_addition_tree::<false>(&mut round[0], c);
+                process_addition_tree::<false>(&mut round[0]);
             });
         }
     });
@@ -641,7 +688,7 @@ fn create_addition_trees(rounds: &mut [RoundData], c: usize) {
 fn do_point_scatter<C: CurveAffine>(round: &RoundData, bases: &[C], points: &mut [C]) {
     let num_threads = multicore::current_num_threads();
     let scatter_map = &round.scatter_map[..round.scatter_map_len];
-    let mut points_box = ThreadBox::from(points);
+    let mut points_box = ThreadBox::wrap(points);
     let start = start_measure("point scatter".to_string(), false);
     if !scatter_map.is_empty() {
         multicore::scope(|scope| {
@@ -680,7 +727,7 @@ fn do_batch_additions<C: CurveAffine>(
     let level_offset = &round.level_offset;
     let output_indices = &round.output_indices;
     let base_positions = &round.base_positions;
-    let mut points_box = ThreadBox::from(points);
+    let mut points_box = ThreadBox::wrap(points);
 
     let start = start_measure("batch additions".to_string(), false);
     for i in 0..num_levels - 1 {
@@ -702,7 +749,7 @@ fn do_batch_additions<C: CurveAffine>(
                         }
 
                         let points = &mut points[(start + thread_start)..];
-                        let output_indices = &output_indices[(start + thread_start / 2)..];
+                        let output_indices = &output_indices[(start + thread_start) / 2..];
                         let offset = start + thread_start;
                         if i == 0 {
                             let base_positions = &base_positions[(start + thread_start)..];
@@ -801,13 +848,14 @@ fn accumulate_buckets<C: CurveAffine>(round: &RoundData, points: &mut [C], c: us
                 }
                 acc += accumulator;
 
+                // Store the result
                 result[0] = acc;
             });
         }
     });
     stop_measure(start_time);
 
-    // Finally add the result of all threads together
+    // Add the results of all threads together
     results
         .iter()
         .fold(C::Curve::identity(), |acc, result| acc + result)
@@ -940,7 +988,7 @@ fn test_multiexp_best_c() {
         let mut best_duration = usize::MAX;
         for c in 4..=21 {
             // Allocate memory so it doesn't impact performance
-            ctx.allocate_for(n, c);
+            ctx.allocate(n, c);
 
             let start = start_measure("measure performance".to_string(), false);
             let res = msm.evaluate_with(&mut ctx, coeffs, false, c);
