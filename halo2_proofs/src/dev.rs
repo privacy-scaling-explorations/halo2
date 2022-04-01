@@ -7,6 +7,8 @@ use std::iter;
 use std::ops::{Add, Mul, Neg, Range};
 
 use ff::Field;
+use subtle::Choice;
+use subtle::ConstantTimeEq;
 
 use crate::plonk::Assigned;
 use crate::{
@@ -351,6 +353,25 @@ impl<F: Group + Field> Mul<F> for Value<F> {
             // and we don't propagate it.
             Value::Poison if rhs.is_zero_vartime() => Value::Real(F::zero()),
             _ => Value::Poison,
+        }
+    }
+}
+
+impl<F: Group + Field> ConstantTimeEq for Value<F> {
+    #[inline]
+    fn ct_eq(&self, rhs: &Self) -> Choice {
+        match self {
+            Value::Real(lhs) => match rhs {
+                Value::Real(rhs) => lhs.ct_eq(rhs),
+                Value::Poison => 0.into(),
+            },
+            Value::Poison => {
+                if matches!(rhs, Value::Poison) {
+                    1.into()
+                } else {
+                    0.into()
+                }
+            }
         }
     }
 }
@@ -858,7 +879,7 @@ impl<F: FieldExt> MockProver<F> {
                         }
                         let row = row as i32;
                         gate.polynomials().iter().enumerate().filter_map(
-                            move |(poly_index, poly)| match poly.evaluate(
+                            move |(poly_index, poly)| match poly.evaluate_lazy(
                                 &|scalar| Value::Real(scalar),
                                 &|_| panic!("virtual selectors are removed during optimization"),
                                 &load(n, row, &self.cs.fixed_queries, &self.fixed),
@@ -868,6 +889,7 @@ impl<F: FieldExt> MockProver<F> {
                                 &|a, b| a + b,
                                 &|a, b| a * b,
                                 &|a, scalar| a * scalar,
+                                &Value::Real(F::zero()),
                             ) {
                                 Value::Real(x) if x.is_zero_vartime() => None,
                                 Value::Real(_) => Some(VerifyFailure::ConstraintNotSatisfied {
@@ -917,7 +939,7 @@ impl<F: FieldExt> MockProver<F> {
                 .enumerate()
                 .flat_map(|(lookup_index, lookup)| {
                     let load = |expression: &Expression<F>, row| {
-                        expression.evaluate(
+                        expression.evaluate_lazy(
                             &|scalar| Value::Real(scalar),
                             &|_| panic!("virtual selectors are removed during optimization"),
                             &|index, _, _| {
@@ -949,6 +971,7 @@ impl<F: FieldExt> MockProver<F> {
                             &|a, b| a + b,
                             &|a, b| a * b,
                             &|a, scalar| a * scalar,
+                            &Value::Real(F::zero()),
                         )
                     };
 
