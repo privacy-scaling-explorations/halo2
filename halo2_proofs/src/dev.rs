@@ -7,8 +7,6 @@ use std::iter;
 use std::ops::{Add, Mul, Neg, Range};
 
 use ff::Field;
-use subtle::Choice;
-use subtle::ConstantTimeEq;
 
 use crate::plonk::Assigned;
 use crate::{
@@ -353,25 +351,6 @@ impl<F: Group + Field> Mul<F> for Value<F> {
             // and we don't propagate it.
             Value::Poison if rhs.is_zero_vartime() => Value::Real(F::zero()),
             _ => Value::Poison,
-        }
-    }
-}
-
-impl<F: Group + Field> ConstantTimeEq for Value<F> {
-    #[inline]
-    fn ct_eq(&self, rhs: &Self) -> Choice {
-        match self {
-            Value::Real(lhs) => match rhs {
-                Value::Real(rhs) => lhs.ct_eq(rhs),
-                Value::Poison => 0.into(),
-            },
-            Value::Poison => {
-                if matches!(rhs, Value::Poison) {
-                    1.into()
-                } else {
-                    0.into()
-                }
-            }
         }
     }
 }

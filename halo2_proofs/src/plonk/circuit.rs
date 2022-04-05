@@ -5,7 +5,6 @@ use std::{
     convert::TryFrom,
     ops::{Neg, Sub},
 };
-use subtle::ConstantTimeEq;
 
 use super::{lookup, permutation, Assigned, Error};
 use crate::circuit::Layouter;
@@ -601,9 +600,9 @@ impl<F: Field> Expression<F> {
         }
     }
 
-    /// Evaluate the polynomial lazely using the provided closures to perform the
+    /// Evaluate the polynomial lazily using the provided closures to perform the
     /// operations.
-    pub fn evaluate_lazy<T: ConstantTimeEq>(
+    pub fn evaluate_lazy<T: PartialEq>(
         &self,
         constant: &impl Fn(F) -> T,
         selector_column: &impl Fn(Selector) -> T,
@@ -677,7 +676,7 @@ impl<F: Field> Expression<F> {
                 sum(a, b)
             }
             Expression::Product(a, b) => {
-                let (a, b) = if a.complexity() <= b.degree() {
+                let (a, b) = if a.complexity() <= b.complexity() {
                     (a, b)
                 } else {
                     (b, a)
@@ -695,7 +694,7 @@ impl<F: Field> Expression<F> {
                     zero,
                 );
 
-                if a.ct_eq(zero).into() {
+                if a == *zero {
                     a
                 } else {
                     let b = b.evaluate_lazy(
