@@ -6,7 +6,9 @@ use ff::Field;
 
 use crate::{
     arithmetic::FieldExt,
-    plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Selector, TableColumn},
+    plonk::{
+        Advice, Any, Assigned, Challenge, Column, Error, Fixed, Instance, Selector, TableColumn,
+    },
 };
 
 pub mod floor_planner;
@@ -333,6 +335,11 @@ impl<'r, F: Field> Region<'r, F> {
     /// has not been enabled.
     pub fn constrain_equal(&mut self, left: Cell, right: Cell) -> Result<(), Error> {
         self.region.constrain_equal(left, right)
+    }
+
+    /// Query challenge.
+    pub fn query_challenge(&mut self, challenge: Challenge) -> Result<Option<F>, Error> {
+        self.region.query_challenge(challenge)
     }
 }
 

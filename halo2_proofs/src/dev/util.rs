@@ -68,6 +68,7 @@ pub(super) fn cell_values<'a, F: FieldExt>(
         &cell_value(virtual_cells, Any::Fixed, load_fixed),
         &cell_value(virtual_cells, Any::Advice, load_advice),
         &cell_value(virtual_cells, Any::Instance, load_instance),
+        &|_, _| BTreeMap::default(),
         &|a| a,
         &|mut a, mut b| {
             a.append(&mut b);

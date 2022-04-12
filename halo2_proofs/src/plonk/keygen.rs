@@ -10,7 +10,7 @@ use super::{
         Advice, Any, Assignment, Circuit, Column, ConstraintSystem, Fixed, FloorPlanner, Instance,
         Selector,
     },
-    permutation, Assigned, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
+    permutation, Assigned, Challenge, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
 };
 use crate::poly::{
     commitment::{Blind, Params},
@@ -85,6 +85,10 @@ impl<F: Field> Assignment<F> for Assembly<F> {
 
         // There is no instance in this context.
         Ok(None)
+    }
+
+    fn query_challenge(&self, _: Challenge) -> Result<Option<F>, Error> {
+        Ok(Some(F::zero()))
     }
 
     fn assign_advice<V, VR, A, AR>(

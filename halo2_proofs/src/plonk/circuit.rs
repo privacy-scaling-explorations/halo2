@@ -291,6 +291,25 @@ impl TableColumn {
     }
 }
 
+/// A challenge squeezed from transcript after advice columns in the round have been committed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct Challenge {
+    round_index: usize,
+    index: usize,
+}
+
+impl Challenge {
+    /// The index of the round where this challenge will be squeezed.
+    pub fn round_index(&self) -> usize {
+        self.round_index
+    }
+
+    /// The index of this challenge in the round.
+    pub fn index(&self) -> usize {
+        self.index
+    }
+}
+
 /// This trait allows a [`Circuit`] to direct some backend to assign a witness
 /// for a constraint system.
 pub trait Assignment<F: Field> {
@@ -330,6 +349,11 @@ pub trait Assignment<F: Field> {
     ///
     /// Returns the cell's value, if known.
     fn query_instance(&self, column: Column<Instance>, row: usize) -> Result<Option<F>, Error>;
+
+    /// Queries the value of a challenge.
+    ///
+    /// Returns the challange's value, if known.
+    fn query_challenge(&self, challenge: Challenge) -> Result<Option<F>, Error>;
 
     /// Assign an advice column value (witness)
     fn assign_advice<V, VR, A, AR>(
@@ -475,6 +499,13 @@ pub enum Expression<F> {
         /// Rotation of this query
         rotation: Rotation,
     },
+    /// This is a challenge
+    Challenge {
+        /// Round index
+        round_index: usize,
+        /// Challenge index
+        index: usize,
+    },
     /// This is a negated polynomial
     Negated(Box<Expression<F>>),
     /// This is the sum of two polynomials
@@ -495,6 +526,7 @@ impl<F: Field> Expression<F> {
         fixed_column: &impl Fn(usize, usize, Rotation) -> T,
         advice_column: &impl Fn(usize, usize, Rotation) -> T,
         instance_column: &impl Fn(usize, usize, Rotation) -> T,
+        challenge: &impl Fn(usize, usize) -> T,
         negated: &impl Fn(T) -> T,
         sum: &impl Fn(T, T) -> T,
         product: &impl Fn(T, T) -> T,
@@ -518,6 +550,7 @@ impl<F: Field> Expression<F> {
                 column_index,
                 rotation,
             } => instance_column(*query_index, *column_index, *rotation),
+            Expression::Challenge { round_index, index } => challenge(*round_index, *index),
             Expression::Negated(a) => {
                 let a = a.evaluate(
                     constant,
@@ -525,6 +558,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -539,6 +573,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -550,6 +585,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -564,6 +600,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -575,6 +612,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -589,6 +627,7 @@ impl<F: Field> Expression<F> {
                     fixed_column,
                     advice_column,
                     instance_column,
+                    challenge,
                     negated,
                     sum,
                     product,
@@ -607,6 +646,7 @@ impl<F: Field> Expression<F> {
             Expression::Fixed { .. } => 1,
             Expression::Advice { .. } => 1,
             Expression::Instance { .. } => 1,
+            Expression::Challenge { .. } => 0,
             Expression::Negated(poly) => poly.degree(),
             Expression::Sum(a, b) => max(a.degree(), b.degree()),
             Expression::Product(a, b) => a.degree() + b.degree(),
@@ -627,6 +667,7 @@ impl<F: Field> Expression<F> {
             &|_, _, _| false,
             &|_, _, _| false,
             &|_, _, _| false,
+            &|_, _| false,
             &|a| a,
             &|a, b| a || b,
             &|a, b| a || b,
@@ -654,6 +695,7 @@ impl<F: Field> Expression<F> {
             &|_, _, _| None,
             &|_, _, _| None,
             &|_, _, _| None,
+            &|_, _| None,
             &|a| a,
             &op,
             &op,
@@ -704,6 +746,12 @@ impl<F: Field> Mul<F> for Expression<F> {
     fn mul(self, rhs: F) -> Expression<F> {
         Expression::Scaled(Box::new(self), rhs)
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct Round {
+    pub(crate) num_advice_columns: usize,
+    pub(crate) num_challenges: usize,
 }
 
 /// Represents an index into a vector where each entry corresponds to a distinct
@@ -796,6 +844,7 @@ pub struct ConstraintSystem<F: Field> {
     pub(crate) num_advice_columns: usize,
     pub(crate) num_instance_columns: usize,
     pub(crate) num_selectors: usize,
+    pub(crate) rounds: Vec<Round>,
     pub(crate) selector_map: Vec<Column<Fixed>>,
     pub(crate) gates: Vec<Gate<F>>,
     pub(crate) advice_queries: Vec<(Column<Advice>, Rotation)>,
@@ -828,6 +877,7 @@ pub struct PinnedConstraintSystem<'a, F: Field> {
     num_advice_columns: &'a usize,
     num_instance_columns: &'a usize,
     num_selectors: &'a usize,
+    rounds: &'a [Round],
     selector_map: &'a [Column<Fixed>],
     gates: PinnedGates<'a, F>,
     advice_queries: &'a Vec<(Column<Advice>, Rotation)>,
@@ -856,6 +906,10 @@ impl<F: Field> Default for ConstraintSystem<F> {
             num_advice_columns: 0,
             num_instance_columns: 0,
             num_selectors: 0,
+            rounds: vec![Round {
+                num_advice_columns: 0,
+                num_challenges: 0,
+            }],
             selector_map: vec![],
             gates: vec![],
             fixed_queries: Vec::new(),
@@ -880,6 +934,7 @@ impl<F: Field> ConstraintSystem<F> {
             num_advice_columns: &self.num_advice_columns,
             num_instance_columns: &self.num_instance_columns,
             num_selectors: &self.num_selectors,
+            rounds: &self.rounds,
             selector_map: &self.selector_map,
             gates: PinnedGates(&self.gates),
             fixed_queries: &self.fixed_queries,
@@ -1206,6 +1261,7 @@ impl<F: Field> ConstraintSystem<F> {
                     column_index,
                     rotation,
                 },
+                &|round_index, index| Expression::Challenge { round_index, index },
                 &|a| -a,
                 &|a, b| a + b,
                 &|a, b| a * b,
@@ -1269,12 +1325,20 @@ impl<F: Field> ConstraintSystem<F> {
 
     /// Allocate a new advice column
     pub fn advice_column(&mut self) -> Column<Advice> {
+        // Start a new round if any challenge has been allocated
+        if self.rounds.last().unwrap().num_challenges != 0 {
+            self.rounds.push(Round {
+                num_advice_columns: 0,
+                num_challenges: 0,
+            })
+        }
         let tmp = Column {
             index: self.num_advice_columns,
             column_type: Advice,
         };
         self.num_advice_columns += 1;
         self.num_advice_queries.push(0);
+        self.rounds.last_mut().unwrap().num_advice_columns += 1;
         tmp
     }
 
@@ -1286,6 +1350,16 @@ impl<F: Field> ConstraintSystem<F> {
         };
         self.num_instance_columns += 1;
         tmp
+    }
+
+    /// Allocate a new challenge
+    pub fn challenge(&mut self) -> Challenge {
+        let challenge = Challenge {
+            round_index: self.rounds.len() - 1,
+            index: self.rounds.last().unwrap().num_challenges,
+        };
+        self.rounds.last_mut().unwrap().num_challenges += 1;
+        challenge
     }
 
     /// Compute the degree of the constraint system (the maximum degree of all
@@ -1423,6 +1497,14 @@ impl<'a, F: Field> VirtualCells<'a, F> {
             Any::Advice => self.query_advice(Column::<Advice>::try_from(column).unwrap(), at),
             Any::Fixed => self.query_fixed(Column::<Fixed>::try_from(column).unwrap(), at),
             Any::Instance => self.query_instance(Column::<Instance>::try_from(column).unwrap(), at),
+        }
+    }
+
+    /// Query a challenge
+    pub fn query_challenge(&mut self, challenge: Challenge) -> Expression<F> {
+        Expression::Challenge {
+            round_index: challenge.round_index,
+            index: challenge.index,
         }
     }
 }

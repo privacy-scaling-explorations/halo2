@@ -87,6 +87,7 @@ impl<F: FieldExt> Argument<F> {
         advice_cosets: &'a [poly::AstLeaf<Ec, ExtendedLagrangeCoeff>],
         fixed_cosets: &'a [poly::AstLeaf<Ec, ExtendedLagrangeCoeff>],
         instance_cosets: &'a [poly::AstLeaf<Ec, ExtendedLagrangeCoeff>],
+        challenge: &'a [Vec<C::Scalar>],
         mut rng: R,
         transcript: &mut T,
     ) -> Result<Permuted<C, Ec>, Error>
@@ -112,6 +113,9 @@ impl<F: FieldExt> Argument<F> {
                         &|_, column_index, rotation| {
                             instance_values[column_index].with_rotation(rotation).into()
                         },
+                        &|round_index, index| {
+                            poly::Ast::ConstantTerm(challenge[round_index][index])
+                        },
                         &|a| -a,
                         &|a, b| a + b,
                         &|a, b| a * b,
@@ -134,6 +138,9 @@ impl<F: FieldExt> Argument<F> {
                         },
                         &|_, column_index, rotation| {
                             instance_cosets[column_index].with_rotation(rotation).into()
+                        },
+                        &|round_index, index| {
+                            poly::Ast::ConstantTerm(challenge[round_index][index])
                         },
                         &|a| -a,
                         &|a, b| a + b,

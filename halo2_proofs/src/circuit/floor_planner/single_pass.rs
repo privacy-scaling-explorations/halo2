@@ -11,8 +11,8 @@ use crate::{
         Cell, Layouter, Region, RegionIndex, RegionStart, Table,
     },
     plonk::{
-        Advice, Any, Assigned, Assignment, Circuit, Column, Error, Fixed, FloorPlanner, Instance,
-        Selector, TableColumn,
+        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, Error, Fixed, FloorPlanner,
+        Instance, Selector, TableColumn,
     },
 };
 
@@ -368,6 +368,10 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> RegionLayouter<F>
         )?;
 
         Ok(())
+    }
+
+    fn query_challenge(&mut self, challenge: Challenge) -> Result<Option<F>, Error> {
+        self.layouter.cs.query_challenge(challenge)
     }
 }
 

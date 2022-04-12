@@ -7,13 +7,14 @@ use std::iter;
 use std::ops::{Add, Mul, Neg, Range};
 
 use ff::Field;
+use rand::{rngs::StdRng, SeedableRng};
 
 use crate::plonk::Assigned;
 use crate::{
     arithmetic::{FieldExt, Group},
     plonk::{
-        permutation, Advice, Any, Assignment, Circuit, Column, ColumnType, ConstraintSystem, Error,
-        Expression, Fixed, FloorPlanner, Instance, Selector, VirtualCell,
+        permutation, Advice, Any, Assignment, Challenge, Circuit, Column, ColumnType,
+        ConstraintSystem, Error, Expression, Fixed, FloorPlanner, Instance, Selector, VirtualCell,
     },
     poly::Rotation,
 };
@@ -78,6 +79,7 @@ impl FailureLocation {
                     &|index, _, _| vec![cs.fixed_queries[index].0.into()],
                     &|index, _, _| vec![cs.advice_queries[index].0.into()],
                     &|index, _, _| vec![cs.instance_queries[index].0.into()],
+                    &|_, _| vec![],
                     &|a| a,
                     &|mut a, mut b| {
                         a.append(&mut b);
@@ -489,6 +491,8 @@ pub struct MockProver<F: Group + Field> {
     // The instance cells in the circuit, arranged as [column][row].
     instance: Vec<Vec<F>>,
 
+    challenges: Vec<Vec<F>>,
+
     selectors: Vec<Vec<bool>>,
 
     permutation: permutation::keygen::Assembly,
@@ -549,6 +553,14 @@ impl<F: Field + Group> Assignment<F> for MockProver<F> {
         self.instance
             .get(column.index())
             .and_then(|column| column.get(row))
+            .map(|v| Some(*v))
+            .ok_or(Error::BoundsFailure)
+    }
+
+    fn query_challenge(&self, challenge: Challenge) -> Result<Option<F>, Error> {
+        self.challenges
+            .get(challenge.round_index())
+            .and_then(|challenges| challenges.get(challenge.index()))
             .map(|v| Some(*v))
             .ok_or(Error::BoundsFailure)
     }
@@ -694,6 +706,20 @@ impl<F: FieldExt> MockProver<F> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
+        let mut rng = StdRng::from_seed([
+            177, 13, 120, 126, 50, 185, 81, 111, 103, 181, 84, 46, 172, 87, 28, 239, //
+            180, 225, 40, 201, 14, 254, 66, 23, 203, 231, 109, 15, 92, 96, 28, 110,
+        ]);
+        let challenges = cs
+            .rounds
+            .iter()
+            .map(|round| {
+                iter::repeat_with(|| F::random(&mut rng))
+                    .take(round.num_challenges)
+                    .collect()
+            })
+            .collect();
+
         // Fixed columns contain no blinding factors.
         let fixed = vec![vec![CellValue::Unassigned; n]; cs.num_fixed_columns];
         let selectors = vec![vec![false; n]; cs.num_selectors];
@@ -723,6 +749,7 @@ impl<F: FieldExt> MockProver<F> {
             fixed,
             advice,
             instance,
+            challenges,
             selectors,
             permutation,
             usable_rows: 0..usable_rows,
@@ -864,6 +891,9 @@ impl<F: FieldExt> MockProver<F> {
                                 &load(n, row, &self.cs.fixed_queries, &self.fixed),
                                 &load(n, row, &self.cs.advice_queries, &self.advice),
                                 &load_instance(n, row, &self.cs.instance_queries, &self.instance),
+                                &|round_index, index| {
+                                    Value::Real(self.challenges[round_index][index])
+                                },
                                 &|a| -a,
                                 &|a, b| a + b,
                                 &|a, b| a * b,
@@ -945,6 +975,7 @@ impl<F: FieldExt> MockProver<F> {
                                         [(row as i32 + n + rotation) as usize % n as usize],
                                 )
                             },
+                            &|round_index, index| Value::Real(self.challenges[round_index][index]),
                             &|a| -a,
                             &|a, b| a + b,
                             &|a, b| a * b,

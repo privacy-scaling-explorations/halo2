@@ -7,7 +7,9 @@ use std::fmt;
 use ff::Field;
 
 use super::{Cell, RegionIndex};
-use crate::plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Selector, TableColumn};
+use crate::plonk::{
+    Advice, Any, Assigned, Challenge, Column, Error, Fixed, Instance, Selector, TableColumn,
+};
 
 /// Helper trait for implementing a custom [`Layouter`].
 ///
@@ -102,6 +104,11 @@ pub trait RegionLayouter<F: Field>: fmt::Debug {
     ///
     /// Returns an error if either of the cells is not within the given permutation.
     fn constrain_equal(&mut self, left: Cell, right: Cell) -> Result<(), Error>;
+
+    /// Query challenge.
+    ///
+    /// Returns the challange's value, if known.
+    fn query_challenge(&mut self, challenge: Challenge) -> Result<Option<F>, Error>;
 }
 
 /// Helper trait for implementing a custom [`Layouter`].
@@ -283,5 +290,9 @@ impl<F: Field> RegionLayouter<F> for RegionShape {
     fn constrain_equal(&mut self, _left: Cell, _right: Cell) -> Result<(), Error> {
         // Equality constraints don't affect the region shape.
         Ok(())
+    }
+
+    fn query_challenge(&mut self, _: Challenge) -> Result<Option<F>, Error> {
+        Ok(Some(F::zero()))
     }
 }

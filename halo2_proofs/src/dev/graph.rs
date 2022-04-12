@@ -2,7 +2,7 @@ use ff::Field;
 use tabbycat::{AttrList, Edge, GraphBuilder, GraphType, Identity, StmtList};
 
 use crate::plonk::{
-    Advice, Any, Assigned, Assignment, Circuit, Column, ConstraintSystem, Error, Fixed,
+    Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
     FloorPlanner, Instance, Selector,
 };
 
@@ -98,6 +98,10 @@ impl<F: Field> Assignment<F> for Graph {
 
     fn query_instance(&self, _: Column<Instance>, _: usize) -> Result<Option<F>, Error> {
         Ok(None)
+    }
+
+    fn query_challenge(&self, _: Challenge) -> Result<Option<F>, Error> {
+        Ok(Some(F::zero()))
     }
 
     fn assign_advice<V, VR, A, AR>(

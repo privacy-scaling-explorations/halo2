@@ -122,6 +122,7 @@ impl CircuitGates {
                             &|_, column, rotation| format!("F{}@{}", column, rotation.0),
                             &|_, column, rotation| format!("A{}@{}", column, rotation.0),
                             &|_, column, rotation| format!("I{}@{}", column, rotation.0),
+                            &|round, index| format!("C{}@{}", round, index),
                             &|a| {
                                 if a.contains(' ') {
                                     format!("-({})", a)
@@ -168,6 +169,7 @@ impl CircuitGates {
                                     .into_iter()
                                     .collect()
                             },
+                            &|_, _| BTreeSet::default(),
                             &|a| a,
                             &|mut a, mut b| {
                                 a.append(&mut b);
@@ -195,6 +197,7 @@ impl CircuitGates {
                         &|_, _, _| (0, 0, 0),
                         &|_, _, _| (0, 0, 0),
                         &|_, _, _| (0, 0, 0),
+                        &|_, _| (0, 0, 0),
                         &|(a_n, a_a, a_m)| (a_n + 1, a_a, a_m),
                         &|(a_n, a_a, a_m), (b_n, b_a, b_m)| (a_n + b_n, a_a + b_a + 1, a_m + b_m),
                         &|(a_n, a_a, a_m), (b_n, b_a, b_m)| (a_n + b_n, a_a + b_a, a_m + b_m + 1),
