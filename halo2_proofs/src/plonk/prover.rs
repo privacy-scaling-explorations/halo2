@@ -136,145 +136,132 @@ pub fn create_proof<
         _marker: std::marker::PhantomData<F>,
     }
 
-    {
+    impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
+        fn enter_region<NR, N>(&mut self, _: N)
+        where
+            NR: Into<String>,
+            N: FnOnce() -> NR,
         {
-            impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
-                fn enter_region<NR, N>(&mut self, _: N)
-                where
-                    NR: Into<String>,
-                    N: FnOnce() -> NR,
-                {
-                    // Do nothing; we don't care about regions in this context.
-                }
+            // Do nothing; we don't care about regions in this context.
+        }
 
-                fn exit_region(&mut self) {
-                    // Do nothing; we don't care about regions in this context.
-                }
+        fn exit_region(&mut self) {
+            // Do nothing; we don't care about regions in this context.
+        }
 
-                fn enable_selector<A, AR>(
-                    &mut self,
-                    _: A,
-                    _: &Selector,
-                    _: usize,
-                ) -> Result<(), Error>
-                where
-                    A: FnOnce() -> AR,
-                    AR: Into<String>,
-                {
-                    // We only care about advice columns here
+        fn enable_selector<A, AR>(&mut self, _: A, _: &Selector, _: usize) -> Result<(), Error>
+        where
+            A: FnOnce() -> AR,
+            AR: Into<String>,
+        {
+            // We only care about advice columns here
 
-                    Ok(())
-                }
+            Ok(())
+        }
 
-                fn query_instance(
-                    &self,
-                    column: Column<Instance>,
-                    row: usize,
-                ) -> Result<Option<F>, Error> {
-                    if !self.usable_rows.contains(&row) {
-                        return Err(Error::not_enough_rows_available(self.k));
-                    }
-
-                    self.instances
-                        .get(column.index())
-                        .and_then(|column| column.get(row))
-                        .map(|v| Some(*v))
-                        .ok_or(Error::BoundsFailure)
-                }
-
-                fn query_challenge(&self, challenge: Challenge) -> Result<Option<F>, Error> {
-                    if challenge.round_index() < self.current_round {
-                        self.challenges
-                            .get(challenge.round_index())
-                            .and_then(|challenges| challenges.get(challenge.index()))
-                            .map(|v| Some(*v))
-                            .ok_or(Error::BoundsFailure)
-                    } else {
-                        Ok(None)
-                    }
-                }
-
-                fn assign_advice<V, VR, A, AR>(
-                    &mut self,
-                    _: A,
-                    column: Column<Advice>,
-                    row: usize,
-                    to: V,
-                ) -> Result<(), Error>
-                where
-                    V: FnOnce() -> Result<VR, Error>,
-                    VR: Into<Assigned<F>>,
-                    A: FnOnce() -> AR,
-                    AR: Into<String>,
-                {
-                    if column.index() < self.current_advice_start {
-                        return Ok(());
-                    }
-
-                    if !self.usable_rows.contains(&row) {
-                        return Err(Error::not_enough_rows_available(self.k));
-                    }
-
-                    *self
-                        .advice
-                        .get_mut(column.index())
-                        .and_then(|v| v.get_mut(row))
-                        .ok_or(Error::BoundsFailure)? = to()?.into();
-
-                    Ok(())
-                }
-
-                fn assign_fixed<V, VR, A, AR>(
-                    &mut self,
-                    _: A,
-                    _: Column<Fixed>,
-                    _: usize,
-                    _: V,
-                ) -> Result<(), Error>
-                where
-                    V: FnOnce() -> Result<VR, Error>,
-                    VR: Into<Assigned<F>>,
-                    A: FnOnce() -> AR,
-                    AR: Into<String>,
-                {
-                    // We only care about advice columns here
-
-                    Ok(())
-                }
-
-                fn copy(
-                    &mut self,
-                    _: Column<Any>,
-                    _: usize,
-                    _: Column<Any>,
-                    _: usize,
-                ) -> Result<(), Error> {
-                    // We only care about advice columns here
-
-                    Ok(())
-                }
-
-                fn fill_from_row(
-                    &mut self,
-                    _: Column<Fixed>,
-                    _: usize,
-                    _: Option<Assigned<F>>,
-                ) -> Result<(), Error> {
-                    Ok(())
-                }
-
-                fn push_namespace<NR, N>(&mut self, _: N)
-                where
-                    NR: Into<String>,
-                    N: FnOnce() -> NR,
-                {
-                    // Do nothing; we don't care about namespaces in this context.
-                }
-
-                fn pop_namespace(&mut self, _: Option<String>) {
-                    // Do nothing; we don't care about namespaces in this context.
-                }
+        fn query_instance(&self, column: Column<Instance>, row: usize) -> Result<Option<F>, Error> {
+            if !self.usable_rows.contains(&row) {
+                return Err(Error::not_enough_rows_available(self.k));
             }
+
+            self.instances
+                .get(column.index())
+                .and_then(|column| column.get(row))
+                .map(|v| Some(*v))
+                .ok_or(Error::BoundsFailure)
+        }
+
+        fn query_challenge(&self, challenge: Challenge) -> Result<Option<F>, Error> {
+            if challenge.round_index() < self.current_round {
+                self.challenges
+                    .get(challenge.round_index())
+                    .and_then(|challenges| challenges.get(challenge.index()))
+                    .map(|v| Some(*v))
+                    .ok_or(Error::BoundsFailure)
+            } else {
+                Ok(None)
+            }
+        }
+
+        fn assign_advice<V, VR, A, AR>(
+            &mut self,
+            _: A,
+            column: Column<Advice>,
+            row: usize,
+            to: V,
+        ) -> Result<(), Error>
+        where
+            V: FnOnce() -> Result<VR, Error>,
+            VR: Into<Assigned<F>>,
+            A: FnOnce() -> AR,
+            AR: Into<String>,
+        {
+            if column.index() < self.current_advice_start {
+                return Ok(());
+            }
+
+            if !self.usable_rows.contains(&row) {
+                return Err(Error::not_enough_rows_available(self.k));
+            }
+
+            *self
+                .advice
+                .get_mut(column.index())
+                .and_then(|v| v.get_mut(row))
+                .ok_or(Error::BoundsFailure)? = to()?.into();
+
+            Ok(())
+        }
+
+        fn assign_fixed<V, VR, A, AR>(
+            &mut self,
+            _: A,
+            _: Column<Fixed>,
+            _: usize,
+            _: V,
+        ) -> Result<(), Error>
+        where
+            V: FnOnce() -> Result<VR, Error>,
+            VR: Into<Assigned<F>>,
+            A: FnOnce() -> AR,
+            AR: Into<String>,
+        {
+            // We only care about advice columns here
+
+            Ok(())
+        }
+
+        fn copy(
+            &mut self,
+            _: Column<Any>,
+            _: usize,
+            _: Column<Any>,
+            _: usize,
+        ) -> Result<(), Error> {
+            // We only care about advice columns here
+
+            Ok(())
+        }
+
+        fn fill_from_row(
+            &mut self,
+            _: Column<Fixed>,
+            _: usize,
+            _: Option<Assigned<F>>,
+        ) -> Result<(), Error> {
+            Ok(())
+        }
+
+        fn push_namespace<NR, N>(&mut self, _: N)
+        where
+            NR: Into<String>,
+            N: FnOnce() -> NR,
+        {
+            // Do nothing; we don't care about namespaces in this context.
+        }
+
+        fn pop_namespace(&mut self, _: Option<String>) {
+            // Do nothing; we don't care about namespaces in this context.
         }
     }
 
