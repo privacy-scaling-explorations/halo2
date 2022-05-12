@@ -47,7 +47,7 @@ pub fn create_proof<
     params: &Params<C>,
     pk: &ProvingKey<C>,
     circuits: &[ConcreteCircuit],
-    instances: &[&[&[C::Scalar]]],
+    instances: &Vec<Vec<Vec<C::Scalar>>>,
     mut rng: R,
     transcript: &mut T,
 ) -> Result<(), Error> {
