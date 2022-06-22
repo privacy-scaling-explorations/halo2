@@ -52,7 +52,7 @@ env_logger = "0.8.1"
 
 # gpu feature
 rust-gpu-tools = { version = "0.3.0", optional = true }
-ff-cl-gen = { path = "../../ff-cl-gen", version = "0.2.0", optional = true }
+ff-cl-gen = { git = 'https://github.com/starslabhq/ff-cl-gen', optional = true,  branch = "gpuFft" }
 fs2 = { version = "0.4.3", optional = true }
 
 # Developer tooling dependencies
