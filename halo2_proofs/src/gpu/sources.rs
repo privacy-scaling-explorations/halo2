@@ -47,15 +47,15 @@ where
 {
     vec![
         if limb64 {
-            ffgen::field_fr::<Fr, ffgen::Limb64>("Fr")
+            ffgen::field::<Fr, ffgen::Limb64>("Fr")
         } else {
-            ffgen::field_fr::<Fr, ffgen::Limb32>("Fr")
+            ffgen::field::<Fr, ffgen::Limb32>("Fr")
         },
         fft("Fr"),
         if limb64 {
-            ffgen::field_fq::<Fq, ffgen::Limb64>("Fq")
+            ffgen::field::<Fq, ffgen::Limb64>("Fq")
         } else {
-            ffgen::field_fq::<Fq, ffgen::Limb32>("Fq")
+            ffgen::field::<Fq, ffgen::Limb32>("Fq")
         },
         ec("Fq", "G1"),
         multiexp("G1", "Fr"),
