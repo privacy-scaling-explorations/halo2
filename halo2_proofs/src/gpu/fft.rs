@@ -17,6 +17,7 @@ const MAX_LOG2_RADIX: u32 = 9; // Radix512
 const MAX_LOG2_LOCAL_WORK_SIZE: u32 = 8; // 256
 
 /// SingleFFTKernel
+#[allow(missing_debug_implementations)]
 pub struct SingleFFTKernel<G>
 where
     G: Group,
@@ -24,6 +25,7 @@ where
     program: opencl::Program,
     pq_buffer: opencl::Buffer<G::Scalar>,
     omegas_buffer: opencl::Buffer<G::Scalar>,
+    #[allow(dead_code)]
     priority: bool,
 }
 
@@ -143,6 +145,7 @@ where
 }
 
 /// Gpu fft kernel vec
+#[allow(missing_debug_implementations)]
 pub struct MultiFFTKernel<G>
 where
     G: Group,

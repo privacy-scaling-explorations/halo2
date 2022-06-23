@@ -121,6 +121,7 @@ use std::ops::Range;
 macro_rules! locked_kernel {
     ($class:ident, $kern:ident, $func:ident, $name:expr) => {
         /// gpu fft locked kernel
+        #[allow(missing_debug_implementations)]
         pub struct $class<G>
         where
             G: Group,
