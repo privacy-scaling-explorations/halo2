@@ -5,12 +5,14 @@
 pub use rayon::{current_num_threads, scope, Scope};
 
 use crossbeam_channel::{bounded, Receiver};
+#[cfg(feature = "gpu")]
 use lazy_static::lazy_static;
 use log::{error, trace};
 use std::env;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+#[cfg(feature = "gpu")]
 static WORKER_SPAWN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 #[cfg(feature = "gpu")]
@@ -35,9 +37,11 @@ lazy_static! {
 }
 
 /// Thread pool
+#[cfg(feature = "gpu")]
 #[derive(Clone, Debug)]
 pub struct Worker {}
 
+#[cfg(feature = "gpu")]
 impl Worker {
     /// New worker
     pub fn new() -> Worker {
@@ -170,11 +174,13 @@ impl Worker {
 }
 
 /// Waiter for receiving
+#[cfg(feature = "gpu")]
 #[derive(Debug)]
 pub struct Waiter<T> {
     receiver: Receiver<T>,
 }
 
+#[cfg(feature = "gpu")]
 impl<T> Waiter<T> {
     /// Wait for the result.
     pub fn wait(&self) -> T {
@@ -195,6 +201,7 @@ impl<T> Waiter<T> {
     }
 }
 
+#[cfg(feature = "gpu")]
 fn log2_floor(num: usize) -> u32 {
     assert!(num > 0);
 
@@ -207,6 +214,7 @@ fn log2_floor(num: usize) -> u32 {
     pow
 }
 
+#[cfg(feature = "gpu")]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -14,6 +14,7 @@ use group::Group as CryptGroup;
 
 use std::marker::PhantomData;
 
+#[cfg(feature = "gpu")]
 use crate::gpu;
 use log::{info, warn};
 
