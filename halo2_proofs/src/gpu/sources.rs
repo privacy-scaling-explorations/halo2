@@ -1,4 +1,3 @@
-//use group::Group;
 use crate::arithmetic::Group;
 use ff_cl_gen as ffgen;
 use pairing::bn256::{Fr, Fq};

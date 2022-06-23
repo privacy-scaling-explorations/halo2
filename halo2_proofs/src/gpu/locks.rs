@@ -2,7 +2,6 @@ use fs2::FileExt;
 use log::{debug, info, warn};
 use std::fs::File;
 use std::path::PathBuf;
-//use group::Group;
 use crate::arithmetic::Group;
 
 const GPU_LOCK_NAME: &str = "bellman.gpu.lock";
@@ -110,10 +109,7 @@ impl Drop for PriorityLock {
 
 use super::error::{GPUError, GPUResult};
 use super::fft::MultiFFTKernel;
-//use super::multiexp::MultiexpKernel;
 use crate::poly::domain::create_fft_kernel;
-//use crate::multiexp::create_multiexp_kernel;
-//use crate::pairing::Engine;
 use std::env;
 use std::ops::Range;
 
@@ -197,9 +193,3 @@ locked_kernel!(
     create_fft_kernel,
     "FFT"
 );
-/*locked_kernel!(
-    LockedMultiexpKernel,
-    MultiexpKernel,
-    create_multiexp_kernel,
-    "Multiexp"
-);*/

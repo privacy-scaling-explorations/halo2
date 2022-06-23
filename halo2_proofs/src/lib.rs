@@ -32,11 +32,13 @@ pub mod worker {
     pub use super::multicore::*;
 }
 pub mod plonk;
+#[cfg(feature = "gpu")]
 pub mod gpu;
 pub mod poly;
 pub mod transcript;
 
 pub mod dev;
 mod helpers;
+#[cfg(feature = "gpu")]
 #[macro_use]
 extern crate lazy_static;

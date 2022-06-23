@@ -3,7 +3,6 @@ use crate::gpu::{
     get_lock_name_and_gpu_range, locks, sources,
 };
 use group::ff::Field;
-//use group::Group;
 use crate::arithmetic::Group;
 use crate::worker::THREAD_POOL;
 use log::{error, info};

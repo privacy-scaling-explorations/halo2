@@ -80,7 +80,6 @@ pub fn dump_device_list() {
     }
 }
 
-#[cfg(feature = "gpu")]
 #[test]
 pub fn test_list_devices() {
     let _ = env_logger::try_init();

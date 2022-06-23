@@ -77,6 +77,7 @@ rand_core = { version = "0.6", default-features = false, features = ["getrandom"
 getrandom = { version = "0.2", features = ["js"] }
 
 [features]
+# todo: set gpu as optional feature
 default = ["shplonk", "gpu"]
 dev-graph = ["plotters", "tabbycat"]
 gadget-traces = ["backtrace"]
