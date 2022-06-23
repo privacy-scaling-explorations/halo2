@@ -1,8 +1,8 @@
+use crate::arithmetic::Group;
 use fs2::FileExt;
 use log::{debug, info, warn};
 use std::fs::File;
 use std::path::PathBuf;
-use crate::arithmetic::Group;
 
 const GPU_LOCK_NAME: &str = "bellman.gpu.lock";
 const PRIORITY_LOCK_NAME: &str = "bellman.priority.lock";
@@ -160,7 +160,7 @@ macro_rules! locked_kernel {
                     );
                 }
             }
-            
+
             /// Gpu kernel config
             pub fn with<F, R>(&mut self, mut f: F) -> GPUResult<R>
             where

@@ -1,16 +1,16 @@
+use crate::arithmetic::Group;
 use crate::gpu::{
     error::{GPUError, GPUResult},
     get_lock_name_and_gpu_range, locks, sources,
 };
-use group::ff::Field;
-use crate::arithmetic::Group;
 use crate::worker::THREAD_POOL;
+use group::ff::Field;
 use log::{error, info};
 use rayon::join;
 use rust_gpu_tools::*;
 use std::cmp::min;
-use std::{cmp, env};
 use std::ops::MulAssign;
+use std::{cmp, env};
 
 const LOG2_MAX_ELEMENTS: usize = 32; // At most 2^32 elements is supported.
 const MAX_LOG2_RADIX: u32 = 9; // Radix512
@@ -121,7 +121,12 @@ where
     /// Performs FFT on `a`
     /// * `omega` - Special value `omega` is used for FFT over finite-fields
     /// * `log_n` - Specifies log2 of number of elements
-    pub fn radix_fft(&mut self, a: &mut [G::Scalar], omega: &G::Scalar, log_n: u32) -> GPUResult<()> {
+    pub fn radix_fft(
+        &mut self,
+        a: &mut [G::Scalar],
+        omega: &G::Scalar,
+        log_n: u32,
+    ) -> GPUResult<()> {
         let n = 1 << log_n;
         let mut src_buffer = self.program.create_buffer::<G::Scalar>(n)?;
         let mut dst_buffer = self.program.create_buffer::<G::Scalar>(n)?;

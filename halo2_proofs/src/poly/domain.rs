@@ -549,7 +549,7 @@ fn test_best_fft_multiple_gpu() {
     use crate::pairing::bn256::Fr;
     use pairing::bn256::Bn256;
 
-    use crate::poly::{EvaluationDomain};
+    use crate::poly::EvaluationDomain;
     use ark_std::{end_timer, start_timer};
     use rand_core::OsRng;
 
@@ -594,7 +594,7 @@ fn test_best_fft_multiple_gpu() {
 
 #[test]
 fn test_fft() {
-    use crate::poly::{EvaluationDomain};
+    use crate::poly::EvaluationDomain;
     use ark_std::{end_timer, start_timer};
     use pairing::bn256::Fr;
     use rand_core::OsRng;

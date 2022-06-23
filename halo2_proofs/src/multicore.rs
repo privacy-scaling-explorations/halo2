@@ -58,7 +58,7 @@ impl Worker {
         log2_floor(*NUM_CPUS)
     }
 
-   /// Compute
+    /// Compute
     pub fn compute<F, R>(&self, f: F) -> Waiter<R>
     where
         F: FnOnce() -> R + Send + 'static,
