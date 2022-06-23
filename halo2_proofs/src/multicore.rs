@@ -13,8 +13,12 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static WORKER_SPAWN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-#[deny(missing_docs)]
+/// Threadpool and number_cpus
+#[cfg(feature = "gpu")]
+#[allow(unused_doc_comments)]
+#[allow(missing_docs)]
 lazy_static! {
+    // THREAD_POOL and NUM_CPUS
     static ref NUM_CPUS: usize = if let Ok(num) = env::var("BELLMAN_NUM_CPUS") {
         if let Ok(num) = num.parse() {
             num
@@ -26,28 +30,35 @@ lazy_static! {
     };
     // See Worker::compute below for a description of this.
     static ref WORKER_SPAWN_MAX_COUNT: usize = *NUM_CPUS * 4;
+    // THREAD_POOL
     pub static ref THREAD_POOL: rayon::ThreadPool = rayon::ThreadPoolBuilder::new()
         .num_threads(*NUM_CPUS)
         .build()
         .unwrap();
 }
 
+/// Thread pool
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct Worker {}
 
 impl Worker {
+    /// New worker
     pub fn new() -> Worker {
         Worker {}
     }
 
+    /// Get_num_cpus
     pub fn get_num_cpus(&self) -> usize {
         *NUM_CPUS
     }
 
+    /// Log_num_cpus
     pub fn log_num_cpus(&self) -> u32 {
         log2_floor(*NUM_CPUS)
     }
 
+   /// Compute
     pub fn compute<F, R>(&self, f: F) -> Waiter<R>
     where
         F: FnOnce() -> R + Send + 'static,
@@ -97,6 +108,7 @@ impl Worker {
         Waiter { receiver }
     }
 
+    /// Scope
     pub fn scope<'a, F, R>(&self, elements: usize, f: F) -> R
     where
         F: FnOnce(&rayon::Scope<'a>, usize) -> R + Send,
@@ -107,6 +119,7 @@ impl Worker {
         THREAD_POOL.scope(|scope| f(scope, chunk_size))
     }
 
+    /// In_place_scope
     pub fn in_place_scope<'a, F, R>(&self, elements: usize, f: F) -> R
     where
         F: FnOnce(&rayon::Scope<'a>, usize) -> R,
@@ -116,6 +129,7 @@ impl Worker {
         THREAD_POOL.in_place_scope(|scope| f(scope, chunk_size))
     }
 
+    /// Get_chunk_size
     pub fn get_chunk_size(&self, elements: usize) -> usize {
         let chunk_size = if elements <= *NUM_CPUS {
             1
@@ -125,7 +139,7 @@ impl Worker {
 
         chunk_size
     }
-    // TODO: check +1?
+    /// Chunk_size_for_num_spawned_threads
     pub fn chunk_size_for_num_spawned_threads(elements: usize, num_threads: usize) -> usize {
         assert!(
             elements >= num_threads,
@@ -140,6 +154,7 @@ impl Worker {
         }
     }
 
+    /// Get_num_spawned_threads
     pub fn get_num_spawned_threads(&self, elements: usize) -> usize {
         let num_spawned = if elements <= *NUM_CPUS {
             elements
@@ -158,6 +173,8 @@ impl Worker {
     }
 }
 
+/// Waiter for receiving
+#[derive(Debug)]
 pub struct Waiter<T> {
     receiver: Receiver<T>,
 }

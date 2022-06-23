@@ -16,6 +16,7 @@ const LOG2_MAX_ELEMENTS: usize = 32; // At most 2^32 elements is supported.
 const MAX_LOG2_RADIX: u32 = 9; // Radix512
 const MAX_LOG2_LOCAL_WORK_SIZE: u32 = 8; // 256
 
+/// SingleFFTKernel
 pub struct SingleFFTKernel<G>
 where
     G: Group,
@@ -30,6 +31,7 @@ impl<G> SingleFFTKernel<G>
 where
     G: Group,
 {
+    /// New gpu fft kernel device
     pub fn create(device: opencl::Device, priority: bool) -> GPUResult<SingleFFTKernel<G>> {
         let src = sources::kernel::<G>(device.brand() == opencl::Brand::Nvidia);
 
@@ -140,6 +142,7 @@ where
     }
 }
 
+/// Gpu fft kernel vec
 pub struct MultiFFTKernel<G>
 where
     G: Group,
@@ -152,6 +155,7 @@ impl<G> MultiFFTKernel<G>
 where
     G: Group,
 {
+    /// New gpu kernel device
     pub fn create(priority: bool) -> GPUResult<MultiFFTKernel<G>> {
         let mut all_devices = opencl::Device::all();
         let all_num = all_devices.len();
@@ -183,6 +187,7 @@ where
         })
     }
 
+    /// fft_multiple call for kernel radix_fft
     pub fn fft_multiple(
         &mut self,
         polys: &mut [&mut [G::Scalar]],

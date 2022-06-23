@@ -57,6 +57,7 @@ lazy_static::lazy_static! {
 }
 
 const DEFAULT_CORE_COUNT: usize = 2560;
+/// Get core number
 pub fn get_core_count(d: &opencl::Device) -> usize {
     let name = d.name();
     match CORE_COUNTS.get(&name[..]) {
@@ -74,6 +75,7 @@ pub fn get_core_count(d: &opencl::Device) -> usize {
     }
 }
 
+/// Dump gpu device
 pub fn dump_device_list() {
     for d in opencl::Device::all() {
         info!("Device: {:?}", d);

@@ -12,6 +12,7 @@ fn tmp_path(filename: &str) -> PathBuf {
     p
 }
 
+/// Get_lock_name_and_gpu_range
 pub fn get_lock_name_and_gpu_range(all_gpus: usize) -> (String, Range<usize>) {
     let mut num_gpus_per_group = all_gpus;
     let mut group_index = 0usize;
@@ -46,6 +47,7 @@ pub fn get_lock_name_and_gpu_range(all_gpus: usize) -> (String, Range<usize>) {
 #[derive(Debug)]
 pub struct GPULock(File);
 impl GPULock {
+    /// GPULock
     pub fn lock(index: String) -> GPULock {
         let filename = GPU_LOCK_NAME.to_string() + &index;
         let gpu_lock_file = tmp_path(&filename);
@@ -71,6 +73,7 @@ impl Drop for GPULock {
 #[derive(Debug)]
 pub struct PriorityLock(File);
 impl PriorityLock {
+    /// PriorityLock
     pub fn lock() -> PriorityLock {
         let priority_lock_file = tmp_path(PRIORITY_LOCK_NAME);
         debug!("Acquiring priority lock at {:?} ...", &priority_lock_file);
@@ -84,6 +87,7 @@ impl PriorityLock {
         debug!("Priority lock acquired!");
         PriorityLock(f)
     }
+    /// PriorityLock wait
     pub fn wait(priority: bool) {
         if !priority {
             File::create(tmp_path(PRIORITY_LOCK_NAME))
@@ -92,6 +96,7 @@ impl PriorityLock {
                 .unwrap();
         }
     }
+    /// PriorityLock break
     pub fn should_break(priority: bool) -> bool {
         !priority
             && File::create(tmp_path(PRIORITY_LOCK_NAME))
@@ -115,6 +120,7 @@ use std::ops::Range;
 
 macro_rules! locked_kernel {
     ($class:ident, $kern:ident, $func:ident, $name:expr) => {
+        /// gpu fft locked kernel
         pub struct $class<G>
         where
             G: Group,
@@ -128,6 +134,7 @@ macro_rules! locked_kernel {
         where
             G: Group,
         {
+            /// New gpu kernel macro
             pub fn new(log_d: usize, priority: bool) -> $class<G> {
                 $class::<G> {
                     log_d,
@@ -152,7 +159,8 @@ macro_rules! locked_kernel {
                     );
                 }
             }
-
+            
+            /// Gpu kernel config
             pub fn with<F, R>(&mut self, mut f: F) -> GPUResult<R>
             where
                 F: FnMut(&mut $kern<G>) -> GPUResult<R>,

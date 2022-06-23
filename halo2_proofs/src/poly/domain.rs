@@ -490,6 +490,8 @@ pub struct PinnedEvaluationDomain<'a, G: Group> {
     omega: &'a G::Scalar,
 }
 
+/// Config gpu fft kernel
+#[cfg(feature = "gpu")]
 pub fn create_fft_kernel<G>(_log_d: usize, priority: bool) -> Option<gpu::MultiFFTKernel<G>>
 where
     G: Group,
@@ -506,11 +508,11 @@ where
     }
 }
 
-use crate::worker::Worker;
+/// Wrap `gpu_fft_multiple`
+#[cfg(feature = "gpu")]
 pub fn best_fft_multiple_gpu<G: Group>(
     kern: &mut Option<gpu::LockedMultiFFTKernel<G>>,
     polys: &mut [&mut [G::Scalar]],
-    worker: &Worker,
     omega: &G::Scalar,
     log_n: u32,
 ) -> gpu::GPUResult<()> {
@@ -526,6 +528,8 @@ pub fn best_fft_multiple_gpu<G: Group>(
     Ok(())
 }
 
+/// Use multiple gpu fft
+#[cfg(feature = "gpu")]
 pub fn gpu_fft_multiple<G: Group>(
     kern: &mut gpu::MultiFFTKernel<G>,
     polys: &mut [&mut [G::Scalar]],
@@ -537,14 +541,12 @@ pub fn gpu_fft_multiple<G: Group>(
     Ok(())
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn test_best_fft_multiple_gpu() {
     use crate::gpu::LockedMultiFFTKernel;
     use crate::pairing::bn256::Fr;
     use pairing::bn256::Bn256;
-    use crate::worker::Worker;
-
-    let worker = Worker::new();
 
     use crate::poly::{EvaluationDomain};
     use ark_std::{end_timer, start_timer};
@@ -577,7 +579,6 @@ fn test_best_fft_multiple_gpu() {
         best_fft_multiple_gpu(
             &mut fft_kern,
             &mut [&mut optimized_fft_coeffs],
-            &worker,
             &domain.get_omega(),
             k as u32,
         )
