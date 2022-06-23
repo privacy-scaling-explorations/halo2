@@ -13,12 +13,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 static WORKER_SPAWN_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// Threadpool and number_cpus
 #[cfg(feature = "gpu")]
-#[allow(unused_doc_comments)]
-#[allow(missing_docs)]
 lazy_static! {
-    // THREAD_POOL and NUM_CPUS
+    /// THREAD_POOL and NUM_CPUS
     static ref NUM_CPUS: usize = if let Ok(num) = env::var("BELLMAN_NUM_CPUS") {
         if let Ok(num) = num.parse() {
             num
@@ -28,9 +25,9 @@ lazy_static! {
     } else {
         num_cpus::get()
     };
-    // See Worker::compute below for a description of this.
+    /// See Worker::compute below for a description of this.
     static ref WORKER_SPAWN_MAX_COUNT: usize = *NUM_CPUS * 4;
-    // THREAD_POOL
+    /// THREAD_POOL
     pub static ref THREAD_POOL: rayon::ThreadPool = rayon::ThreadPoolBuilder::new()
         .num_threads(*NUM_CPUS)
         .build()
@@ -38,8 +35,7 @@ lazy_static! {
 }
 
 /// Thread pool
-#[derive(Clone)]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Worker {}
 
 impl Worker {
