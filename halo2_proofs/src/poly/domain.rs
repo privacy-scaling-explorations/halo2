@@ -562,19 +562,18 @@ fn test_best_fft_multiple_gpu() {
         // evaluation domain
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(1, k);
 
-        let mut prev_fft_coeffs = coeffs.clone();
-
-        let mut optimized_fft_coeffs = coeffs.clone();
-
         let message = format!("prev_fft degree {}", k);
         let start = start_timer!(|| message);
+
+        let mut prev_fft_coeffs = coeffs.clone();
         best_fft(&mut prev_fft_coeffs, domain.get_omega(), k);
+
         end_timer!(start);
-        //println!("coeffs cpu {:?}\n",prev_fft_coeffs);
 
         let message = format!("gpu_fft degree {}", k);
         let start = start_timer!(|| message);
 
+        let mut optimized_fft_coeffs = coeffs.clone();
         let mut fft_kern = Some(LockedMultiFFTKernel::<Fr>::new(k as usize, false));
 
         best_fft_multiple_gpu(
@@ -587,7 +586,6 @@ fn test_best_fft_multiple_gpu() {
 
         end_timer!(start);
 
-        //println!("coeffs gpu {:?}\n",optimized_fft_coeffs);
         assert_eq!(prev_fft_coeffs, optimized_fft_coeffs);
     }
 }
@@ -608,11 +606,12 @@ fn test_fft() {
         // evaluation domain
         let domain: EvaluationDomain<Fr> = EvaluationDomain::new(1, k);
 
-        let mut prev_fft_coeffs = coeffs.clone();
-
         let message = format!("prev_fft degree {}", k);
         let start = start_timer!(|| message);
+
+        let mut prev_fft_coeffs = coeffs.clone();
         best_fft(&mut prev_fft_coeffs, domain.get_omega(), k);
+
         end_timer!(start);
     }
 }
