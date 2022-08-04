@@ -126,16 +126,10 @@ pub fn create_proof<
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    struct AdviceSingle<C: CurveAffine> {
-        pub advice_values: Vec<Polynomial<C::Scalar, LagrangeCoeff>>,
-        pub advice_polys: Vec<Polynomial<C::Scalar, Coeff>>,
-        pub advice_cosets: Vec<Polynomial<C::Scalar, ExtendedLagrangeCoeff>>,
-    }
-
-    let advice: Vec<AdviceSingle<C>> = circuits
+    let advice_values: Vec<Vec<Polynomial<C::Scalar, LagrangeCoeff>>> = circuits
         .iter()
         .zip(instances.iter())
-        .map(|(circuit, instances)| -> Result<AdviceSingle<C>, Error> {
+        .map(|(circuit, instances)| -> Result<_, Error> {
             struct WitnessCollection<'a, F: Field> {
                 k: u32,
                 pub advice: Vec<Polynomial<Assigned<F>, LagrangeCoeff>>,
@@ -310,22 +304,7 @@ pub fn create_proof<
                 transcript.write_point(*commitment)?;
             }
 
-            let advice_polys: Vec<_> = advice
-                .clone()
-                .into_iter()
-                .map(|poly| domain.lagrange_to_coeff(poly))
-                .collect();
-
-            let advice_cosets: Vec<_> = advice_polys
-                .iter()
-                .map(|poly| domain.coeff_to_extended(poly.clone()))
-                .collect();
-
-            Ok(AdviceSingle {
-                advice_values: advice,
-                advice_polys,
-                advice_cosets,
-            })
+            Ok(advice)
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -334,8 +313,8 @@ pub fn create_proof<
 
     let lookups: Vec<Vec<lookup::prover::Permuted<C>>> = instance
         .iter()
-        .zip(advice.iter())
-        .map(|(instance, advice)| -> Result<Vec<_>, Error> {
+        .zip(advice_values.iter())
+        .map(|(instance, advice_values)| -> Result<Vec<_>, Error> {
             // Construct and commit to permuted values for each lookup
             pk.vk
                 .cs
@@ -347,7 +326,7 @@ pub fn create_proof<
                         params,
                         domain,
                         theta,
-                        &advice.advice_values,
+                        advice_values,
                         &pk.fixed_values,
                         &instance.instance_values,
                         transcript,
@@ -367,13 +346,13 @@ pub fn create_proof<
     // Commit to permutations.
     let permutations: Vec<permutation::prover::Committed<C>> = instance
         .iter()
-        .zip(advice.iter())
-        .map(|(instance, advice)| {
+        .zip(advice_values.iter())
+        .map(|(instance, advice_values)| {
             pk.vk.cs.permutation.commit(
                 params,
                 pk,
                 &pk.permutation,
-                &advice.advice_values,
+                advice_values,
                 &pk.fixed_values,
                 &instance.instance_values,
                 beta,
@@ -401,10 +380,21 @@ pub fn create_proof<
     // Obtain challenge for keeping all separate gates linearly independent
     let y: ChallengeY<_> = transcript.squeeze_challenge_scalar();
 
+    // Calculate the advice polys
+    let advice_polys: Vec<Vec<Polynomial<C::Scalar, Coeff>>> = advice_values
+        .into_iter()
+        .map(|advice_values| {
+            advice_values
+                .into_iter()
+                .map(|poly| domain.lagrange_to_coeff(poly))
+                .collect()
+        })
+        .collect();
+
     // Evaluate the h(X) polynomial
     let h_poly = pk.ev.evaluate_h(
         pk,
-        advice.iter().map(|a| &a.advice_cosets).collect(),
+        &advice_polys,
         instance.iter().map(|i| &i.instance_cosets).collect(),
         *y,
         *beta,
@@ -441,16 +431,13 @@ pub fn create_proof<
     }
 
     // Compute and hash advice evals for each circuit instance
-    for advice in advice.iter() {
+    for advice_polys in advice_polys.iter() {
         // Evaluate polynomials at omega^i x
         let advice_evals: Vec<_> = meta
             .advice_queries
             .iter()
             .map(|&(column, at)| {
-                eval_polynomial(
-                    &advice.advice_polys[column.index()],
-                    domain.rotate_omega(*x, at),
-                )
+                eval_polynomial(&advice_polys[column.index()], domain.rotate_omega(*x, at))
             })
             .collect();
 
@@ -498,10 +485,10 @@ pub fn create_proof<
 
     let instances = instance
         .iter()
-        .zip(advice.iter())
+        .zip(advice_polys.iter())
         .zip(permutations.iter())
         .zip(lookups.iter())
-        .flat_map(|(((instance, advice), permutation), lookups)| {
+        .flat_map(|(((instance, advice_polys), permutation), lookups)| {
             iter::empty()
                 .chain(
                     pk.vk
@@ -522,7 +509,7 @@ pub fn create_proof<
                         .map(move |&(column, at)| ProverQuery {
                             point: domain.rotate_omega(*x, at),
                             rotation: at,
-                            poly: &advice.advice_polys[column.index()],
+                            poly: &advice_polys[column.index()],
                         }),
                 )
                 .chain(permutation.open(pk, x))
