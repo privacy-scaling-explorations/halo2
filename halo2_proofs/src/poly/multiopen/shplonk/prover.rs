@@ -3,7 +3,7 @@ use super::{
 };
 use crate::arithmetic::{
     eval_polynomial, evaluate_vanishing_polynomial, kate_division, lagrange_interpolate,
-    CurveAffine, FieldExt,
+    parallelize, CurveAffine, FieldExt,
 };
 use crate::poly::multiopen::ProverQuery;
 use crate::poly::{commitment::Params, Coeff, Error, Polynomial, Rotation};
@@ -30,9 +30,8 @@ struct CommitmentExtension<'a, C: CurveAffine> {
 }
 
 impl<'a, C: CurveAffine> Commitment<C::Scalar, PolynomialPointer<'a, C>> {
-    fn extend(&self, n: u64, points: Vec<C::Scalar>) -> CommitmentExtension<'a, C> {
-        let mut poly = lagrange_interpolate(&points[..], &self.evals()[..]);
-        poly.resize(n as usize, C::Scalar::zero());
+    fn extend(&self, _n: u64, points: Vec<C::Scalar>) -> CommitmentExtension<'a, C> {
+        let poly = lagrange_interpolate(&points[..], &self.evals()[..]);
 
         let low_degree_equivalent = Polynomial {
             values: poly,
@@ -54,8 +53,17 @@ impl<'a, C: CurveAffine> CommitmentExtension<'a, C> {
     }
 
     fn quotient_contribution(&self) -> Polynomial<C::Scalar, Coeff> {
-        let p_x = self.commitment.get().poly.clone();
-        p_x - &self.low_degree_equivalent
+        let range = self.low_degree_equivalent.len();
+        let mut p_x = self.commitment.get().poly.clone();
+        parallelize(&mut p_x.values[0..range], |lhs, start| {
+            for (lhs, rhs) in lhs
+                .iter_mut()
+                .zip(self.low_degree_equivalent.values[start..].iter())
+            {
+                *lhs -= *rhs;
+            }
+        });
+        p_x
     }
 }
 
@@ -144,12 +152,10 @@ where
 
     let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
 
-    let quotient_polynomials: Vec<Polynomial<C::Scalar, Coeff>> =
-        rotation_sets.iter().map(quotient_contribution).collect();
+    let quotient_polynomials = rotation_sets.iter().map(quotient_contribution);
 
-    let h_x: Polynomial<C::Scalar, Coeff> = quotient_polynomials
-        .iter()
-        .fold(zero(), |acc, u_x| (acc * *v) + u_x);
+    let h_x: Polynomial<C::Scalar, Coeff> =
+        quotient_polynomials.fold(zero(), |acc, u_x| (acc * *v) + &u_x);
 
     let h = params.commit(&h_x).to_affine();
     transcript.write_point(h)?;
