@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, RangeFrom, RangeFull, Sub};
 
 pub mod commitment;
-mod domain;
+pub mod domain;
 mod msm;
 pub mod multiopen;
 

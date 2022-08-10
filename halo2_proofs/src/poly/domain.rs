@@ -10,7 +10,13 @@ use super::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, Rotation};
 
 use group::ff::{BatchInvert, Field, PrimeField};
 
+use group::Group as CryptGroup;
+
 use std::marker::PhantomData;
+
+#[cfg(feature = "gpu")]
+use crate::gpu;
+use log::{info, warn};
 
 /// This structure contains precomputed constants and other details needed for
 /// performing operations on an evaluation domain of size $2^k$ and an extended
@@ -483,6 +489,131 @@ pub struct PinnedEvaluationDomain<'a, G: Group> {
     k: &'a u32,
     extended_k: &'a u32,
     omega: &'a G::Scalar,
+}
+
+/// Config gpu fft kernel
+#[cfg(feature = "gpu")]
+pub fn create_fft_kernel<G>(_log_d: usize, priority: bool) -> Option<gpu::MultiFFTKernel<G>>
+where
+    G: Group,
+{
+    match gpu::MultiFFTKernel::create(priority) {
+        Ok(k) => {
+            info!("GPU FFT kernel instantiated!");
+            Some(k)
+        }
+        Err(e) => {
+            warn!("Cannot instantiate GPU FFT kernel! Error: {}", e);
+            None
+        }
+    }
+}
+
+/// Wrap `gpu_fft_multiple`
+#[cfg(feature = "gpu")]
+pub fn best_fft_multiple_gpu<G: Group>(
+    kern: &mut Option<gpu::LockedMultiFFTKernel<G>>,
+    polys: &mut [&mut [G::Scalar]],
+    omega: &G::Scalar,
+    log_n: u32,
+) -> gpu::GPUResult<()> {
+    if let Some(ref mut kern) = kern {
+        if kern
+            .with(|k: &mut gpu::MultiFFTKernel<G>| gpu_fft_multiple(k, polys, omega, log_n))
+            .is_ok()
+        {
+            println!("use multiple GPUs");
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
+/// Use multiple gpu fft
+#[cfg(feature = "gpu")]
+pub fn gpu_fft_multiple<G: Group>(
+    kern: &mut gpu::MultiFFTKernel<G>,
+    polys: &mut [&mut [G::Scalar]],
+    omega: &G::Scalar,
+    log_n: u32,
+) -> gpu::GPUResult<()> {
+    kern.fft_multiple(polys, omega, log_n)?;
+
+    Ok(())
+}
+
+#[cfg(feature = "gpu")]
+#[test]
+fn test_best_fft_multiple_gpu() {
+    use crate::gpu::LockedMultiFFTKernel;
+    use crate::pairing::bn256::Fr;
+    use pairing::bn256::Bn256;
+
+    use crate::poly::EvaluationDomain;
+    use ark_std::{end_timer, start_timer};
+    use rand_core::OsRng;
+
+    for k in 1..20 {
+        let rng = OsRng;
+        // polynomial degree n = 2^k
+        let n = 1u64 << k;
+        // polynomial coeffs
+        let coeffs: Vec<_> = (0..n).map(|_| Fr::random(rng)).collect();
+        // evaluation domain
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(1, k);
+
+        let message = format!("prev_fft degree {}", k);
+        let start = start_timer!(|| message);
+
+        let mut prev_fft_coeffs = coeffs.clone();
+        best_fft(&mut prev_fft_coeffs, domain.get_omega(), k);
+
+        end_timer!(start);
+
+        let message = format!("gpu_fft degree {}", k);
+        let start = start_timer!(|| message);
+
+        let mut optimized_fft_coeffs = coeffs.clone();
+        let mut fft_kern = Some(LockedMultiFFTKernel::<Fr>::new(k as usize, false));
+
+        best_fft_multiple_gpu(
+            &mut fft_kern,
+            &mut [&mut optimized_fft_coeffs],
+            &domain.get_omega(),
+            k as u32,
+        )
+        .unwrap();
+
+        end_timer!(start);
+
+        assert_eq!(prev_fft_coeffs, optimized_fft_coeffs);
+    }
+}
+
+#[test]
+fn test_fft() {
+    use crate::poly::EvaluationDomain;
+    use ark_std::{end_timer, start_timer};
+    use pairing::bn256::Fr;
+    use rand_core::OsRng;
+
+    for k in 1..20 {
+        let rng = OsRng;
+        // polynomial degree n = 2^k
+        let n = 1u64 << k;
+        // polynomial coeffs
+        let coeffs: Vec<_> = (0..n).map(|_| Fr::random(rng)).collect();
+        // evaluation domain
+        let domain: EvaluationDomain<Fr> = EvaluationDomain::new(1, k);
+
+        let message = format!("prev_fft degree {}", k);
+        let start = start_timer!(|| message);
+
+        let mut prev_fft_coeffs = coeffs.clone();
+        best_fft(&mut prev_fft_coeffs, domain.get_omega(), k);
+
+        end_timer!(start);
+    }
 }
 
 #[test]
