@@ -3,7 +3,7 @@ use group::Curve;
 
 use super::{Argument, ProvingKey, VerifyingKey};
 use crate::{
-    arithmetic::{CurveAffine, FieldExt},
+    arithmetic::{parallelize, CurveAffine, FieldExt},
     plonk::{Any, Column, Error},
     poly::{
         commitment::{Blind, CommitmentScheme, Params},
@@ -109,13 +109,16 @@ impl Assembly {
         p: &Argument,
     ) -> VerifyingKey<C> {
         // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-        let mut omega_powers = Vec::with_capacity(params.n() as usize);
+        let mut omega_powers = vec![C::Scalar::zero(); params.n as usize];
         {
-            let mut cur = C::Scalar::one();
-            for _ in 0..params.n() {
-                omega_powers.push(cur);
-                cur *= &domain.get_omega();
-            }
+            let omega = domain.get_omega();
+            parallelize(&mut omega_powers, |o, start| {
+                let mut cur = omega.pow_vartime(&[start as u64]);
+                for v in o.iter_mut() {
+                    *v = cur;
+                    cur *= &omega;
+                }
+            })
         }
 
         // Compute [omega_powers * \delta^0, omega_powers * \delta^1, ..., omega_powers * \delta^m]
@@ -162,13 +165,16 @@ impl Assembly {
         p: &Argument,
     ) -> ProvingKey<C> {
         // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-        let mut omega_powers = Vec::with_capacity(params.n() as usize);
+        let mut omega_powers = vec![C::Scalar::zero(); params.n as usize];
         {
-            let mut cur = C::Scalar::one();
-            for _ in 0..params.n() {
-                omega_powers.push(cur);
-                cur *= &domain.get_omega();
-            }
+            let omega = domain.get_omega();
+            parallelize(&mut omega_powers, |o, start| {
+                let mut cur = omega.pow_vartime(&[start as u64]);
+                for v in o.iter_mut() {
+                    *v = cur;
+                    cur *= &omega;
+                }
+            })
         }
 
         // Compute [omega_powers * \delta^0, omega_powers * \delta^1, ..., omega_powers * \delta^m]
