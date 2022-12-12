@@ -182,22 +182,125 @@ pub fn create_proof<
                 .ok_or(Error::BoundsFailure)
         }
 
-        fn assign_advice<V, VR, A, AR>(
-            &mut self,
-            _: A,
-            column: Column<Advice>,
-            row: usize,
-            to: V,
-        ) -> Result<(), Error>
-        where
-            V: FnOnce() -> Value<VR>,
-            VR: Into<Assigned<F>>,
-            A: FnOnce() -> AR,
-            AR: Into<String>,
-        {
-            // Ignore assignment of advice column in different phase than current one.
-            if self.current_phase != column.column_type().phase {
-                return Ok(());
+                fn exit_region(&mut self) {
+                    // Do nothing; we don't care about regions in this context.
+                }
+
+                fn enable_selector<A, AR>(
+                    &mut self,
+                    _: A,
+                    _: &Selector,
+                    _: usize,
+                ) -> Result<(), Error>
+                where
+                    A: FnOnce() -> AR,
+                    AR: Into<String>,
+                {
+                    // We only care about advice columns here
+
+                    Ok(())
+                }
+
+                fn query_instance(
+                    &self,
+                    column: Column<Instance>,
+                    row: usize,
+                ) -> Result<Value<F>, Error> {
+                    if !self.usable_rows.contains(&row) {
+                        return Err(Error::not_enough_rows_available(self.k));
+                    }
+
+                    self.instances
+                        .get(column.index())
+                        .and_then(|column| column.get(row))
+                        .map(|v| Value::known(*v))
+                        .ok_or(Error::BoundsFailure)
+                }
+
+                fn assign_advice<V, VR, A, AR>(
+                    &mut self,
+                    _: A,
+                    column: Column<Advice>,
+                    row: usize,
+                    to: V,
+                ) -> Result<(), Error>
+                where
+                    V: FnOnce() -> Value<VR>,
+                    VR: Into<Assigned<F>>,
+                    A: FnOnce() -> AR,
+                    AR: Into<String>,
+                {
+                    if !self.usable_rows.contains(&row) {
+                        return Err(Error::not_enough_rows_available(self.k));
+                    }
+
+                    *self
+                        .advice
+                        .get_mut(column.index())
+                        .and_then(|v| v.get_mut(row))
+                        .ok_or(Error::BoundsFailure)? = to().into_field().assign()?;
+
+                    Ok(())
+                }
+
+                fn assign_fixed<V, VR, A, AR>(
+                    &mut self,
+                    _: A,
+                    _: Column<Fixed>,
+                    _: usize,
+                    _: V,
+                ) -> Result<(), Error>
+                where
+                    V: FnOnce() -> Value<VR>,
+                    VR: Into<Assigned<F>>,
+                    A: FnOnce() -> AR,
+                    AR: Into<String>,
+                {
+                    // We only care about advice columns here
+
+                    Ok(())
+                }
+
+                fn copy(
+                    &mut self,
+                    _: Column<Any>,
+                    _: usize,
+                    _: Column<Any>,
+                    _: usize,
+                ) -> Result<(), Error> {
+                    // We only care about advice columns here
+
+                    Ok(())
+                }
+
+                fn fill_from_row(
+                    &mut self,
+                    _: Column<Fixed>,
+                    _: usize,
+                    _: Value<Assigned<F>>,
+                ) -> Result<(), Error> {
+                    Ok(())
+                }
+
+                fn annotate_column<A, AR>(&mut self, annotation: A, column: Column<Any>)
+                where
+                    A: FnOnce() -> AR,
+                    AR: Into<String>,
+                {
+                    unimplemented!()
+                }
+
+                fn push_namespace<NR, N>(&mut self, _: N)
+                where
+                    NR: Into<String>,
+                    N: FnOnce() -> NR,
+                {
+                    // Do nothing; we don't care about namespaces in this context.
+                }
+
+                fn pop_namespace(&mut self, _: Option<String>) {
+                    // Do nothing; we don't care about namespaces in this context.
+                }
             }
 
             if !self.usable_rows.contains(&row) {

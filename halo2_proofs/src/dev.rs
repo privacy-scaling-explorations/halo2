@@ -28,6 +28,7 @@ use rayon::{
 };
 
 pub mod metadata;
+use metadata::Column as ColumnMetadata;
 mod util;
 
 mod failure;
@@ -57,7 +58,9 @@ struct Region {
     /// The selectors that have been enabled in this region. All other selectors are by
     /// construction not enabled.
     enabled_selectors: HashMap<Selector, Vec<usize>>,
-    /// The cells assigned in this region. We store this as a `HashMap` with count so that if any cells
+    /// Annotations of the columns.
+    annotations: HashMap<ColumnMetadata, String>,
+    /// The cells assigned in this region. We store this as a `Vec` so that if any cells
     /// are double-assigned, they will be visibly darker.
     cells: HashMap<(Column<Any>, usize), usize>,
 }
@@ -316,6 +319,7 @@ impl<F: Field + Group> Assignment<F> for MockProver<F> {
             name: name().into(),
             columns: HashSet::default(),
             rows: None,
+            annotations: HashMap::default(),
             enabled_selectors: HashMap::default(),
             cells: HashMap::default(),
         });
@@ -323,6 +327,18 @@ impl<F: Field + Group> Assignment<F> for MockProver<F> {
 
     fn exit_region(&mut self) {
         self.regions.push(self.current_region.take().unwrap());
+    }
+
+    fn annotate_column<A, AR>(&mut self, annotation: A, column: Column<Any>)
+    where
+        A: FnOnce() -> AR,
+        AR: Into<String>,
+    {
+        if let Some(region) = self.current_region.as_mut() {
+            region
+                .annotations
+                .insert(ColumnMetadata::from(column), annotation().into());
+        }
     }
 
     fn enable_selector<A, AR>(&mut self, _: A, selector: &Selector, row: usize) -> Result<(), Error>
@@ -636,17 +652,39 @@ impl<F: FieldExt> MockProver<F> {
                                 // Determine where this cell should have been assigned.
                                 let cell_row = ((gate_row + n + cell.rotation.0) % n) as usize;
 
-                                // Check that it was assigned!
-                                if r.cells.contains_key(&(cell.column, cell_row)) {
-                                    None
-                                } else {
-                                    Some(VerifyFailure::CellNotAssigned {
-                                        gate: (gate_index, gate.name()).into(),
-                                        region: (r_i, r.name.clone()).into(),
-                                        gate_offset: *selector_row,
-                                        column: cell.column,
-                                        offset: cell_row as isize - r.rows.unwrap().0 as isize,
-                                    })
+                                match cell.column.column_type() {
+                                    Any::Instance => {
+                                        // Handle instance cells, which are not in the region.
+                                        let instance_value =
+                                            &self.instance[cell.column.index()][cell_row];
+                                        match instance_value {
+                                            InstanceValue::Assigned(_) => None,
+                                            _ => Some(VerifyFailure::InstanceCellNotAssigned {
+                                                gate: (gate_index, gate.name()).into(),
+                                                region: (r_i, r.name.clone(), &r.annotations)
+                                                    .into(),
+                                                gate_offset: *selector_row,
+                                                column: cell.column.try_into().unwrap(),
+                                                row: cell_row,
+                                            }),
+                                        }
+                                    }
+                                    _ => {
+                                        // Check that it was assigned!
+                                        if r.cells.contains(&(cell.column, cell_row)) {
+                                            None
+                                        } else {
+                                            Some(VerifyFailure::CellNotAssigned {
+                                                gate: (gate_index, gate.name()).into(),
+                                                region: (r_i, r.name.clone(), &r.annotations)
+                                                    .into(),
+                                                gate_offset: *selector_row,
+                                                column: cell.column,
+                                                offset: cell_row as isize
+                                                    - r.rows.unwrap().0 as isize,
+                                            })
+                                        }
+                                    }
                                 }
                             })
                         })
@@ -860,6 +898,7 @@ impl<F: FieldExt> MockProver<F> {
                                         *input_row,
                                         lookup.input_expressions.iter(),
                                     ),
+                                    //annotations: Some(&self.cs.lookup_annotations),
                                 })
                             } else {
                                 None
@@ -1346,7 +1385,7 @@ mod tests {
     use crate::{
         circuit::{Layouter, SimpleFloorPlanner, Value},
         plonk::{
-            Advice, Any, Circuit, Column, ConstraintSystem, Error, Expression, Selector,
+            Advice, Any, Circuit, Column, ConstraintSystem, Error, Expression, Fixed, Selector,
             TableColumn,
         },
         poly::Rotation,
@@ -1359,6 +1398,7 @@ mod tests {
         #[derive(Clone)]
         struct FaultyCircuitConfig {
             a: Column<Advice>,
+            b: Column<Advice>,
             q: Selector,
         }
 
@@ -1382,7 +1422,7 @@ mod tests {
                     vec![q * (a - b)]
                 });
 
-                FaultyCircuitConfig { a, q }
+                FaultyCircuitConfig { a, b, q }
             }
 
             fn without_witnesses(&self) -> Self {
@@ -1403,6 +1443,12 @@ mod tests {
                         // Assign a = 0.
                         region.assign_advice(|| "a", config.a, 0, || Value::known(Fp::zero()))?;
 
+                        // Name Column a
+                        region.name_column(|| "This is annotated!", config.a);
+
+                        // Name Column b
+                        region.name_column(|| "This is also annotated!", config.b);
+
                         // BUG: Forget to assign b = 0! This could go unnoticed during
                         // development, because cell values default to zero, which in this
                         // case is fine, but for other assignments would be broken.
@@ -1413,16 +1459,17 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        assert_eq!(
-            prover.verify(),
-            Err(vec![VerifyFailure::CellNotAssigned {
-                gate: (0, "Equality check").into(),
-                region: (0, "Faulty synthesis".to_owned()).into(),
-                gate_offset: 1,
-                column: Column::new(1, Any::advice()),
-                offset: 1,
-            }])
-        );
+        prover.assert_satisfied();
+        // assert_eq!(
+        //     prover.verify(),
+        //     Err(vec![VerifyFailure::CellNotAssigned {
+        //         gate: (0, "Equality check").into(),
+        //         region: (0, "Faulty synthesis".to_owned()).into(),
+        //         gate_offset: 1,
+        //         column: Column::new(1, Any::Advice),
+        //         offset: 1,
+        //     }])
+        // );
     }
 
     #[test]
@@ -1446,6 +1493,7 @@ mod tests {
                 let a = meta.advice_column();
                 let q = meta.complex_selector();
                 let table = meta.lookup_table_column();
+                meta.annotate_lookup_column(table, || "Table Lookup");
 
                 meta.lookup("lookup", |cells| {
                     let a = cells.query_advice(a, Rotation::cur());
@@ -1534,6 +1582,8 @@ mod tests {
                             || Value::known(Fp::from(5)),
                         )?;
 
+                        region.name_column(|| "Witness example", config.a);
+
                         Ok(())
                     },
                 )
@@ -1541,16 +1591,153 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        assert_eq!(
-            prover.verify(),
-            Err(vec![VerifyFailure::Lookup {
-                name: "lookup",
-                lookup_index: 0,
-                location: FailureLocation::InRegion {
-                    region: (2, "Faulty synthesis").into(),
-                    offset: 1,
-                }
-            }])
-        );
+        prover.assert_satisfied();
+        // assert_eq!(
+        //     prover.verify(),
+        //     Err(vec![VerifyFailure::Lookup {
+        //         lookup_index: 0,
+        //         location: FailureLocation::InRegion {
+        //             region: (2, "Faulty synthesis").into(),
+        //             offset: 1,
+        //         }
+        //     }])
+        // );
+    }
+
+    #[test]
+    fn contraint_unsatisfied() {
+        const K: u32 = 4;
+
+        #[derive(Clone)]
+        struct FaultyCircuitConfig {
+            a: Column<Advice>,
+            b: Column<Advice>,
+            c: Column<Advice>,
+            d: Column<Fixed>,
+            q: Selector,
+        }
+
+        struct FaultyCircuit {}
+
+        impl Circuit<Fp> for FaultyCircuit {
+            type Config = FaultyCircuitConfig;
+            type FloorPlanner = SimpleFloorPlanner;
+
+            fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
+                let a = meta.advice_column();
+                let b = meta.advice_column();
+                let c = meta.advice_column();
+                let d = meta.fixed_column();
+                let q = meta.selector();
+
+                meta.create_gate("Equality check", |cells| {
+                    let a = cells.query_advice(a, Rotation::cur());
+                    let b = cells.query_advice(b, Rotation::cur());
+                    let c = cells.query_advice(c, Rotation::cur());
+                    let d = cells.query_fixed(d, Rotation::cur());
+                    let q = cells.query_selector(q);
+
+                    // If q is enabled, a and b must be assigned to.
+                    vec![q * (a - b) * (c - d)]
+                });
+
+                FaultyCircuitConfig { a, b, c, d, q }
+            }
+
+            fn without_witnesses(&self) -> Self {
+                Self {}
+            }
+
+            fn synthesize(
+                &self,
+                config: Self::Config,
+                mut layouter: impl Layouter<Fp>,
+            ) -> Result<(), Error> {
+                layouter.assign_region(
+                    || "Correct synthesis",
+                    |mut region| {
+                        // Enable the equality gate.
+                        config.q.enable(&mut region, 0)?;
+
+                        // Assign a = 1.
+                        region.assign_advice(|| "a", config.a, 0, || Value::known(Fp::one()))?;
+
+                        // Assign b = 1.
+                        region.assign_advice(|| "b", config.b, 0, || Value::known(Fp::one()))?;
+
+                        // Assign c = 5.
+                        region.assign_advice(
+                            || "c",
+                            config.c,
+                            0,
+                            || Value::known(Fp::from(5u64)),
+                        )?;
+                        // Assign d = 7.
+                        region.assign_fixed(
+                            || "d",
+                            config.d,
+                            0,
+                            || Value::known(Fp::from(7u64)),
+                        )?;
+                        Ok(())
+                    },
+                )?;
+                layouter.assign_region(
+                    || "Wrong synthesis",
+                    |mut region| {
+                        // Enable the equality gate.
+                        config.q.enable(&mut region, 0)?;
+
+                        // Assign a = 1.
+                        region.assign_advice(|| "a", config.a, 0, || Value::known(Fp::one()))?;
+
+                        // Assign b = 0.
+                        region.assign_advice(|| "b", config.b, 0, || Value::known(Fp::zero()))?;
+
+                        // Name Column a
+                        region.name_column(|| "This is Advice!", config.a);
+                        // Name Column b
+                        region.name_column(|| "This is Advice too!", config.b);
+
+                        // Assign c = 5.
+                        region.assign_advice(
+                            || "c",
+                            config.c,
+                            0,
+                            || Value::known(Fp::from(5u64)),
+                        )?;
+                        // Assign d = 7.
+                        region.assign_fixed(
+                            || "d",
+                            config.d,
+                            0,
+                            || Value::known(Fp::from(7u64)),
+                        )?;
+
+                        // Name Column c
+                        region.name_column(|| "Another one!", config.c);
+                        // Name Column d
+                        region.name_column(|| "This is a Fixed!", config.d);
+
+                        // Note that none of the terms cancel eachother. Therefore we will have a constraint that is non satisfied for
+                        // the `Equalty check` gate.
+                        Ok(())
+                    },
+                )
+            }
+        }
+
+        let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
+        prover.assert_satisfied();
+        // assert_eq!(
+        //     prover.verify(),
+        //     Err(vec![VerifyFailure::CellNotAssigned {
+        //         gate: (0, "Equality check").into(),
+        //         region: (0, "Faulty synthesis".to_owned()).into(),
+        //         gate_offset: 1,
+        //         column: Column::new(1, Any::Advice),
+        //         offset: 1,
+        //     }])
+        // );
     }
 }
