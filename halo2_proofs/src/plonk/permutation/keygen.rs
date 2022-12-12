@@ -109,7 +109,7 @@ impl Assembly {
         p: &Argument,
     ) -> VerifyingKey<C> {
         // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-        let mut omega_powers = vec![C::Scalar::zero(); params.n as usize];
+        let mut omega_powers = vec![C::Scalar::zero(); params.n() as usize];
         {
             let omega = domain.get_omega();
             parallelize(&mut omega_powers, |o, start| {
@@ -165,7 +165,7 @@ impl Assembly {
         p: &Argument,
     ) -> ProvingKey<C> {
         // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-        let mut omega_powers = vec![C::Scalar::zero(); params.n as usize];
+        let mut omega_powers = vec![C::Scalar::zero(); params.n() as usize];
         {
             let omega = domain.get_omega();
             parallelize(&mut omega_powers, |o, start| {
