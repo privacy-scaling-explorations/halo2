@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::iter;
 
@@ -19,12 +19,12 @@ use crate::{
 mod emitter;
 
 /// The location within the circuit at which a particular [`VerifyFailure`] occurred.
-#[derive(Debug, PartialEq)]
-pub enum FailureLocation {
+#[derive(Debug, PartialEq, Eq)]
+pub enum FailureLocation<'a> {
     /// A location inside a region.
     InRegion {
         /// The region in which the failure occurred.
-        region: metadata::Region,
+        region: metadata::Region<'a>,
         /// The offset (relative to the start of the region) at which the failure
         /// occurred.
         offset: usize,
@@ -36,7 +36,7 @@ pub enum FailureLocation {
     },
 }
 
-impl fmt::Display for FailureLocation {
+impl<'a> fmt::Display for FailureLocation<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InRegion { region, offset } => write!(f, "in {} at offset {}", region, offset),
@@ -47,10 +47,10 @@ impl fmt::Display for FailureLocation {
     }
 }
 
-impl FailureLocation {
-    pub(super) fn find_expressions<'a, F: Field>(
+impl<'a> FailureLocation<'a> {
+    pub(super) fn find_expressions<F: Field>(
         cs: &ConstraintSystem<F>,
-        regions: &[Region],
+        regions: &'a [Region],
         failure_row: usize,
         failure_expressions: impl Iterator<Item = &'a Expression<F>>,
     ) -> Self {
@@ -82,7 +82,7 @@ impl FailureLocation {
 
     /// Figures out whether the given row and columns overlap an assigned region.
     pub(super) fn find(
-        regions: &[Region],
+        regions: &'a [Region],
         failure_row: usize,
         failure_columns: HashSet<Column<Any>>,
     ) -> Self {
@@ -99,24 +99,21 @@ impl FailureLocation {
                 (start..=end).contains(&failure_row) && !failure_columns.is_disjoint(&r.columns)
             })
             .map(|(r_i, r)| FailureLocation::InRegion {
-                region: (r_i, r.name.clone()).into(),
-                offset: failure_row as usize - r.rows.unwrap().0 as usize,
-            })
-            .unwrap_or_else(|| FailureLocation::OutsideRegion {
-                row: failure_row as usize,
+                region: (r_i, r.name.clone(), &r.annotations).into(),
+                offset: failure_row - r.rows.unwrap().0,
             })
     }
 }
 
 /// The reasons why a particular circuit is not satisfied.
-#[derive(Debug, PartialEq)]
-pub enum VerifyFailure {
+#[derive(Debug, PartialEq, Eq)]
+pub enum VerifyFailure<'a> {
     /// A cell used in an active gate was not assigned to.
     CellNotAssigned {
         /// The index of the active gate.
         gate: metadata::Gate,
         /// The region in which this cell should be assigned.
-        region: metadata::Region,
+        region: metadata::Region<'a>,
         /// The offset (relative to the start of the region) at which the active gate
         /// queries this cell.
         gate_offset: usize,
@@ -127,6 +124,20 @@ pub enum VerifyFailure {
         /// offset 0, but the gate uses `Rotation::prev()`).
         offset: isize,
     },
+    /// An instance cell used in an active gate was not assigned to.
+    InstanceCellNotAssigned {
+        /// The index of the active gate.
+        gate: metadata::Gate,
+        /// The region in which this gate was activated.
+        region: metadata::Region<'a>,
+        /// The offset (relative to the start of the region) at which the active gate
+        /// queries this cell.
+        gate_offset: usize,
+        /// The column in which this cell should be assigned.
+        column: Column<Instance>,
+        /// The absolute row at which this cell should be assigned.
+        row: usize,
+    },
     /// A constraint was not satisfied for a particular row.
     ConstraintNotSatisfied {
         /// The polynomial constraint that is not satisfied.
@@ -135,7 +146,7 @@ pub enum VerifyFailure {
         ///
         /// `FailureLocation::OutsideRegion` is usually caused by a constraint that does
         /// not contain a selector, and as a result is active on every row.
-        location: FailureLocation,
+        location: FailureLocation<'a>,
         /// The values of the virtual cells used by this constraint.
         cell_values: Vec<(metadata::VirtualCell, String)>,
     },
@@ -164,18 +175,20 @@ pub enum VerifyFailure {
         ///   in the table when the lookup is not being used.
         /// - The input expressions use a column queried at a non-zero `Rotation`, and the
         ///   lookup is active on a row adjacent to an unrelated region.
-        location: FailureLocation,
+        location: FailureLocation<'a>,
+        // Maps lookup columns to their annotations from an outside-region perspective.
+        //annotations: Option<&'a HashMap<usize, String>>,
     },
     /// A permutation did not preserve the original value of a cell.
     Permutation {
         /// The column in which this permutation is not satisfied.
         column: metadata::Column,
         /// The location at which the permutation is not satisfied.
-        location: FailureLocation,
+        location: FailureLocation<'a>,
     },
 }
 
-impl fmt::Display for VerifyFailure {
+impl<'a> fmt::Display for VerifyFailure<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CellNotAssigned {
@@ -332,6 +345,8 @@ fn render_constraint_not_satisfied<F: Field>(
             .entry(cell.column)
             .or_insert(format!("x{}", i));
     }
+
+    dbg!(location);
 
     eprintln!("error: constraint not satisfied");
     emitter::render_cell_layout("  ", location, &columns, &layout, |_, rotation| {
@@ -498,6 +513,25 @@ fn render_lookup<F: FieldExt>(
             emitter::expression_to_string(input, &layout)
         );
         eprintln!("    ^");
+        // // Include into the FailureLocation the TableColumns that we want to be annotated when displayed.
+        // let mut location_extended = location.clone();
+        // match location_extended {
+        //     FailureLocation::InRegion { mut region, offset } => {
+        //         if region.column_annotations.is_none() {
+        //             ()
+        //         } else if let Some(annotation) = prover.cs.lookup_annotations.get(&lookup_index) {
+        //             region
+        //                 .column_annotations
+        //                 .as_mut()
+        //                 .unwrap()
+        //                 .insert(lookup_index, annotation.clone());
+        //         } else {
+        //             ()
+        //         }
+        //     }
+        //     _ => (),
+        // };
+
         emitter::render_cell_layout("    | ", location, &columns, &layout, |_, rotation| {
             if rotation == 0 {
                 eprint!(" <--{{ Lookup '{}' inputs queried here", name);
@@ -513,7 +547,7 @@ fn render_lookup<F: FieldExt>(
     }
 }
 
-impl VerifyFailure {
+impl<'a> VerifyFailure<'a> {
     /// Emits this failure in pretty-printed format to stderr.
     pub(super) fn emit<F: FieldExt>(&self, prover: &MockProver<F>) {
         match self {
