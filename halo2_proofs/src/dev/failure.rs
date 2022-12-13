@@ -346,8 +346,6 @@ fn render_constraint_not_satisfied<F: Field>(
             .or_insert(format!("x{}", i));
     }
 
-    dbg!(location);
-
     eprintln!("error: constraint not satisfied");
     emitter::render_cell_layout("  ", location, &columns, &layout, |_, rotation| {
         if rotation == 0 {
@@ -455,9 +453,19 @@ fn render_lookup<F: FieldExt>(
     for i in 0..lookup.input_expressions.len() {
         eprint!("{}L{}", if i == 0 { "" } else { ", " }, i);
     }
+
     eprint!(") ∉ (");
-    for (i, column) in lookup_columns.enumerate() {
-        eprint!("{}{}", if i == 0 { "" } else { ", " }, column);
+    for (i, column) in table_columns.enumerate() {
+        eprint!(
+            "{}{}",
+            if i == 0 { "" } else { ", " },
+            prover
+                .cs
+                .lookup_annotations
+                .get(&column)
+                .cloned()
+                .unwrap_or_else(|| format!("{}", column))
+        );
     }
     eprintln!(")");
 
@@ -513,24 +521,6 @@ fn render_lookup<F: FieldExt>(
             emitter::expression_to_string(input, &layout)
         );
         eprintln!("    ^");
-        // // Include into the FailureLocation the TableColumns that we want to be annotated when displayed.
-        // let mut location_extended = location.clone();
-        // match location_extended {
-        //     FailureLocation::InRegion { mut region, offset } => {
-        //         if region.column_annotations.is_none() {
-        //             ()
-        //         } else if let Some(annotation) = prover.cs.lookup_annotations.get(&lookup_index) {
-        //             region
-        //                 .column_annotations
-        //                 .as_mut()
-        //                 .unwrap()
-        //                 .insert(lookup_index, annotation.clone());
-        //         } else {
-        //             ()
-        //         }
-        //     }
-        //     _ => (),
-        // };
 
         emitter::render_cell_layout("    | ", location, &columns, &layout, |_, rotation| {
             if rotation == 0 {
