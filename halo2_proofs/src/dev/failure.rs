@@ -13,7 +13,7 @@ use super::{
 };
 use crate::dev::metadata::Constraint;
 use crate::{
-    dev::Value,
+    dev::{Instance, Value},
     plonk::{Any, Column, ConstraintSystem, Expression, Gate},
     poly::Rotation,
 };
@@ -104,6 +104,7 @@ impl<'a> FailureLocation<'a> {
                 region: (r_i, r.name.clone(), &r.annotations).into(),
                 offset: failure_row - r.rows.unwrap().0,
             })
+            .unwrap_or_else(|| FailureLocation::OutsideRegion { row: failure_row })
     }
 }
 
@@ -125,20 +126,6 @@ pub enum VerifyFailure<'a> {
         /// assigned. This may be negative (for example, if a selector enables a gate at
         /// offset 0, but the gate uses `Rotation::prev()`).
         offset: isize,
-    },
-    /// An instance cell used in an active gate was not assigned to.
-    InstanceCellNotAssigned {
-        /// The index of the active gate.
-        gate: metadata::Gate,
-        /// The region in which this gate was activated.
-        region: metadata::Region<'a>,
-        /// The offset (relative to the start of the region) at which the active gate
-        /// queries this cell.
-        gate_offset: usize,
-        /// The column in which this cell should be assigned.
-        column: Column<Instance>,
-        /// The absolute row at which this cell should be assigned.
-        row: usize,
     },
     /// A constraint was not satisfied for a particular row.
     ConstraintNotSatisfied {

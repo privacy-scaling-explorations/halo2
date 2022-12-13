@@ -6,7 +6,7 @@ use group::ff::Field;
 use super::FailureLocation;
 use crate::{
     dev::{metadata, util},
-    plonk::{Any, Expression},
+    plonk::{Advice, Any, Expression},
 };
 
 fn padded(p: char, width: usize, text: &str) -> String {
@@ -24,7 +24,7 @@ fn column_type_and_idx(column: &metadata::Column) -> String {
     format!(
         "{}{}",
         match column.column_type {
-            Any::Advice => "A",
+            Any::Advice(_) => "A",
             Any::Fixed => "F",
             Any::Instance => "I",
         },
