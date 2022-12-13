@@ -1,14 +1,15 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::fmt::{self, Debug};
 
 use group::ff::Field;
 use halo2curves::FieldExt;
 
 use super::metadata::DebugVirtualCell;
+use super::MockProver;
 use super::{
     metadata,
     util::{self, AnyQuery},
-    MockProver, Region,
+    Region,
 };
 use crate::dev::metadata::Constraint;
 use crate::{
@@ -213,13 +214,15 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
                 writeln!(f, "{} is not satisfied {}", constraint, location)?;
                 for (dvc, value) in cell_values.iter().map(|(vc, string)| {
                     let ann_map = match location {
-                        FailureLocation::InRegion { region, offset } => region.column_annotations,
+                        FailureLocation::InRegion { region, offset: _ } => {
+                            region.column_annotations
+                        }
                         _ => None,
                     };
 
                     (DebugVirtualCell::from((vc, ann_map)), string)
                 }) {
-                    writeln!(f, "- {} = {}", dvc, value);
+                    let _ = writeln!(f, "- {} = {}", dvc, value);
                 }
 
                 Ok(())
@@ -261,7 +264,6 @@ impl<'a> Debug for VerifyFailure<'a> {
                 location,
                 cell_values,
             } => {
-                let constraint: Constraint = constraint.clone();
                 #[derive(Debug)]
                 struct ConstraintCaseDebug<'a> {
                     constraint: Constraint,
@@ -270,12 +272,12 @@ impl<'a> Debug for VerifyFailure<'a> {
                 }
 
                 let ann_map = match location {
-                    FailureLocation::InRegion { region, offset } => region.column_annotations,
+                    FailureLocation::InRegion { region, offset: _ } => region.column_annotations,
                     _ => None,
                 };
 
                 let debug = ConstraintCaseDebug {
-                    constraint: constraint.clone(),
+                    constraint: *constraint,
                     location: location.clone(),
                     cell_values: cell_values
                         .iter()
