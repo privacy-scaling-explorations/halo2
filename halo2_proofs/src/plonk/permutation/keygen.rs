@@ -122,39 +122,45 @@ impl Assembly {
         }
 
         // Compute [omega_powers * \delta^0, omega_powers * \delta^1, ..., omega_powers * \delta^m]
-        let mut deltaomega = Vec::with_capacity(p.columns.len());
+        let mut deltaomega = vec![omega_powers; p.columns.len()];
         {
-            let mut cur = C::Scalar::one();
-            for _ in 0..p.columns.len() {
-                let mut omega_powers = omega_powers.clone();
-                for o in &mut omega_powers {
-                    *o *= &cur;
+            parallelize(&mut deltaomega, |o, start| {
+                let mut cur = C::Scalar::DELTA.pow_vartime(&[start as u64]);
+                for omega_powers in o.iter_mut() {
+                    for v in omega_powers {
+                        *v *= &cur;
+                    }
+                    cur *= &C::Scalar::DELTA;
                 }
+            });
+        }
 
-                deltaomega.push(omega_powers);
-
-                cur *= &C::Scalar::DELTA;
-            }
+        // Computes the permutation polynomial based on the permutation
+        // description in the assembly.
+        let mut permutations = vec![domain.empty_lagrange(); p.columns.len()];
+        {
+            parallelize(&mut permutations, |o, start| {
+                for (x, permutation_poly) in o.iter_mut().enumerate() {
+                    let i = start + x;
+                    for (j, p) in permutation_poly.iter_mut().enumerate() {
+                        let (permuted_i, permuted_j) = self.mapping[i][j];
+                        *p = deltaomega[permuted_i][permuted_j];
+                    }
+                }
+            });
         }
 
         // Pre-compute commitments for the URS.
-        let mut commitments = vec![];
-        for i in 0..p.columns.len() {
-            // Computes the permutation polynomial based on the permutation
-            // description in the assembly.
-            let mut permutation_poly = domain.empty_lagrange();
-            for (j, p) in permutation_poly.iter_mut().enumerate() {
-                let (permuted_i, permuted_j) = self.mapping[i][j];
-                *p = deltaomega[permuted_i][permuted_j];
-            }
-
+        let mut commitments = Vec::with_capacity(p.columns.len());
+        for permutation in &permutations {
             // Compute commitment to permutation polynomial
             commitments.push(
                 params
-                    .commit_lagrange(&permutation_poly, Blind::default())
+                    .commit_lagrange(permutation, Blind::default())
                     .to_affine(),
             );
         }
+
         VerifyingKey { commitments }
     }
 
@@ -178,40 +184,55 @@ impl Assembly {
         }
 
         // Compute [omega_powers * \delta^0, omega_powers * \delta^1, ..., omega_powers * \delta^m]
-        let mut deltaomega = Vec::with_capacity(p.columns.len());
+        let mut deltaomega = vec![omega_powers; p.columns.len()];
         {
-            let mut cur = C::Scalar::one();
-            for _ in 0..p.columns.len() {
-                let mut omega_powers = omega_powers.clone();
-                for o in &mut omega_powers {
-                    *o *= &cur;
+            parallelize(&mut deltaomega, |o, start| {
+                let mut cur = C::Scalar::DELTA.pow_vartime(&[start as u64]);
+                for omega_powers in o.iter_mut() {
+                    for v in omega_powers {
+                        *v *= &cur;
+                    }
+                    cur *= &C::Scalar::DELTA;
                 }
-
-                deltaomega.push(omega_powers);
-
-                cur *= &C::Scalar::DELTA;
-            }
+            });
         }
 
         // Compute permutation polynomials, convert to coset form.
-        let mut permutations = vec![];
-        let mut polys = vec![];
-        let mut cosets = vec![];
-        for i in 0..p.columns.len() {
-            // Computes the permutation polynomial based on the permutation
-            // description in the assembly.
-            let mut permutation_poly = domain.empty_lagrange();
-            for (j, p) in permutation_poly.iter_mut().enumerate() {
-                let (permuted_i, permuted_j) = self.mapping[i][j];
-                *p = deltaomega[permuted_i][permuted_j];
-            }
-
-            // Store permutation polynomial and precompute its coset evaluation
-            permutations.push(permutation_poly.clone());
-            let poly = domain.lagrange_to_coeff(permutation_poly);
-            polys.push(poly.clone());
-            cosets.push(domain.coeff_to_extended(poly));
+        let mut permutations = vec![domain.empty_lagrange(); p.columns.len()];
+        {
+            parallelize(&mut permutations, |o, start| {
+                for (x, permutation_poly) in o.iter_mut().enumerate() {
+                    let i = start + x;
+                    for (j, p) in permutation_poly.iter_mut().enumerate() {
+                        let (permuted_i, permuted_j) = self.mapping[i][j];
+                        *p = deltaomega[permuted_i][permuted_j];
+                    }
+                }
+            });
         }
+
+        let mut polys = vec![domain.empty_coeff(); p.columns.len()];
+        {
+            parallelize(&mut polys, |o, start| {
+                for (x, poly) in o.iter_mut().enumerate() {
+                    let i = start + x;
+                    let permutation_poly = permutations[i].clone();
+                    *poly = domain.lagrange_to_coeff(permutation_poly);
+                }
+            });
+        }
+
+        let mut cosets = vec![domain.empty_extended(); p.columns.len()];
+        {
+            parallelize(&mut cosets, |o, start| {
+                for (x, coset) in o.iter_mut().enumerate() {
+                    let i = start + x;
+                    let poly = polys[i].clone();
+                    *coset = domain.coeff_to_extended(poly);
+                }
+            });
+        }
+
         ProvingKey {
             permutations,
             polys,
