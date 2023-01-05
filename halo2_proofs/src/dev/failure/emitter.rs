@@ -120,15 +120,18 @@ pub(super) fn expression_to_string<F: Field>(
         &|query| {
             layout
                 .get(&query.rotation.0)
-                .unwrap()
-                .get(
-                    &(
-                        Any::Advice(Advice { phase: query.phase }),
-                        query.column_index,
+                .map(|map| {
+                    map.get(
+                        &(
+                            Any::Advice(Advice { phase: query.phase }),
+                            query.column_index,
+                        )
+                            .into(),
                     )
-                        .into(),
-                )
-                .unwrap()
+                })
+                .flatten()
+                .cloned()
+                .unwrap_or_else(|| String::new())
                 .clone()
         },
         &|query| {
