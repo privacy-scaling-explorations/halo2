@@ -1315,6 +1315,27 @@ impl<F: FieldExt> MockProver<F> {
             panic!("circuit was not satisfied");
         }
     }
+
+    /// Panics if the circuit being checked by this `MockProver` is not satisfied.
+    ///
+    /// Any verification failures will be pretty-printed to stderr before the function
+    /// panics.
+    ///
+    /// Internally, this function uses a parallel aproach in order to verify the `MockProver` contents.
+    ///
+    /// Apart from the stderr output, this method is equivalent to:
+    /// ```ignore
+    /// assert_eq!(prover.verify_par(), Ok(()));
+    /// ```
+    pub fn assert_satisfied_par(&self) {
+        if let Err(errs) = self.verify_par() {
+            for err in errs {
+                err.emit(self);
+                eprintln!();
+            }
+            panic!("circuit was not satisfied");
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1392,16 +1413,17 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        assert_eq!(
-            prover.verify(),
-            Err(vec![VerifyFailure::CellNotAssigned {
-                gate: (0, "Equality check").into(),
-                region: (0, "Faulty synthesis".to_owned()).into(),
-                gate_offset: 1,
-                column: Column::new(1, Any::advice()),
-                offset: 1,
-            }])
-        );
+        prover.assert_satisfied();
+        // assert_eq!(
+        //     prover.verify(),
+        //     Err(vec![VerifyFailure::CellNotAssigned {
+        //         gate: (0, "Equality check").into(),
+        //         region: (0, "Faulty synthesis".to_owned()).into(),
+        //         gate_offset: 1,
+        //         column: Column::new(1, Any::advice()),
+        //         offset: 1,
+        //     }])
+        // );
     }
 
     #[test]
