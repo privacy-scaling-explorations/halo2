@@ -1413,17 +1413,16 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        prover.assert_satisfied();
-        // assert_eq!(
-        //     prover.verify(),
-        //     Err(vec![VerifyFailure::CellNotAssigned {
-        //         gate: (0, "Equality check").into(),
-        //         region: (0, "Faulty synthesis".to_owned()).into(),
-        //         gate_offset: 1,
-        //         column: Column::new(1, Any::advice()),
-        //         offset: 1,
-        //     }])
-        // );
+        assert_eq!(
+            prover.verify(),
+            Err(vec![VerifyFailure::CellNotAssigned {
+                gate: (0, "Equality check").into(),
+                region: (0, "Faulty synthesis".to_owned()).into(),
+                gate_offset: 1,
+                column: Column::new(1, Any::advice()),
+                offset: 1,
+            }])
+        );
     }
 
     #[test]
