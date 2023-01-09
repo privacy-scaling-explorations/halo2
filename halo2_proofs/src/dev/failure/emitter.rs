@@ -120,7 +120,7 @@ pub(super) fn expression_to_string<F: Field>(
         &|query| {
             layout
                 .get(&query.rotation.0)
-                .map(|map| {
+                .and_then(|map| {
                     map.get(
                         &(
                             Any::Advice(Advice { phase: query.phase }),
@@ -129,7 +129,6 @@ pub(super) fn expression_to_string<F: Field>(
                             .into(),
                     )
                 })
-                .flatten()
                 .cloned()
                 .unwrap_or_else(|| String::new())
                 .clone()
