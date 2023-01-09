@@ -130,8 +130,7 @@ pub(super) fn expression_to_string<F: Field>(
                     )
                 })
                 .cloned()
-                .unwrap_or_else(|| String::new())
-                .clone()
+                .unwrap_or_default()
         },
         &|query| {
             layout
