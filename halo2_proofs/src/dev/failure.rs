@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use group::ff::Field;
 use halo2curves::FieldExt;
 
-use super::metadata::DebugVirtualCell;
+use super::metadata::{DebugColumn, DebugVirtualCell};
 use super::MockProver;
 use super::{
     metadata,
@@ -50,6 +50,28 @@ impl<'a> fmt::Display for FailureLocation<'a> {
 }
 
 impl<'a> FailureLocation<'a> {
+    /// Returns a `DebugColumn` from Column metadata and `&self`.
+    pub(super) fn get_debug_column(&self, metadata: metadata::Column) -> DebugColumn {
+        match self {
+            Self::InRegion { region, .. } => {
+                DebugColumn::from((metadata, region.column_annotations))
+            }
+            _ => DebugColumn::from((metadata, None)),
+        }
+    }
+
+    /// Fetch the annotation of a `Column` within a `FailureLocation` providing it's associated metadata.
+    ///
+    /// This function will return `None` if:
+    /// - `self` matches to `Self::OutsideRegion`.
+    /// - There's no annotation map generated for the `Region` inside `self`.
+    /// - There's no entry on the annotation map corresponding to the metadata provided.
+    pub(super) fn get_column_annotation(&self, metadata: metadata::Column) -> Option<String> {
+        match self {
+            Self::InRegion { region, .. } => region.get_column_annotation(metadata),
+            _ => None,
+        }
+    }
     pub(super) fn find_expressions<F: Field>(
         cs: &ConstraintSystem<F>,
         regions: &'a [Region],
@@ -187,8 +209,8 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
             } => {
                 write!(
                     f,
-                    "{} uses {} at offset {}, which requires cell in column {:?} at offset {} to be assigned.",
-                    region, gate, gate_offset, column, offset
+                    "{} uses {} at offset {}, which requires cell in column {:?} at offset {} with annotation {:?} to be assigned.",
+                    region, gate, gate_offset, column, offset, region.get_column_annotation((*column).into())
                 )
             }
             Self::ConstraintNotSatisfied {
@@ -197,6 +219,7 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
                 cell_values,
             } => {
                 writeln!(f, "{} is not satisfied {}", constraint, location)?;
+                println!("All OK");
                 for (dvc, value) in cell_values.iter().map(|(vc, string)| {
                     let ann_map = match location {
                         FailureLocation::InRegion { region, offset: _ } => {
@@ -209,7 +232,6 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
                 }) {
                     let _ = writeln!(f, "- {} = {}", dvc, value);
                 }
-
                 Ok(())
             }
             Self::ConstraintPoisoned { constraint } => {
@@ -233,8 +255,9 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
             Self::Permutation { column, location } => {
                 write!(
                     f,
-                    "Equality constraint not satisfied by cell ({:?}, {})",
-                    column, location
+                    "Equality constraint not satisfied by cell ({}, {})",
+                    location.get_debug_column(*column),
+                    location
                 )
             }
         }
@@ -272,7 +295,7 @@ impl<'a> Debug for VerifyFailure<'a> {
 
                 write!(f, "{:#?}", debug)
             }
-            _ => write!(f, "{:#?}", self),
+            _ => write!(f, "{:#}", self),
         }
     }
 }
@@ -494,7 +517,7 @@ fn render_lookup<F: FieldExt>(
             if i == 0 { "" } else { ", " },
             prover
                 .cs
-                .lookup_annotations
+                .general_column_annotations
                 .get(&column)
                 .cloned()
                 .unwrap_or_else(|| format!("{}", column))

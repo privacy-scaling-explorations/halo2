@@ -222,6 +222,18 @@ pub struct Region<'a> {
     pub(super) column_annotations: Option<&'a HashMap<ColumnMetadata, String>>,
 }
 
+impl<'a> Region<'a> {
+    /// Fetch the annotation of a `Column` within a `Region` providing it's associated metadata.
+    ///
+    /// This function will return `None` if:
+    /// - There's no annotation map generated for this `Region`.
+    /// - There's no entry on the annotation map corresponding to the metadata provided.
+    pub(crate) fn get_column_annotation(&self, metadata: ColumnMetadata) -> Option<String> {
+        self.column_annotations
+            .and_then(|map| map.get(&metadata).cloned())
+    }
+}
+
 impl<'a> PartialEq for Region<'a> {
     fn eq(&self, other: &Self) -> bool {
         self.index == other.index && self.name == other.name
