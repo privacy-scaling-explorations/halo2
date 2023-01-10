@@ -38,7 +38,7 @@ impl From<plonk::Column<Any>> for Column {
 
 /// A helper structure that allows to print a Column with it's annotation as a single structure.
 #[derive(Debug, Clone)]
-struct DebugColumn {
+pub(super) struct DebugColumn {
     /// The type of the column.
     column_type: Any,
     /// The index of the column.
@@ -57,7 +57,7 @@ impl From<(Column, Option<&HashMap<Column, String>>)> for DebugColumn {
                 .map(|map| map.get(&info.0))
                 .flatten()
                 .cloned()
-                .unwrap_or_else(String::new),
+                .unwrap_or_default(),
         }
     }
 }
