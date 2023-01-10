@@ -1436,23 +1436,21 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        //print!("{:?}", prover.verify());
-        prover.assert_satisfied();
-        // assert_eq!(
-        //     prover.verify(),
-        //     Err(vec![VerifyFailure::CellNotAssigned {
-        //         gate: (0, "Equality check").into(),
-        //         region: (0, "Faulty synthesis".to_owned()).into(),
-        //         gate_offset: 1,
-        //         column: Column::new(
-        //             1,
-        //             Any::Advice(Advice {
-        //                 phase: FirstPhase.to_sealed()
-        //             })
-        //         ),
-        //         offset: 1,
-        //     }])
-        // );
+        assert_eq!(
+            prover.verify(),
+            Err(vec![VerifyFailure::CellNotAssigned {
+                gate: (0, "Equality check").into(),
+                region: (0, "Faulty synthesis".to_owned()).into(),
+                gate_offset: 1,
+                column: Column::new(
+                    1,
+                    Any::Advice(Advice {
+                        phase: FirstPhase.to_sealed()
+                    })
+                ),
+                offset: 1,
+            }])
+        );
     }
 
     #[test]
@@ -1574,19 +1572,17 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        //print!("{:?}", prover.verify());
-        prover.assert_satisfied();
-        // assert_eq!(
-        //     prover.verify(),
-        //     Err(vec![VerifyFailure::Lookup {
-        //         name: "lookup",
-        //         lookup_index: 0,
-        //         location: FailureLocation::InRegion {
-        //             region: (2, "Faulty synthesis").into(),
-        //             offset: 1,
-        //         }
-        //     }])
-        // );
+        assert_eq!(
+            prover.verify(),
+            Err(vec![VerifyFailure::Lookup {
+                name: "lookup",
+                lookup_index: 0,
+                location: FailureLocation::InRegion {
+                    region: (2, "Faulty synthesis").into(),
+                    offset: 1,
+                }
+            }])
+        );
     }
 
     #[test]
@@ -1713,62 +1709,60 @@ mod tests {
         }
 
         let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        //print!("{:?}", prover.verify());
-        prover.assert_satisfied();
-        // assert_eq!(
-        //     prover.verify(),
-        //     Err(vec![VerifyFailure::ConstraintNotSatisfied {
-        //         constraint: ((0, "Equality check").into(), 0, "").into(),
-        //         location: FailureLocation::InRegion {
-        //             region: (1, "Wrong synthesis").into(),
-        //             offset: 0,
-        //         },
-        //         cell_values: vec![
-        //             (
-        //                 (
-        //                     (
-        //                         Any::Advice(Advice {
-        //                             phase: FirstPhase.to_sealed()
-        //                         }),
-        //                         0
-        //                     )
-        //                         .into(),
-        //                     0
-        //                 )
-        //                     .into(),
-        //                 "1".to_string()
-        //             ),
-        //             (
-        //                 (
-        //                     (
-        //                         Any::Advice(Advice {
-        //                             phase: FirstPhase.to_sealed()
-        //                         }),
-        //                         1
-        //                     )
-        //                         .into(),
-        //                     0
-        //                 )
-        //                     .into(),
-        //                 "0".to_string()
-        //             ),
-        //             (
-        //                 (
-        //                     (
-        //                         Any::Advice(Advice {
-        //                             phase: FirstPhase.to_sealed()
-        //                         }),
-        //                         2
-        //                     )
-        //                         .into(),
-        //                     0
-        //                 )
-        //                     .into(),
-        //                 "0x5".to_string()
-        //             ),
-        //             (((Any::Fixed, 0).into(), 0).into(), "0x7".to_string()),
-        //         ],
-        //     },])
-        // )
+        assert_eq!(
+            prover.verify(),
+            Err(vec![VerifyFailure::ConstraintNotSatisfied {
+                constraint: ((0, "Equality check").into(), 0, "").into(),
+                location: FailureLocation::InRegion {
+                    region: (1, "Wrong synthesis").into(),
+                    offset: 0,
+                },
+                cell_values: vec![
+                    (
+                        (
+                            (
+                                Any::Advice(Advice {
+                                    phase: FirstPhase.to_sealed()
+                                }),
+                                0
+                            )
+                                .into(),
+                            0
+                        )
+                            .into(),
+                        "1".to_string()
+                    ),
+                    (
+                        (
+                            (
+                                Any::Advice(Advice {
+                                    phase: FirstPhase.to_sealed()
+                                }),
+                                1
+                            )
+                                .into(),
+                            0
+                        )
+                            .into(),
+                        "0".to_string()
+                    ),
+                    (
+                        (
+                            (
+                                Any::Advice(Advice {
+                                    phase: FirstPhase.to_sealed()
+                                }),
+                                2
+                            )
+                                .into(),
+                            0
+                        )
+                            .into(),
+                        "0x5".to_string()
+                    ),
+                    (((Any::Fixed, 0).into(), 0).into(), "0x7".to_string()),
+                ],
+            },])
+        )
     }
 }
