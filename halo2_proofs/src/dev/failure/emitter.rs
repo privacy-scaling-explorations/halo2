@@ -98,8 +98,7 @@ pub(super) fn render_cell_layout(
                     FailureLocation::InRegion { region, offset: _ } => {
                         region
                             .column_annotations
-                            .map(|column_ann| column_ann.get(column).cloned())
-                            .flatten()
+                            .and_then(|column_ann| column_ann.get(column).cloned())
                             .unwrap_or_else(|| column_type_and_idx(column))
                     }
                     FailureLocation::OutsideRegion { row: _ } => {
