@@ -459,9 +459,39 @@ fn render_lookup<F: FieldExt>(
         expr.evaluate(
             &|_| panic!("no constants in table expressions"),
             &|_| panic!("no selectors in table expressions"),
-            &|query| format!("F{}", query.column_index),
-            &|query| format! {"A{}", query.column_index},
-            &|query| format! {"I{}", query.column_index},
+            &|query| {
+                format!(
+                    "{:?}",
+                    prover
+                        .cs
+                        .general_column_annotations
+                        .get(&metadata::Column::from((Any::Fixed, query.column_index)))
+                        .cloned()
+                        .unwrap_or_else(|| format!("F{}", query.column_index()))
+                )
+            },
+            &|query| {
+                format!(
+                    "{:?}",
+                    prover
+                        .cs
+                        .general_column_annotations
+                        .get(&metadata::Column::from((Any::advice(), query.column_index)))
+                        .cloned()
+                        .unwrap_or_else(|| format!("I{}", query.column_index()))
+                )
+            },
+            &|query| {
+                format!(
+                    "{:?}",
+                    prover
+                        .cs
+                        .general_column_annotations
+                        .get(&metadata::Column::from((Any::Instance, query.column_index)))
+                        .cloned()
+                        .unwrap_or_else(|| format!("I{}", query.column_index()))
+                )
+            },
             &|challenge| format! {"C{}", challenge.index()},
             &|query| format! {"-{}", query},
             &|a, b| format! {"{} + {}", a,b},
@@ -499,17 +529,8 @@ fn render_lookup<F: FieldExt>(
     }
 
     eprint!(") ∉ (");
-    for (i, column) in table_columns.enumerate() {
-        eprint!(
-            "{}{}",
-            if i == 0 { "" } else { ", " },
-            prover
-                .cs
-                .general_column_annotations
-                .get(&column)
-                .cloned()
-                .unwrap_or_else(|| format!("{}", column))
-        );
+    for (i, column) in lookup_columns.enumerate() {
+        eprint!("{}{}", if i == 0 { "" } else { ", " }, column);
     }
     eprintln!(")");
 
