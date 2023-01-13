@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use blake2b_simd::blake2b;
 use ff::Field;
 
+use crate::plonk::permutation::keygen::Assembly;
 use crate::{
     arithmetic::{FieldExt, Group},
     circuit,
@@ -1340,6 +1341,11 @@ impl<F: FieldExt> MockProver<F> {
     /// Returns the list of Fixed Columns used within a MockProver instance and the associated values contained on each Cell.
     pub fn fixed(&self) -> &Vec<Vec<CellValue<F>>> {
         &self.fixed
+    }
+
+    /// TODO
+    pub fn permutation(&self) -> &Assembly {
+        &self.permutation
     }
 }
 
