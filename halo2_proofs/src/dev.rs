@@ -1343,7 +1343,7 @@ impl<F: FieldExt> MockProver<F> {
         &self.fixed
     }
 
-    /// TODO
+    /// Returns the permutation argument (`Assembly`) used within a MockProver instance.
     pub fn permutation(&self) -> &Assembly {
         &self.permutation
     }
