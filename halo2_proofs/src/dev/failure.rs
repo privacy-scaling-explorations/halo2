@@ -457,8 +457,8 @@ fn render_lookup<F: FieldExt>(
     // expressions for the table side of lookups.
     let lookup_columns = lookup.table_expressions.iter().map(|expr| {
         expr.evaluate(
-            &|_| panic!("no constants in table expressions"),
-            &|_| panic!("no selectors in table expressions"),
+            &|f| format! {"Const: {:#?}", f},
+            &|s| format! {"S{}", s.0},
             &|query| {
                 format!(
                     "{:?}",
@@ -478,7 +478,7 @@ fn render_lookup<F: FieldExt>(
                         .general_column_annotations
                         .get(&metadata::Column::from((Any::advice(), query.column_index)))
                         .cloned()
-                        .unwrap_or_else(|| format!("I{}", query.column_index()))
+                        .unwrap_or_else(|| format!("A{}", query.column_index()))
                 )
             },
             &|query| {
