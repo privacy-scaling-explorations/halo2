@@ -217,7 +217,7 @@ impl<'a> fmt::Display for VerifyFailure<'a> {
 
                     (DebugVirtualCell::from((vc, ann_map)), string)
                 }) {
-                    let _ = writeln!(f, "- {} = {}", dvc, value)?;
+                    writeln!(f, "- {} = {}", dvc, value)?;
                 }
                 Ok(())
             }
