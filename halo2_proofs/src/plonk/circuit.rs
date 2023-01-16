@@ -526,7 +526,9 @@ pub trait Assignment<F: Field> {
         NR: Into<String>,
         N: FnOnce() -> NR;
 
-    /// TODO: Document
+    /// Allows the developer to include an annotation for an specific column within a `Region`.
+    ///
+    /// This is usually useful for debugging circuit failures.
     fn annotate_column<A, AR>(&mut self, annotation: A, column: Column<Any>)
     where
         A: FnOnce() -> AR,
@@ -1381,7 +1383,7 @@ pub struct ConstraintSystem<F: Field> {
     // input expressions and a sequence of table expressions involved in the lookup.
     pub(crate) lookups: Vec<lookup::Argument<F>>,
 
-    // List of indexes of Fixed columns which are associated to a `TableColumn` tied to their annotation.
+    // List of indexes of Fixed columns which are associated to a circuit-general Column tied to their annotation.
     pub(crate) general_column_annotations: HashMap<metadata::Column, String>,
 
     // Vector of fixed columns, which can be used to store constant values
@@ -1858,7 +1860,7 @@ impl<F: Field> ConstraintSystem<F> {
         A: Fn() -> AR,
         AR: Into<String>,
     {
-        // We don't care if the table has already an annotation. If it's the case we keep the original one.
+        // We don't care if the table has already an annotation. If it's the case we keep the new one.
         self.general_column_annotations.insert(
             metadata::Column::from((Any::Fixed, column.inner().index)),
             annotation().into(),
@@ -1873,7 +1875,7 @@ impl<F: Field> ConstraintSystem<F> {
         T: Into<Column<Any>>,
     {
         let col_any = column.into();
-        // We don't care if the table has already an annotation. If it's the case we keep the original one.
+        // We don't care if the table has already an annotation. If it's the case we keep the new one.
         self.general_column_annotations.insert(
             metadata::Column::from((col_any.column_type, col_any.index)),
             annotation().into(),
