@@ -89,7 +89,7 @@ impl FailureLocation {
             })
             .collect();
 
-        Self::find(&regions, failure_row, failure_columns)
+        Self::find(regions, failure_row, failure_columns)
     }
 
     /// Figures out whether the given row and columns overlap an assigned region.
