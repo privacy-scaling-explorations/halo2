@@ -27,13 +27,18 @@ type ChallengeU<F> = ChallengeScalar<F, U>;
 struct V {}
 type ChallengeV<F> = ChallengeScalar<F, V>;
 
-struct CommitmentData<F: FieldExt, Q: Query<F>> {
+/// CommitmentData
+#[derive(Debug)]
+pub struct CommitmentData<F: FieldExt, Q: Query<F>> {
     queries: Vec<Q>,
     point: F,
     _marker: PhantomData<F>,
 }
 
-fn construct_intermediate_sets<F: FieldExt, I, Q: Query<F>>(queries: I) -> Vec<CommitmentData<F, Q>>
+/// construct_intermediate_sets
+pub fn construct_intermediate_sets<F: FieldExt, I, Q: Query<F>>(
+    queries: I,
+) -> Vec<CommitmentData<F, Q>>
 where
     I: IntoIterator<Item = Q> + Clone,
 {

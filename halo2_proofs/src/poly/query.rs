@@ -8,12 +8,18 @@ use crate::{
 use ff::Field;
 use halo2curves::CurveAffine;
 
+/// Query
 pub trait Query<F>: Sized + Clone + Send + Sync {
+    /// Commitment
     type Commitment: PartialEq + Copy + Send + Sync;
+    /// Eval
     type Eval: Clone + Default + Debug;
 
+    /// get_point
     fn get_point(&self) -> F;
+    /// get_eval
     fn get_eval(&self) -> Self::Eval;
+    /// get_commitment
     fn get_commitment(&self) -> Self::Commitment;
 }
 
@@ -29,7 +35,7 @@ pub struct ProverQuery<'com, C: CurveAffine> {
 }
 
 #[doc(hidden)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct PolynomialPointer<'com, C: CurveAffine> {
     pub(crate) poly: &'com Polynomial<C::Scalar, Coeff>,
     pub(crate) blind: Blind<C::Scalar>,
@@ -101,8 +107,11 @@ impl<'com, C: CurveAffine, M: MSM<C>> Clone for VerifierQuery<'com, C, M> {
 }
 
 #[derive(Clone, Debug)]
+/// CommitmentReference
 pub enum CommitmentReference<'r, C: CurveAffine, M: MSM<C>> {
+    /// Commitment
     Commitment(&'r C),
+    /// MSM
     MSM(&'r M),
 }
 
