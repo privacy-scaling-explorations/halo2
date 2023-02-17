@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Struct that accumulates all the necessary data in order to construct the permutation argument.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assembly {
     /// Columns that participate on the copy permutation argument.
     columns: Vec<Column<Any>>,
