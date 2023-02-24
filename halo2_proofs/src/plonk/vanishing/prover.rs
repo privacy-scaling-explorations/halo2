@@ -52,7 +52,7 @@ impl<C: CurveAffine> Argument<C> {
         let n_threads = std::thread::available_parallelism().unwrap().get();
         let needed_scalars = (1usize << domain.k() as usize) / n_threads;
 
-        let thread_seeds: Vec<ChaCha20Rng> = (0..needed_scalars)
+        let thread_seeds: Vec<ChaCha20Rng> = (0..n_threads)
             .into_iter()
             .map(|_| {
                 let mut seed = [0u8; 32];
