@@ -1,8 +1,10 @@
 use std::iter;
 
-use ff::Field;
+use ff::{Field, PrimeField};
 use group::Curve;
-use rand_core::RngCore;
+use rand_chacha::ChaCha20Rng;
+use rand_core::{RngCore, SeedableRng};
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use super::Argument;
 use crate::{
@@ -47,10 +49,25 @@ impl<C: CurveAffine> Argument<C> {
         transcript: &mut T,
     ) -> Result<Committed<C>, Error> {
         // Sample a random polynomial of degree n - 1
-        let mut random_poly = domain.empty_coeff();
-        for coeff in random_poly.iter_mut() {
-            *coeff = C::Scalar::random(&mut rng);
-        }
+        let n_threads = std::thread::available_parallelism().unwrap().get();
+        let needed_scalars = (1usize << domain.k() as usize) / n_threads;
+
+        let thread_seeds: Vec<ChaCha20Rng> = (0..needed_scalars)
+            .into_iter()
+            .map(|_| {
+                let mut seed = [0u8; 32];
+                rng.fill_bytes(&mut seed);
+                ChaCha20Rng::from_seed(seed)
+            })
+            .collect();
+
+        let rand_vec: Vec<C::Scalar> = thread_seeds
+            .par_iter()
+            .flat_map(|rng| vec![C::Scalar::random(rng.to_owned()); needed_scalars])
+            .collect();
+
+        let random_poly: Polynomial<C::Scalar, Coeff> = Polynomial::from_evals(rand_vec);
+
         // Sample a random blinding factor
         let random_blind = Blind(C::Scalar::random(rng));
 
