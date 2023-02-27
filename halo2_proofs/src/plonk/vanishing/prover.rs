@@ -4,7 +4,10 @@ use ff::{Field, PrimeField};
 use group::Curve;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use rayon::{
+    current_num_threads,
+    prelude::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
+};
 
 use super::Argument;
 use crate::{
@@ -49,10 +52,10 @@ impl<C: CurveAffine> Argument<C> {
         transcript: &mut T,
     ) -> Result<Committed<C>, Error> {
         // Sample a random polynomial of degree n - 1
-        let n_threads = std::thread::available_parallelism().unwrap().get();
+        let n_threads = current_num_threads();
         let needed_scalars = (1usize << domain.k() as usize) / n_threads;
 
-        let thread_seeds: Vec<ChaCha20Rng> = (0..n_threads)
+        let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_threads)
             .into_iter()
             .map(|_| {
                 let mut seed = [0u8; 32];
@@ -62,8 +65,13 @@ impl<C: CurveAffine> Argument<C> {
             .collect();
 
         let rand_vec: Vec<C::Scalar> = thread_seeds
-            .par_iter()
-            .flat_map(|rng| vec![C::Scalar::random(rng.to_owned()); needed_scalars])
+            .par_iter_mut()
+            .flat_map(|mut rng| {
+                (0..needed_scalars)
+                    .into_iter()
+                    .map(|_| C::Scalar::random(&mut rng))
+                    .collect::<Vec<C::Scalar>>()
+            })
             .collect();
 
         let random_poly: Polynomial<C::Scalar, Coeff> = Polynomial::from_evals(rand_vec);
