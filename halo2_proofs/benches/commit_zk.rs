@@ -2,7 +2,6 @@ extern crate criterion;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use group::ff::Field;
-use halo2_proofs::poly::{LagrangeCoeff, Polynomial};
 use halo2_proofs::*;
 use halo2curves::pasta::pallas::Scalar;
 use rand_chacha::rand_core::RngCore;
@@ -10,24 +9,23 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use rayon::{current_num_threads, prelude::*};
 
-fn rand_poly_serial(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, LagrangeCoeff> {
+fn rand_poly_serial(mut rng: ChaCha20Rng, domain: usize) -> Vec<Scalar> {
     // Sample a random polynomial of degree n - 1
     let mut random_poly = vec![Scalar::zero(); 1 << domain];
     for coeff in random_poly.iter_mut() {
         *coeff = Scalar::random(&mut rng);
     }
-    assert_eq!(random_poly.len(), 1 << domain);
-    Polynomial::from_evals(random_poly)
+
+    random_poly
 }
 
-fn rand_poly_par(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, LagrangeCoeff> {
+fn rand_poly_par(mut rng: ChaCha20Rng, domain: usize) -> Vec<Scalar> {
     // Sample a random polynomial of degree n - 1
     let n_threads = current_num_threads();
     let n = 1usize << domain;
     let n_chunks = n_threads + if n % n_threads != 0 { 1 } else { 0 };
     let mut rand_vec = vec![Scalar::zero(); n];
 
-    // We always round up the division by adding 1 extra seed.
     let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_chunks)
         .into_iter()
         .map(|_| {
@@ -42,7 +40,7 @@ fn rand_poly_par(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, Lagr
         .zip_eq(rand_vec.par_chunks_mut(n / n_threads))
         .for_each(|(mut rng, chunk)| chunk.iter_mut().for_each(|v| *v = Scalar::random(&mut rng)));
 
-    Polynomial::from_evals(rand_vec)
+    rand_vec
 }
 
 fn bench_commit(c: &mut Criterion) {

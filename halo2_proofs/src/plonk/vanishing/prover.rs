@@ -54,7 +54,6 @@ impl<C: CurveAffine> Argument<C> {
         let n_chunks = n_threads + if n % n_threads != 0 { 1 } else { 0 };
         let mut rand_vec = vec![C::Scalar::zero(); n];
 
-        // We always round up the division by adding 1 extra seed.
         let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_chunks)
             .into_iter()
             .map(|_| {
@@ -72,9 +71,6 @@ impl<C: CurveAffine> Argument<C> {
                     .iter_mut()
                     .for_each(|v| *v = C::Scalar::random(&mut rng))
             });
-
-        // Truncate the leftover elements of the Vec (if any).
-        rand_vec.truncate(1usize << domain.k() as usize);
 
         let random_poly: Polynomial<C::Scalar, Coeff> = domain.coeff_from_vec(rand_vec);
 
