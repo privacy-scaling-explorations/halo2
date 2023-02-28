@@ -8,10 +8,7 @@ use halo2curves::pasta::pallas::Scalar;
 use rand_chacha::rand_core::RngCore;
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
-use rayon::{
-    current_num_threads,
-    prelude::{IntoParallelRefIterator, ParallelIterator},
-};
+use rayon::{current_num_threads, prelude::*};
 
 fn rand_poly_serial(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, LagrangeCoeff> {
     // Sample a random polynomial of degree n - 1
@@ -26,9 +23,12 @@ fn rand_poly_serial(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, L
 fn rand_poly_par(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, LagrangeCoeff> {
     // Sample a random polynomial of degree n - 1
     let n_threads = current_num_threads();
-    let needed_scalars = (1 << domain) / n_threads;
+    let n = 1usize << domain;
+    let n_chunks = n_threads + if n % n_threads != 0 { 1 } else { 0 };
+    let mut rand_vec = vec![Scalar::zero(); n];
 
-    let thread_seeds: Vec<ChaCha20Rng> = (0..n_threads)
+    // We always round up the division by adding 1 extra seed.
+    let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_chunks)
         .into_iter()
         .map(|_| {
             let mut seed = [0u8; 32];
@@ -37,12 +37,11 @@ fn rand_poly_par(mut rng: ChaCha20Rng, domain: usize) -> Polynomial<Scalar, Lagr
         })
         .collect();
 
-    let rand_vec: Vec<Scalar> = thread_seeds
-        .par_iter()
-        .flat_map(|rng| vec![Scalar::random(rng.to_owned()); needed_scalars])
-        .collect();
+    thread_seeds
+        .par_iter_mut()
+        .zip_eq(rand_vec.par_chunks_mut(n / n_threads))
+        .for_each(|(mut rng, chunk)| chunk.iter_mut().for_each(|v| *v = Scalar::random(&mut rng)));
 
-    assert_eq!(rand_vec.len(), 1 << domain);
     Polynomial::from_evals(rand_vec)
 }
 

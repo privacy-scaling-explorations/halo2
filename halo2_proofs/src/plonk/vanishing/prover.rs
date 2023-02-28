@@ -4,10 +4,7 @@ use ff::{Field, PrimeField};
 use group::Curve;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-use rayon::{
-    current_num_threads,
-    prelude::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator},
-};
+use rayon::{current_num_threads, prelude::*};
 
 use super::Argument;
 use crate::{
@@ -53,9 +50,12 @@ impl<C: CurveAffine> Argument<C> {
     ) -> Result<Committed<C>, Error> {
         // Sample a random polynomial of degree n - 1
         let n_threads = current_num_threads();
-        let needed_scalars = (1usize << domain.k() as usize) / n_threads;
+        let n = 1usize << domain.k() as usize;
+        let n_chunks = n_threads + if n % n_threads != 0 { 1 } else { 0 };
+        let mut rand_vec = vec![C::Scalar::zero(); n];
 
-        let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_threads)
+        // We always round up the division by adding 1 extra seed.
+        let mut thread_seeds: Vec<ChaCha20Rng> = (0..n_chunks)
             .into_iter()
             .map(|_| {
                 let mut seed = [0u8; 32];
@@ -64,17 +64,19 @@ impl<C: CurveAffine> Argument<C> {
             })
             .collect();
 
-        let rand_vec: Vec<C::Scalar> = thread_seeds
+        thread_seeds
             .par_iter_mut()
-            .flat_map(|mut rng| {
-                (0..needed_scalars)
-                    .into_iter()
-                    .map(|_| C::Scalar::random(&mut rng))
-                    .collect::<Vec<C::Scalar>>()
-            })
-            .collect();
+            .zip_eq(rand_vec.par_chunks_mut(n / n_threads))
+            .for_each(|(mut rng, chunk)| {
+                chunk
+                    .iter_mut()
+                    .for_each(|v| *v = C::Scalar::random(&mut rng))
+            });
 
-        let random_poly: Polynomial<C::Scalar, Coeff> = Polynomial::from_evals(rand_vec);
+        // Truncate the leftover elements of the Vec (if any).
+        rand_vec.truncate(1usize << domain.k() as usize);
+
+        let random_poly: Polynomial<C::Scalar, Coeff> = domain.coeff_from_vec(rand_vec);
 
         // Sample a random blinding factor
         let random_blind = Blind(C::Scalar::random(rng));
