@@ -132,6 +132,26 @@ where
         }
     }
 
+    /// Initializes parameters for the curve through existing parameters
+    pub fn from_params(
+        &self,
+        k: u32,
+        n: u64,
+        g: Vec<E::G1Affine>,
+        g_lagrange: Vec<E::G1Affine>,
+        g2: E::G2Affine,
+        s_g2: E::G2Affine,
+    ) -> Self {
+        Self {
+            k,
+            n,
+            g,
+            g_lagrange,
+            g2,
+            s_g2,
+        }
+    }
+
     /// Returns gernerator on G2
     pub fn g2(&self) -> E::G2Affine {
         self.g2
