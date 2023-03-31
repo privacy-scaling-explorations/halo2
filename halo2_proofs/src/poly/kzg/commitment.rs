@@ -133,6 +133,7 @@ where
     }
 
     /// Initializes parameters for the curve through existing parameters
+    /// k, n, g, g_lagrange, g2, s_g2
     pub fn from_params(
         &self,
         k: u32,
