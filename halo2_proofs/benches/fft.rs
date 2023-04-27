@@ -10,8 +10,11 @@ use criterion::{BenchmarkId, Criterion};
 use rand_core::OsRng;
 
 fn criterion_benchmark(c: &mut Criterion) {
+    const MIN_K: u32 = 16;
+    const MAX_K: u32 = 24;
+
     let mut group = c.benchmark_group("fft");
-    for k in 3..19 {
+    for k in MIN_K..=MAX_K {
         group.bench_function(BenchmarkId::new("k", k), |b| {
             let mut a = (0..(1 << k)).map(|_| Fp::random(OsRng)).collect::<Vec<_>>();
             let omega = Fp::random(OsRng); // would be weird if this mattered

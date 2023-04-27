@@ -47,6 +47,10 @@ harness = false
 name = "fft"
 harness = false
 
+[[bench]]
+name = "msm"
+harness = false
+
 [dependencies]
 backtrace = { version = "0.3", optional = true }
 rayon = "1.5.1"

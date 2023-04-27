@@ -9,6 +9,7 @@ use halo2_proofs::*;
 use halo2_proofs::poly::{commitment::ParamsProver, ipa::commitment::ParamsIPA};
 
 use criterion::{black_box, Criterion};
+use halo2curves::CurveAffine;
 use rand_core::OsRng;
 
 fn criterion_benchmark(c: &mut Criterion) {
