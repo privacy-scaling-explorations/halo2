@@ -152,7 +152,7 @@ where
         Self {
             k,
             n,
-            g: g,
+            g,
             g_lagrange: g_lag,
             g2,
             s_g2,
