@@ -407,13 +407,7 @@ mod tests {
   }
 
 
-  #[test]
-  fn poly_sanity_check() {
-      let k = 4;
-
-      let test_list = [1,2,3];
-      let test_point = 5;
-
+  fn poly_sanity_check(test_list: Vec<u64>, test_point: u64, k: u32) {
       let coeffs: Vec<Value<Fp>> = test_list.clone().into_iter().map(|x| {Value::known(Fp::from(x))}).collect();
 
       let point = Value::known(Fp::from(test_point));
@@ -433,4 +427,20 @@ mod tests {
       assert_eq!(prover.verify(), Ok(()))
    
   }
+
+  #[test]
+  fn simple_check() {
+      let test_list = vec![1,2,3];
+      let test_point = 5;
+      poly_sanity_check(test_list, test_point, 4)
+  }
+
+  #[test]
+  fn random_check() {
+    use rand::Rng;
+    let test_list = (1..10).map(|_| rand::thread_rng().gen_range(0..100)).collect::<Vec<u64>>();
+    let test_point = rand::thread_rng().gen_range(0..100) as u64;
+    poly_sanity_check(test_list, test_point, 7)
+  }
+
 }
