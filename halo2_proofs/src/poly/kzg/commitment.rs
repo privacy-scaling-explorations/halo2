@@ -143,17 +143,15 @@ where
         s_g2: E::G2Affine,
     ) -> Self {
         let n = 1 << k;
-        let mut g_lag = Vec::new();
-        if g_lagrange.is_some() {
-            g_lag = g_lagrange.unwrap()
-        } else {
-            g_lag = g_to_lagrange(g.iter().map(|g| PrimeCurveAffine::to_curve(g)).collect(), k)
-        }
         Self {
             k,
             n,
+            g_lagrange: if g_lagrange.is_some() {
+                g_lagrange.unwrap()
+            } else {
+                g_to_lagrange(g.iter().map(|g| PrimeCurveAffine::to_curve(g)).collect(), k)
+            },
             g,
-            g_lagrange: g_lag,
             g2,
             s_g2,
         }
