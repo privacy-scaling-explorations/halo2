@@ -11,6 +11,7 @@ use halo2_proofs::arithmetic::Field;
 
 pub(crate) mod fp;
 pub(crate) mod fq;
+pub(crate) mod fr;
 pub(crate) mod grain;
 pub(crate) mod mds;
 
