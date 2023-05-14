@@ -818,7 +818,21 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                 &Value::Real(F::ZERO),
                             ) {
                                 Value::Real(x) if x.is_zero_vartime() => None,
-                                Value::Real(_) => Some(VerifyFailure::ConstraintNotSatisfied {
+                                Value::Real(_) => {
+                                   let load_fn = |n: i32, row: i32| {
+                                       for (column, at) in self.cs.fixed_queries.iter() {
+                                              let resolved_row = (row + at.0) % n;
+                                              let val = self.fixed[column.index()][resolved_row as usize];
+                                              println!("not constraint, fixed: row={}, col={:?}, rot={:?}, val={:?}", resolved_row, column, at, val);
+                                       }
+                                       for (column, at) in self.cs.advice_queries.iter() {
+                                              let resolved_row = (row + at.0) % n;
+                                              let val = self.advice[column.index()][resolved_row as usize];
+                                              println!("not constraint, advice: row={}, col={:?}, rot={:?}, val={:?}", resolved_row, column, at, val);
+                                       }
+                                    };
+                                    load_fn(n, row);
+                                    Some(VerifyFailure::ConstraintNotSatisfied {
                                     constraint: (
                                         (gate_index, gate.name()).into(),
                                         poly_index,
@@ -843,15 +857,31 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                             &self.instance,
                                         ),
                                     ),
-                                }),
-                                Value::Poison => Some(VerifyFailure::ConstraintPoisoned {
+                                })
+                                }
+                                Value::Poison => {
+                                   let load_fn = |n: i32, row: i32| {
+                                       for (column, at) in self.cs.fixed_queries.iter() {
+                                              let resolved_row = (row + at.0) % n;
+                                              let val = self.fixed[column.index()][resolved_row as usize];
+                                              println!("poisoned, fixed: row={}, col={:?}, rot={:?}, val={:?}", resolved_row, column, at, val);
+                                       }
+                                       for (column, at) in self.cs.advice_queries.iter() {
+                                              let resolved_row = (row + at.0) % n;
+                                              let val = self.advice[column.index()][resolved_row as usize];
+                                              println!("poisoned, advice: row={}, col={:?}, rot={:?}, val={:?}", resolved_row, column, at, val);
+                                       }
+                                    };
+                                    load_fn(n, row);
+                                    Some(VerifyFailure::ConstraintPoisoned {
                                     constraint: (
                                         (gate_index, gate.name()).into(),
                                         poly_index,
                                         gate.constraint_name(poly_index),
                                     )
                                         .into(),
-                                }),
+                                })
+                            }
                             },
                         )
                     })

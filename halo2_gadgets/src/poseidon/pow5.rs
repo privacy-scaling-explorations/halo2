@@ -161,6 +161,7 @@ impl<F: Field, const WIDTH: usize, const RATE: usize> Pow5Chip<F, WIDTH, RATE> {
         });
 
         meta.create_gate("pad-and-add", |meta| {
+            // chao: last element is capacity element here
             let initial_state_rate = meta.query_advice(state[RATE], Rotation::prev());
             let output_state_rate = meta.query_advice(state[RATE], Rotation::next());
 
