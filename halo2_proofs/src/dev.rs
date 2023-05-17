@@ -461,12 +461,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
                     .get_mut(column.index())
                     .and_then(|v| v.get_mut(row))
                     .expect("bounds failure");
-                if let CellValue::Assigned(value) = value {
-                    // Inconsistent assignment between different phases.
-                    assert_eq!(value, &to, "value={:?}, to={:?}", value, &to);
-                } else {
-                    *value = CellValue::Assigned(to);
-                }
+                *value = CellValue::Assigned(to);
             }
             Err(err) => {
                 // Propagate `assign` error if the column is in current phase.
@@ -876,7 +871,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                             &|scalar| Value::Real(scalar),
                             &|_| panic!("virtual selectors are removed during optimization"),
                             &|query| {
-                                let query = self.cs.fixed_queries[query.index];
+                                let query = self.cs.fixed_queries[query.index.unwrap()];
                                 let column_index = query.0.index();
                                 let rotation = query.1 .0;
                                 self.fixed[column_index]
@@ -884,7 +879,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                     .into()
                             },
                             &|query| {
-                                let query = self.cs.advice_queries[query.index];
+                                let query = self.cs.advice_queries[query.index.unwrap()];
                                 let column_index = query.0.index();
                                 let rotation = query.1 .0;
                                 self.advice[column_index]
@@ -892,7 +887,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                     .into()
                             },
                             &|query| {
-                                let query = self.cs.instance_queries[query.index];
+                                let query = self.cs.instance_queries[query.index.unwrap()];
                                 let column_index = query.0.index();
                                 let rotation = query.1 .0;
                                 Value::Real(
