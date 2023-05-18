@@ -134,7 +134,7 @@ where
 
     /// Initializes parameters for the curve through existing parameters
     /// k, g, g_lagrange (optional), g2, s_g2
-    pub fn from_params(
+    pub fn from_parts(
         &self,
         k: u32,
         g: Vec<E::G1Affine>,
