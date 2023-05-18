@@ -142,10 +142,9 @@ where
         g2: E::G2Affine,
         s_g2: E::G2Affine,
     ) -> Self {
-        let n = 1 << k;
         Self {
             k,
-            n,
+            n: 1 << k,
             g_lagrange: if let Some(g_l) = g_lagrange {
                 g_l
             } else {
