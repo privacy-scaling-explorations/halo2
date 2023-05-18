@@ -146,10 +146,10 @@ where
         Self {
             k,
             n,
-            g_lagrange: if g_lagrange.is_some() {
-                g_lagrange.unwrap()
+            g_lagrange: if let Some(g_l) = g_lagrange {
+                g_l
             } else {
-                g_to_lagrange(g.iter().map(|g| PrimeCurveAffine::to_curve(g)).collect(), k)
+                g_to_lagrange(g.iter().map(PrimeCurveAffine::to_curve).collect(), k)
             },
             g,
             g2,
