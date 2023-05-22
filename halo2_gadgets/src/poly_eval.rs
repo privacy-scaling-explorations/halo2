@@ -13,18 +13,15 @@ use halo2_proofs::{
 };
 
 /// Global var for advice col layput
-const URINDEX: usize = 0;
+const XINDEX: usize = 0;
 const COEFFINDEX: usize = 1;
-const POWXINDEX: usize = 2;
-const RESINDEX: usize = 3;
-const ACCINDEX: usize = 4;
+const ACCINDEX: usize = 2;
 // As end of the layout
 const EVALADVCOL: usize = ACCINDEX + 1;
 
 /// Polynomial represents in coeffs, [c0, c1, c2, ...]
 /// P[x] = c0 * 1 + c1 * x + c2 * x^2 + ... cn * x^n
-/// where x is in a Fp, c_i could be chosen another group
-/// or field to conduct a Field extension, but not necessarily here
+/// where selection of x and coeffs are from same finite field
 pub trait PolyEvalInstructions<F: Field>: Chip<F> {
     /// Variable representing a coefficient.
     /// Certainly it could be from another Field/Group,
@@ -49,7 +46,7 @@ pub trait PolyEvalInstructions<F: Field>: Chip<F> {
 /// Chip for poly eval
 #[derive(Clone, Debug)]
 pub struct PolyEvalConfig {
-    /// column layput | eval point | coeff | pow of point | result | accumulative result |
+    /// column layput : | eval point | coeff | accumulative result |
     advice: [Column<Advice>; EVALADVCOL],
 
     /// A selector controls gate
@@ -76,6 +73,7 @@ impl<F: Field> PolyEvalChip<F> {
     }
 
     /// Define the gates that constraint system needs
+    /// Polynomial Evaluation -- Horner's rule
     pub fn configure(
         meta: &mut ConstraintSystem<F>,
         advice: [Column<Advice>; EVALADVCOL],
@@ -94,45 +92,31 @@ impl<F: Field> PolyEvalChip<F> {
 
             // Simply making a cell to zero is not sufficient
             // We have to enforce the relationship between two rows:
-            // namely, The starting acc calucation must begin with an inital `acc` with zero value
+            // That is, the next line acc calucation must be dependent on an inital `acc` with zero value
             let init_acc_clone = meta.query_advice(advice[ACCINDEX], Rotation::cur());
             let next_acc = meta.query_advice(advice[ACCINDEX], Rotation::next());
-            let next_res = meta.query_advice(advice[RESINDEX], Rotation::next());
+            let next_coeff = meta.query_advice(advice[COEFFINDEX], Rotation::next());
+            let next_x = meta.query_advice(advice[XINDEX], Rotation::next());
             let zero_s_clone = meta.query_selector(zero_sel);
 
             // First, to constrain init acc is zero;
             // Second, to make sure init acc is guaranteed to be used in following calculation
+            // Namely acc(i+1) = coeff(i) + x * acc(i) recursion formula
             vec![
                 zero_s * init_acc,
-                zero_s_clone * (next_res + init_acc_clone - next_acc),
+                zero_s_clone * (next_coeff + next_x * init_acc_clone - next_acc),
             ]
         });
 
-        meta.create_gate("x pow", |meta| {
-            let unit_of_root = meta.query_advice(advice[URINDEX], Rotation::cur());
-            let cur_x = meta.query_advice(advice[POWXINDEX], Rotation::cur());
-            let next_x = meta.query_advice(advice[POWXINDEX], Rotation::next());
-            let pow_s = meta.query_selector(e_sel);
-
-            vec![pow_s * (next_x - cur_x * unit_of_root)]
-        });
-
-        meta.create_gate("addition for res", |meta| {
-            let coeff = meta.query_advice(advice[COEFFINDEX], Rotation::cur());
-            let elem = meta.query_advice(advice[POWXINDEX], Rotation::cur());
-            let res = meta.query_advice(advice[RESINDEX], Rotation::cur());
-            let add_s = meta.query_selector(e_sel);
-
-            vec![add_s * (res - coeff * elem)]
-        });
-
+        // Following lines are enforced acc(i+1) = coeff(i) + x * acc(i) recursion formula
         meta.create_gate("acc", |meta| {
             let prev_acc = meta.query_advice(advice[ACCINDEX], Rotation::prev());
             let cur_acc = meta.query_advice(advice[ACCINDEX], Rotation::cur());
-            let res = meta.query_advice(advice[RESINDEX], Rotation::cur());
+            let x = meta.query_advice(advice[XINDEX], Rotation::cur());
+            let coeff = meta.query_advice(advice[COEFFINDEX], Rotation::cur());
             let acc_s = meta.query_selector(e_sel);
 
-            vec![acc_s * (cur_acc - (res + prev_acc))]
+            vec![acc_s * (coeff + x * prev_acc - cur_acc)]
         });
 
         PolyEvalConfig {
@@ -171,7 +155,7 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
         layouter.assign_region(
             || "load eval point",
             |mut region: Region<F>| {
-                region.assign_advice(|| "eval point value", config.advice[URINDEX], 0, || a)
+                region.assign_advice(|| "eval point value", config.advice[XINDEX], 0, || a)
             },
         )
     }
@@ -194,68 +178,47 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
                     0,
                     || Value::known(F::ZERO),
                 )?;
-                let mut pow_x = Value::known(F::ONE);
                 config.zero_sel.enable(&mut region, 0)?;
 
                 // Assign the advice according to the coeff list
-                for (i, coeff) in coeffs.iter().enumerate() {
+                // NOTICE:
+                // As input, the coeff list is assigned as natural order c0, c1, c2...
+                // while by leveraging Horner's Rule, we order we need is reserved order
+                // cn-1, cn-2, ...
+                let len = coeffs.len();
+                let reorder = |i: usize| len - 1 - i;
+                for i in 0..len {
                     // Since our region starts at an aux row which only stores an init acc(F::ZERO)
                     let offset = i + 1;
+                    let coeff = &coeffs[reorder(i)];
                     config.e_sel.enable(&mut region, offset)?;
 
-                    // Constraint on a fixed unit of root
+                    // Constraint on a fixed eval point
                     elem.copy_advice(
-                        || format!("unit of root on {}", i),
+                        || format!("eval point on {}", i),
                         &mut region,
-                        config.advice[URINDEX],
+                        config.advice[XINDEX],
                         offset,
                     )?;
 
                     // Constrain coeff
                     coeff.copy_advice(
-                        || format!("coeff {}", i),
+                        || format!("coeff {}", reorder(i)),
                         &mut region,
                         config.advice[COEFFINDEX],
                         offset,
                     )?;
 
-                    // Assgin x exponentiation
-                    region.assign_advice(
-                        || format!("x power {}", i),
-                        config.advice[POWXINDEX],
-                        offset,
-                        || pow_x,
-                    )?;
-
-                    // Calculate the current result
-                    let res = region.assign_advice(
-                        || format!("res {}", i),
-                        config.advice[RESINDEX],
-                        offset,
-                        || coeff.clone().value().copied() * pow_x,
-                    )?;
-
                     // At end of each turn, assign acc and store it
+                    // Again acc(i+1) = coeff(i) + x * acc(i)
                     let prev_acc_value = acc.value().copied();
                     acc = region.assign_advice(
                         || format!("acc {}", i),
                         config.advice[ACCINDEX],
                         offset,
-                        || prev_acc_value + res.value(),
+                        || coeff.value().copied() + elem.value().copied() * prev_acc_value,
                     )?;
-
-                    // Step pow_x with another mul per se
-                    pow_x = pow_x * elem.clone().value().copied();
                 }
-
-                // Since we use only one selector on 3 gates, then we have to satisfy gate `pow x`
-                // by providing one more row
-                region.assign_advice(
-                    || format!("final row for pow x gate {}", coeffs.len()),
-                    config.advice[POWXINDEX],
-                    coeffs.len() + 1,
-                    || pow_x,
-                )?;
 
                 Ok(acc)
             },
@@ -404,6 +367,10 @@ mod tests {
     impl<F: Field> Circuit<F> for PolyEvalCircuit<F> {
         type Config = PolyEvalExtConfig;
         type FloorPlanner = SimpleFloorPlanner;
+        // Optional circuit configuration parameters, which is not in used
+        // For compiler compability it is added here
+        #[cfg(feature = "circuit-params")]
+        type Params = F;
 
         fn without_witnesses(&self) -> Self {
             Self::default()
@@ -411,8 +378,6 @@ mod tests {
 
         fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
             let advice = [
-                meta.advice_column(),
-                meta.advice_column(),
                 meta.advice_column(),
                 meta.advice_column(),
                 meta.advice_column(),
@@ -450,6 +415,7 @@ mod tests {
         }
     }
 
+    // Use naive way to implement poly eval, for comparison purpose
     fn poly_eval(coeffs: Vec<u64>, x: u64) -> u64 {
         let mut acc = 0;
         let mut temp = 1;
@@ -469,10 +435,7 @@ mod tests {
 
         let point = Value::known(Fp::from(test_point));
 
-        let circuit = PolyEvalCircuit {
-            coeffs: coeffs,
-            point: point,
-        };
+        let circuit = PolyEvalCircuit { coeffs, point };
 
         let instance = poly_eval(test_list.to_vec(), test_point);
 
@@ -482,6 +445,24 @@ mod tests {
         let prover = MockProver::run(k, &circuit, vec![public_inputs]).unwrap();
 
         assert_eq!(prover.verify(), Ok(()))
+    }
+
+    #[test]
+    fn zero_coeff_check() {
+        use rand::Rng;
+        let test_list = (1..10).map(|_| 0).collect::<Vec<u64>>();
+        let test_point = rand::thread_rng().gen_range(0..100) as u64;
+        poly_sanity_check(test_list, test_point, 7)
+    }
+
+    #[test]
+    fn zero_x_check() {
+        use rand::Rng;
+        let test_list = (1..10)
+            .map(|_| rand::thread_rng().gen_range(0..100))
+            .collect::<Vec<u64>>();
+        let test_point: u64 = 0;
+        poly_sanity_check(test_list, test_point, 7)
     }
 
     #[test]
