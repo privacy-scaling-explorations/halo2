@@ -1,6 +1,6 @@
 use halo2_proofs::arithmetic::Field;
-use halo2curves::pasta::{pallas::Base as Fp, vesta::Base as Fq};
 use halo2curves::bn256::Fr;
+use halo2curves::pasta::{pallas::Base as Fp, vesta::Base as Fq};
 
 use super::{Mds, Spec};
 
