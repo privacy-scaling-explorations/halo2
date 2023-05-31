@@ -322,7 +322,7 @@ mod tests {
         fn load_coeffs(
             &self,
             mut layouter: impl Layouter<F>,
-            list: &Vec<Value<F>>,
+            list: &[Value<F>],
         ) -> Result<Vec<AssignedCell<F, F>>, Error> {
             let config = self.config().polyevalconfig.clone();
             let mut coeffs: Vec<AssignedCell<F, F>> = vec![];
