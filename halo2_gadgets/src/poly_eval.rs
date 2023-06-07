@@ -185,12 +185,10 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
                 // As input, the coeff list is assigned as natural order c0, c1, c2...
                 // while by leveraging Horner's Rule, we order we need is reserved order
                 // cn-1, cn-2, ...
-                let len = coeffs.len();
-                let reorder = |i: usize| len - 1 - i;
-                for i in 0..len {
+                let n = coeffs.len();
+                for (i, coeff) in coeffs.iter().rev().enumerate() {
                     // Since our region starts at an aux row which only stores an init acc(F::ZERO)
                     let offset = i + 1;
-                    let coeff = &coeffs[reorder(i)];
                     config.e_sel.enable(&mut region, offset)?;
 
                     // Constraint on a fixed eval point
@@ -203,7 +201,7 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
 
                     // Constrain coeff
                     coeff.copy_advice(
-                        || format!("coeff {}", reorder(i)),
+                        || format!("coeff {}", n - 1 - i),
                         &mut region,
                         config.advice[COEFFINDEX],
                         offset,
@@ -219,6 +217,7 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
                         || coeff.value().copied() + elem.value().copied() * prev_acc_value,
                     )?;
                 }
+
 
                 Ok(acc)
             },
