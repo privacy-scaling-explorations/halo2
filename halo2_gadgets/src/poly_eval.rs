@@ -23,9 +23,7 @@ const EVALADVCOL: usize = ACCINDEX + 1;
 /// P[x] = c0 * 1 + c1 * x + c2 * x^2 + ... cn * x^n
 /// where selection of x and coeffs are from same finite field
 pub trait PolyEvalInstructions<F: Field>: Chip<F> {
-    /// Variable representing a coefficient.
-    /// Certainly it could be from another Field/Group,
-    /// orther than current one
+    /// Coefficient type
     type Coeff;
 
     /// Field element
@@ -46,7 +44,7 @@ pub trait PolyEvalInstructions<F: Field>: Chip<F> {
 /// Chip for poly eval
 #[derive(Clone, Debug)]
 pub struct PolyEvalConfig {
-    /// column layput : | eval point | coeff | accumulative result |
+    /// column layout : | eval point | coeff | accumulative result |
     advice: [Column<Advice>; EVALADVCOL],
 
     /// A selector controls gate
@@ -90,22 +88,8 @@ impl<F: Field> PolyEvalChip<F> {
             let init_acc = meta.query_advice(advice[ACCINDEX], Rotation::cur());
             let zero_s = meta.query_selector(zero_sel);
 
-            // Simply making a cell to zero is not sufficient
-            // We have to enforce the relationship between two rows:
-            // That is, the next line acc calucation must be dependent on an inital `acc` with zero value
-            let init_acc_clone = meta.query_advice(advice[ACCINDEX], Rotation::cur());
-            let next_acc = meta.query_advice(advice[ACCINDEX], Rotation::next());
-            let next_coeff = meta.query_advice(advice[COEFFINDEX], Rotation::next());
-            let next_x = meta.query_advice(advice[XINDEX], Rotation::next());
-            let zero_s_clone = meta.query_selector(zero_sel);
-
-            // First, to constrain init acc is zero;
-            // Second, to make sure init acc is guaranteed to be used in following calculation
-            // Namely acc(i+1) = coeff(i) + x * acc(i) recursion formula
-            vec![
-                zero_s * init_acc,
-                zero_s_clone * (next_coeff + next_x * init_acc_clone - next_acc),
-            ]
+            // To constrain init acc is zero;
+            vec![zero_s * init_acc]
         });
 
         // Following lines are enforced acc(i+1) = coeff(i) + x * acc(i) recursion formula
@@ -217,7 +201,6 @@ impl<F: Field> PolyEvalInstructions<F> for PolyEvalChip<F> {
                         || coeff.value().copied() + elem.value().copied() * prev_acc_value,
                     )?;
                 }
-
 
                 Ok(acc)
             },
@@ -344,7 +327,9 @@ mod tests {
             Ok(coeffs)
         }
 
-        fn reveal(
+        /// Constaint on final output
+        /// The evaluation calculated by circuit should be equal to the instance
+        fn constrain_pi(
             &self,
             mut layouter: impl Layouter<F>,
             elem: AssignedCell<F, F>,
@@ -410,7 +395,7 @@ mod tests {
                 )
                 .unwrap();
 
-            chip.reveal(layouter.namespace(|| "reveal"), evaluation, 0)
+            chip.constrain_pi(layouter.namespace(|| "constrain_pi"), evaluation, 0)
         }
     }
 
@@ -425,7 +410,7 @@ mod tests {
         acc
     }
 
-    fn poly_sanity_check(test_list: Vec<u64>, test_point: u64, k: u32) {
+    fn mock_prover_gen(test_list: Vec<u64>, test_point: u64, k: u32) -> MockProver<Fp> {
         let coeffs: Vec<Value<Fp>> = test_list
             .clone()
             .into_iter()
@@ -441,17 +426,17 @@ mod tests {
         let public_inputs = vec![Fp::from(instance)];
 
         // Given the correct public input, our circuit will verify.
-        let prover = MockProver::run(k, &circuit, vec![public_inputs]).unwrap();
-
-        assert_eq!(prover.verify(), Ok(()))
+        MockProver::run(k, &circuit, vec![public_inputs]).unwrap()
     }
 
     #[test]
     fn zero_coeff_check() {
         use rand::Rng;
-        let test_list = (1..10).map(|_| 0).collect::<Vec<u64>>();
+        let test_list = vec![0u64; 10];
         let test_point = rand::thread_rng().gen_range(0..100) as u64;
-        poly_sanity_check(test_list, test_point, 7)
+        let prover = mock_prover_gen(test_list, test_point, 7);
+
+        prover.assert_satisfied()
     }
 
     #[test]
@@ -461,14 +446,18 @@ mod tests {
             .map(|_| rand::thread_rng().gen_range(0..100))
             .collect::<Vec<u64>>();
         let test_point: u64 = 0;
-        poly_sanity_check(test_list, test_point, 7)
+        let prover = mock_prover_gen(test_list, test_point, 7);
+
+        prover.assert_satisfied()
     }
 
     #[test]
     fn simple_check() {
         let test_list = vec![1, 2, 3];
         let test_point = 5;
-        poly_sanity_check(test_list, test_point, 4)
+        let prover = mock_prover_gen(test_list, test_point, 4);
+
+        prover.assert_satisfied()
     }
 
     #[test]
@@ -478,6 +467,107 @@ mod tests {
             .map(|_| rand::thread_rng().gen_range(0..100))
             .collect::<Vec<u64>>();
         let test_point = rand::thread_rng().gen_range(0..100) as u64;
-        poly_sanity_check(test_list, test_point, 7)
+        let prover = mock_prover_gen(test_list, test_point, 7);
+
+        prover.assert_satisfied()
+    }
+
+    #[test]
+    fn reject_wrong_instance() {
+        use rand::Rng;
+        let test_list = (1..10)
+            .map(|_| rand::thread_rng().gen_range(0..100))
+            .collect::<Vec<u64>>();
+        let test_point = rand::thread_rng().gen_range(0..100) as u64;
+        let coeffs: Vec<Value<Fp>> = test_list
+            .clone()
+            .into_iter()
+            .map(|x| Value::known(Fp::from(x)))
+            .collect();
+
+        let point = Value::known(Fp::from(test_point));
+
+        let circuit = PolyEvalCircuit { coeffs, point };
+
+        // Case 1
+        // Wrong instance
+        let instance = poly_eval(test_list.to_vec(), test_point) + 1;
+
+        let public_inputs = vec![Fp::from(instance)];
+
+        // Given the correct public input, our circuit will verify.
+        let prover = MockProver::run(7, &circuit, vec![public_inputs]).unwrap();
+
+        // The fraud prover should be rejected
+        assert_ne!(prover.verify(), Ok(()));
+        // Case 3
+        // Extra instance
+        let public_inputs: Vec<Fp> = vec![Fp::from(instance), Fp::from(instance)];
+
+        // Given the correct public input, our circuit will verify.
+        let prover = MockProver::run(7, &circuit, vec![public_inputs]).unwrap();
+
+        // The fraud prover should be rejected
+        assert_ne!(prover.verify(), Ok(()));
+    }
+
+    #[test]
+    fn reject_insufficient_instance() {
+        use rand::Rng;
+        let test_list = (1..10)
+            .map(|_| rand::thread_rng().gen_range(0..100))
+            .collect::<Vec<u64>>();
+        let test_point = rand::thread_rng().gen_range(0..100) as u64;
+        let coeffs: Vec<Value<Fp>> = test_list
+            .clone()
+            .into_iter()
+            .map(|x| Value::known(Fp::from(x)))
+            .collect();
+
+        let point = Value::known(Fp::from(test_point));
+
+        let circuit = PolyEvalCircuit { coeffs, point };
+
+        // Case 2
+        // Insufficient instance
+        let public_inputs: Vec<Fp> = vec![];
+
+        // Given the correct public input, our circuit will verify.
+        let prover = MockProver::run(7, &circuit, vec![public_inputs]).unwrap();
+
+        // The fraud prover should be rejected
+        assert_ne!(prover.verify(), Ok(()));
+    }
+
+    #[test]
+    // In this TEST implementation, our circuit only constrains on the row 0, col 0 of instance
+    // and omits the others. So it could be okay to pass on as many as instance
+    fn accept_extra_instance() {
+        use rand::Rng;
+        let test_list = (1..10)
+            .map(|_| rand::thread_rng().gen_range(0..100))
+            .collect::<Vec<u64>>();
+        let test_point = rand::thread_rng().gen_range(0..100) as u64;
+        let coeffs: Vec<Value<Fp>> = test_list
+            .clone()
+            .into_iter()
+            .map(|x| Value::known(Fp::from(x)))
+            .collect();
+
+        let point = Value::known(Fp::from(test_point));
+
+        let circuit = PolyEvalCircuit { coeffs, point };
+
+        let instance = poly_eval(test_list.to_vec(), test_point);
+
+        // Case 3
+        // Extra instance
+        let public_inputs: Vec<Fp> = vec![Fp::from(instance), Fp::from(instance + 1u64)];
+
+        // Given the correct public input, our circuit will verify.
+        let prover = MockProver::run(7, &circuit, vec![public_inputs]).unwrap();
+
+        // The fraud prover should be rejected
+        assert_eq!(prover.verify(), Ok(()));
     }
 }
