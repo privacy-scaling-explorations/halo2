@@ -24,6 +24,10 @@ impl<V> Default for Value<V> {
 }
 
 impl<V> Value<V> {
+    /// unwrap the inner field 
+    pub const fn unwrap(&self) -> &Option<V> {
+        &self.inner
+    }
     /// Constructs an unwitnessed value.
     pub const fn unknown() -> Self {
         Self { inner: None }
