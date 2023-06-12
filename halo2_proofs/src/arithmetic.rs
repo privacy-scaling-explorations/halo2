@@ -383,20 +383,59 @@ where
 
 /// This simple utility function will parallelize an operation that is to be
 /// performed over a mutable slice.
+#[allow(unsafe_code)]
 pub fn parallelize<T: Send, F: Fn(&mut [T], usize) + Send + Sync + Clone>(v: &mut [T], f: F) {
-    let n = v.len();
+
+    // Algorithm rationale:
+    //
+    // Using the stdlib `chunks_mut` will lead to severe load imbalance.
+    // From https://github.com/rust-lang/rust/blob/e94bda3/library/core/src/slice/iter.rs#L1607-L1637
+    // if the division is not exact, the last chunk will be the remainder.
+    //
+    // Dividing 40 items on 12 threads will lead to a chunk size of 40/12 = 3,
+    // the first 11 threads will work on 3 items and the last on 40-11*3 = 7 items,
+    // a 2.33x workload difference
+    //
+    // Instead we can divide work into chunks of size
+    // 4, 4, 4, 4, 3, 3, 3, 3, 3, 3, 3, 3 = 4*4 + 3*8 = 40
+    //
+    // This would lead to a 7/4 = 1.75x speedup
+    //
+    // Speedup can be even more dramatic if for exemple we had 351 items to split on 32 cores
+    // 351/32 = 10, 10*31 = 310, last chunk would be 41 items, a 4.1x workload difference.
+    //
+    // See also OpenMP spec (page 60)
+    // http://www.openmp.org/mp-documents/openmp-4.5.pdf
+    // "When no chunk_size is specified, the iteration space is divided into chunks
+    // that are approximately equal in size, and at most one chunk is distributed to
+    // each thread. The size of the chunks is unspecified in this case."
+    // This implies chunks are the same size ±1
+
+    let total_iters = v.len();
     let num_threads = multicore::current_num_threads();
-    let mut chunk = (n as usize) / num_threads;
-    if chunk < num_threads {
-        chunk = 1;
-    }
+    let num_chunks = std::cmp::min(num_threads, total_iters);
+    let base_chunk_size = total_iters / num_threads;
+    let cutoff = total_iters % num_threads;
 
     multicore::scope(|scope| {
-        for (chunk_num, v) in v.chunks_mut(chunk).enumerate() {
+        for chunk_id in 0..num_chunks {
             let f = f.clone();
+            let (offset, chunk_size) = if chunk_id < cutoff {
+                ((base_chunk_size+1) * chunk_id, base_chunk_size+1)
+            } else {
+                ((base_chunk_size * chunk_id) + cutoff, base_chunk_size)
+            };
+
+            // The borrow checker cannot prove that the chunks are disjoint slices.
+            // so we need to resort to raw pointers to construct mutable disjoint slices.
+            let chunk: &mut [T] = unsafe {
+                let ptr_offset = v.get_unchecked_mut(offset);
+                let len = std::cmp::min(total_iters-offset, chunk_size);
+                std::slice::from_raw_parts_mut(ptr_offset, len)
+            };
+
             scope.spawn(move |_| {
-                let start = chunk_num * chunk;
-                f(v, start);
+                f(chunk, offset);
             });
         }
     });
