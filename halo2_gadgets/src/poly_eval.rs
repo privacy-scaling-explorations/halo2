@@ -514,12 +514,9 @@ mod tests {
     #[test]
     fn reject_insufficient_instance() {
         use rand::Rng;
-        let test_list = (1..10)
-            .map(|_| rand::thread_rng().gen_range(0..100))
-            .collect::<Vec<u64>>();
+        let test_list = (1..10).map(|_| rand::thread_rng().gen_range(0..100));
         let test_point = rand::thread_rng().gen_range(0..100) as u64;
         let coeffs: Vec<Value<Fp>> = test_list
-            .clone()
             .into_iter()
             .map(|x| Value::known(Fp::from(x)))
             .collect();
@@ -558,7 +555,7 @@ mod tests {
 
         let circuit = PolyEvalCircuit { coeffs, point };
 
-        let instance = poly_eval(test_list.to_vec(), test_point);
+        let instance = poly_eval(test_list, test_point);
 
         // Case 3
         // Extra instance
