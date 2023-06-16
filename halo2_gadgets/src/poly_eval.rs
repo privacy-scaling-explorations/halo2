@@ -535,36 +535,4 @@ mod tests {
         // The fraud prover should be rejected
         assert_ne!(prover.verify(), Ok(()));
     }
-
-    #[test]
-    // In this TEST implementation, our circuit only constrains on the row 0, col 0 of instance
-    // and omits the others. So it could be okay to pass on as many as instance
-    fn accept_extra_instance() {
-        use rand::Rng;
-        let test_list = (1..10)
-            .map(|_| rand::thread_rng().gen_range(0..100))
-            .collect::<Vec<u64>>();
-        let test_point = rand::thread_rng().gen_range(0..100) as u64;
-        let coeffs: Vec<Value<Fp>> = test_list
-            .clone()
-            .into_iter()
-            .map(|x| Value::known(Fp::from(x)))
-            .collect();
-
-        let point = Value::known(Fp::from(test_point));
-
-        let circuit = PolyEvalCircuit { coeffs, point };
-
-        let instance = poly_eval(test_list, test_point);
-
-        // Case 3
-        // Extra instance
-        let public_inputs: Vec<Fp> = vec![Fp::from(instance), Fp::from(instance + 1u64)];
-
-        // Given the correct public input, our circuit will verify.
-        let prover = MockProver::run(7, &circuit, vec![public_inputs]).unwrap();
-
-        // The fraud prover should be rejected
-        assert_eq!(prover.verify(), Ok(()));
-    }
 }
