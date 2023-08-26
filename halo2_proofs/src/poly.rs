@@ -12,7 +12,7 @@ use group::ff::{BatchInvert, Field};
 use std::fmt::Debug;
 use std::io;
 use std::marker::PhantomData;
-use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, RangeFrom, RangeFull, Sub};
+use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, Range, RangeFrom, RangeFull, Sub};
 
 /// Generic commitment scheme structures
 pub mod commitment;
@@ -108,6 +108,20 @@ impl<F, B> Index<RangeFull> for Polynomial<F, B> {
 
 impl<F, B> IndexMut<RangeFull> for Polynomial<F, B> {
     fn index_mut(&mut self, index: RangeFull) -> &mut [F] {
+        self.values.index_mut(index)
+    }
+}
+
+impl<F, B> Index<Range<usize>> for Polynomial<F, B> {
+    type Output = [F];
+
+    fn index(&self, index: Range<usize>) -> &[F] {
+        self.values.index(index)
+    }
+}
+
+impl<F, B> IndexMut<Range<usize>> for Polynomial<F, B> {
+    fn index_mut(&mut self, index: Range<usize>) -> &mut [F] {
         self.values.index_mut(index)
     }
 }
