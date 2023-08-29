@@ -1,5 +1,5 @@
 use super::{
-    construct_intermediate_sets, ChallengeU, ChallengeV, ChallengeY, Commitment, Query, RotationSet,
+    construct_intermediate_sets, ChallengeU, ChallengeV, ChallengeY, Commitment, RotationSet,
 };
 use crate::arithmetic::{
     eval_polynomial, evaluate_vanishing_polynomial, kate_division, lagrange_interpolate,
@@ -9,8 +9,7 @@ use crate::helpers::SerdeCurveAffine;
 use crate::poly::commitment::{Blind, ParamsProver, Prover};
 use crate::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
 use crate::poly::query::{PolynomialPointer, ProverQuery};
-use crate::poly::Rotation;
-use crate::poly::{commitment::Params, Coeff, Polynomial};
+use crate::poly::{Coeff, Polynomial};
 use crate::transcript::{EncodedChallenge, TranscriptWrite};
 
 use crate::multicore::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -19,7 +18,7 @@ use group::Curve;
 use halo2curves::pairing::Engine;
 use rand_core::RngCore;
 use std::fmt::Debug;
-use std::io::{self, Write};
+use std::io;
 use std::marker::PhantomData;
 use std::ops::MulAssign;
 

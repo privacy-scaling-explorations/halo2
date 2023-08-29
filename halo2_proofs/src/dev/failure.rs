@@ -14,7 +14,6 @@ use crate::dev::metadata::Constraint;
 use crate::{
     dev::{Instance, Value},
     plonk::{Any, Column, ConstraintSystem, Expression, Gate},
-    poly::Rotation,
 };
 
 mod emitter;

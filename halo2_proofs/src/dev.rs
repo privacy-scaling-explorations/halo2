@@ -1,19 +1,14 @@
 //! Tools for developing circuits.
 
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::fmt;
 use std::iter;
 use std::ops::{Add, Mul, Neg, Range};
-use std::time::{Duration, Instant};
 
 use blake2b_simd::blake2b;
 use ff::Field;
 use ff::FromUniformBytes;
-use group::Group;
 
-use crate::circuit::layouter::SyncDeps;
 use crate::multicore::{
     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
     ParallelSliceMut,
@@ -24,11 +19,9 @@ use crate::{
     plonk::{
         permutation,
         sealed::{self, SealedPhase},
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ColumnType,
-        ConstraintSystem, Error, Expression, FirstPhase, Fixed, FloorPlanner, Instance, Phase,
-        Selector, VirtualCell,
+        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
+        Expression, FirstPhase, Fixed, FloorPlanner, Instance, Phase, Selector,
     },
-    poly::Rotation,
 };
 
 pub mod metadata;

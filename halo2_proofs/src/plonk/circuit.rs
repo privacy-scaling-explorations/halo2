@@ -9,9 +9,8 @@ use core::cmp::max;
 use core::ops::{Add, Mul};
 use ff::Field;
 use sealed::SealedPhase;
-use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::{
     convert::TryFrom,
     ops::{Neg, Sub},
@@ -873,6 +872,7 @@ impl<F: Field> Expression<F> {
 
     /// Evaluate the polynomial using the provided closures to perform the
     /// operations.
+    #[allow(clippy::too_many_arguments)]
     pub fn evaluate<T>(
         &self,
         constant: &impl Fn(F) -> T,
@@ -982,6 +982,7 @@ impl<F: Field> Expression<F> {
 
     /// Evaluate the polynomial lazily using the provided closures to perform the
     /// operations.
+    #[allow(clippy::too_many_arguments)]
     pub fn evaluate_lazy<T: PartialEq>(
         &self,
         constant: &impl Fn(F) -> T,

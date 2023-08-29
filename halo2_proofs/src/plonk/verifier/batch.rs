@@ -1,9 +1,7 @@
-use std::{io, marker::PhantomData};
-
 use ff::FromUniformBytes;
 use group::ff::Field;
 use halo2curves::CurveAffine;
-use rand_core::{OsRng, RngCore};
+use rand_core::OsRng;
 
 use super::{verify_proof, VerificationStrategy};
 use crate::{

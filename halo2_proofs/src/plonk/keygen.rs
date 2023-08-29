@@ -11,15 +11,14 @@ use super::{
         Selector,
     },
     evaluation::Evaluator,
-    permutation, Assigned, Challenge, Error, Expression, LagrangeCoeff, Polynomial, ProvingKey,
-    VerifyingKey,
+    permutation, Assigned, Challenge, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
 };
 use crate::{
     arithmetic::{parallelize, CurveAffine},
-    circuit::{layouter::SyncDeps, Value},
+    circuit::Value,
     poly::{
         batch_invert_assigned,
-        commitment::{Blind, Params, MSM},
+        commitment::{Blind, Params},
         EvaluationDomain,
     },
 };

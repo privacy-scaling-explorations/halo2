@@ -8,7 +8,7 @@ use ff::Field;
 
 pub use super::table_layouter::TableLayouter;
 use super::{Cell, RegionIndex, Value};
-use crate::plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Selector, TableColumn};
+use crate::plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Selector};
 
 /// Intermediate trait requirements for [`RegionLayouter`] when thread-safe regions are enabled.
 #[cfg(feature = "thread-safe-region")]

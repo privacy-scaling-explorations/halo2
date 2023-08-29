@@ -1,6 +1,6 @@
 use std::iter;
 
-use ff::{Field, PrimeField};
+use ff::Field;
 use group::Curve;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
@@ -9,12 +9,11 @@ use super::Argument;
 use crate::{
     arithmetic::{eval_polynomial, CurveAffine},
     multicore::{
-        current_num_threads, IndexedParallelIterator, IntoParallelIterator,
-        IntoParallelRefMutIterator, ParallelIterator, ParallelSliceMut,
+        current_num_threads, IndexedParallelIterator, IntoParallelRefMutIterator, ParallelIterator,
+        ParallelSliceMut,
     },
-    plonk::{ChallengeX, ChallengeY, Error},
+    plonk::{ChallengeX, Error},
     poly::{
-        self,
         commitment::{Blind, ParamsProver},
         Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery,
     },
