@@ -101,16 +101,17 @@ impl FailureLocation {
             .iter()
             .enumerate()
             .find(|(_, r)| {
-                if r.rows.is_none() {
-                    return false;
+                if let Some((start, end)) = r.rows {
+                    // We match the region if any input columns overlap, rather than all of
+                    // them, because matching complex selector columns is hard. As long as
+                    // regions are rectangles, and failures occur due to assignments entirely
+                    // within single regions, "any" will be equivalent to "all". If these
+                    // assumptions change, we'll start getting bug reports from users :)
+                    (start..=end).contains(&failure_row) && !failure_columns.is_disjoint(&r.columns)
+                } else {
+                    // Zero-area region
+                    false
                 }
-                let (start, end) = r.rows.unwrap();
-                // We match the region if any input columns overlap, rather than all of
-                // them, because matching complex selector columns is hard. As long as
-                // regions are rectangles, and failures occur due to assignments entirely
-                // within single regions, "any" will be equivalent to "all". If these
-                // assumptions change, we'll start getting bug reports from users :)
-                (start..=end).contains(&failure_row) && !failure_columns.is_disjoint(&r.columns)
             })
             .map(|(r_i, r)| FailureLocation::InRegion {
                 region: (r_i, r.name.clone(), r.annotations.clone()).into(),
