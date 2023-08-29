@@ -46,8 +46,6 @@ struct Assembly {
     selectors: Vec<Vec<bool>>,
 }
 
-impl SyncDeps for Assembly {}
-
 impl<F: Field> Assignment<F> for Assembly {
     fn enter_region<NR, N>(&mut self, _: N)
     where

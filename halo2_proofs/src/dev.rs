@@ -2212,5 +2212,3 @@ mod tests {
         )
     }
 }
-
-impl<F: Field> SyncDeps for MockProver<F> {}

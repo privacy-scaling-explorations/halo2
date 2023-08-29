@@ -13,9 +13,15 @@ use crate::plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Select
 #[cfg(feature = "thread-safe-region")]
 pub trait SyncDeps: Send + Sync {}
 
+#[cfg(feature = "thread-safe-region")]
+impl<T: Send + Sync> SyncDeps for T {}
+
 /// Intermediate trait requirements for [`RegionLayouter`].
 #[cfg(not(feature = "thread-safe-region"))]
 pub trait SyncDeps {}
+
+#[cfg(not(feature = "thread-safe-region"))]
+impl<T> SyncDeps for T {}
 
 /// Helper trait for implementing a custom [`Layouter`].
 ///
@@ -148,8 +154,6 @@ pub struct RegionShape {
     pub(super) columns: HashSet<RegionColumn>,
     pub(super) row_count: usize,
 }
-
-impl SyncDeps for RegionShape {}
 
 /// The virtual column involved in a region. This includes concrete columns,
 /// as well as selectors that are not concrete columns at this stage.

@@ -384,8 +384,6 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> V1Region<'r, 'a, F, CS> {
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> SyncDeps for V1Region<'r, 'a, F, CS> {}
-
 impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Region<'r, 'a, F, CS> {
     fn enable_selector<'v>(
         &'v mut self,

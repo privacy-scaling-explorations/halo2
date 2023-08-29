@@ -61,8 +61,6 @@ struct Assembly<F: Field> {
     _marker: std::marker::PhantomData<F>,
 }
 
-impl<F: Field> SyncDeps for Assembly<F> {}
-
 impl<F: Field> Assignment<F> for Assembly<F> {
     fn enter_region<NR, N>(&mut self, _: N)
     where

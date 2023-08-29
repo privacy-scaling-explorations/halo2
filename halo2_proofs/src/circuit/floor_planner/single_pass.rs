@@ -265,11 +265,6 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> SingleChipLayouterRegion<'r, 'a, 
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a + SyncDeps> SyncDeps
-    for SingleChipLayouterRegion<'r, 'a, F, CS>
-{
-}
-
 impl<'r, 'a, F: Field, CS: Assignment<F> + 'a + SyncDeps> RegionLayouter<F>
     for SingleChipLayouterRegion<'r, 'a, F, CS>
 {
