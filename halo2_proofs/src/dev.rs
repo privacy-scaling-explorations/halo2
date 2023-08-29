@@ -14,6 +14,10 @@ use ff::FromUniformBytes;
 use group::Group;
 
 use crate::circuit::layouter::SyncDeps;
+use crate::multicore::{
+    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+    ParallelSliceMut,
+};
 use crate::plonk::permutation::keygen::Assembly;
 use crate::{
     circuit,
@@ -25,12 +29,6 @@ use crate::{
         Selector, VirtualCell,
     },
     poly::Rotation,
-};
-use rayon::{
-    iter::{
-        IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-    },
-    slice::ParallelSliceMut,
 };
 
 pub mod metadata;

@@ -4,10 +4,10 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use group::ff::Field;
 use halo2_proofs::*;
 use halo2curves::pasta::pallas::Scalar;
+use maybe_rayon::{current_num_threads, prelude::*};
 use rand_chacha::rand_core::RngCore;
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
-use rayon::{current_num_threads, prelude::*};
 
 fn rand_poly_serial(mut rng: ChaCha20Rng, domain: usize) -> Vec<Scalar> {
     // Sample a random polynomial of degree n - 1

@@ -13,11 +13,11 @@ use crate::poly::Rotation;
 use crate::poly::{commitment::Params, Coeff, Polynomial};
 use crate::transcript::{EncodedChallenge, TranscriptWrite};
 
+use crate::multicore::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use ff::{Field, PrimeField};
 use group::Curve;
 use halo2curves::pairing::Engine;
 use rand_core::RngCore;
-use rayon::prelude::*;
 use std::fmt::Debug;
 use std::io::{self, Write};
 use std::marker::PhantomData;

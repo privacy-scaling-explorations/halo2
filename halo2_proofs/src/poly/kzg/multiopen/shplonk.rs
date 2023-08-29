@@ -1,6 +1,7 @@
 mod prover;
 mod verifier;
 
+use crate::multicore::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use crate::{
     arithmetic::{eval_polynomial, lagrange_interpolate, CurveAffine},
     poly::{query::Query, Coeff, Polynomial},
@@ -8,7 +9,6 @@ use crate::{
 };
 use ff::Field;
 pub use prover::ProverSHPLONK;
-use rayon::prelude::*;
 use std::{
     collections::{btree_map::Entry, BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,

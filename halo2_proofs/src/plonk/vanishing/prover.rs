@@ -4,11 +4,14 @@ use ff::{Field, PrimeField};
 use group::Curve;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
-use rayon::{current_num_threads, prelude::*};
 
 use super::Argument;
 use crate::{
     arithmetic::{eval_polynomial, CurveAffine},
+    multicore::{
+        current_num_threads, IndexedParallelIterator, IntoParallelIterator,
+        IntoParallelRefMutIterator, ParallelIterator, ParallelSliceMut,
+    },
     plonk::{ChallengeX, ChallengeY, Error},
     poly::{
         self,
