@@ -5,9 +5,7 @@ use rand_core::OsRng;
 
 use super::{verify_proof, VerificationStrategy};
 use crate::{
-    multicore::{
-        IndexedParallelIterator, IntoParallelIterator, ParallelIterator, TryFoldAndReduce,
-    },
+    multicore::{IntoParallelIterator, TryFoldAndReduce},
     plonk::{Error, VerifyingKey},
     poly::{
         commitment::{Params, MSM},
@@ -20,6 +18,9 @@ use crate::{
     },
     transcript::{Blake2bRead, TranscriptReadBuffer},
 };
+
+#[cfg(feature = "multicore")]
+use crate::multicore::{IndexedParallelIterator, ParallelIterator};
 
 /// A proof verification strategy that returns the proof's MSM.
 ///

@@ -8,25 +8,21 @@ compile_error!(
 );
 
 pub use maybe_rayon::{
-    iter::{
-        IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator,
-        IntoParallelRefMutIterator, ParallelIterator,
-    },
-    join, scope,
-    slice::ParallelSliceMut,
-    Scope,
+    iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
+    join, scope, Scope,
 };
 
 #[cfg(feature = "multicore")]
-pub use maybe_rayon::current_num_threads;
+pub use maybe_rayon::{
+    current_num_threads,
+    iter::{IndexedParallelIterator, IntoParallelRefIterator},
+    slice::ParallelSliceMut,
+};
 
 #[cfg(not(feature = "multicore"))]
 pub fn current_num_threads() -> usize {
     1
 }
-
-#[cfg(not(feature = "multicore"))]
-pub trait IndexedParallelIterator: std::iter::Iterator {}
 
 pub trait TryFoldAndReduce<T, E> {
     /// Implements `iter.try_fold().try_reduce()` for `rayon::iter::ParallelIterator`,

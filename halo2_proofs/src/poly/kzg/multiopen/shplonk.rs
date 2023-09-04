@@ -1,12 +1,15 @@
 mod prover;
 mod verifier;
 
-use crate::multicore::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use crate::multicore::IntoParallelIterator;
 use crate::{poly::query::Query, transcript::ChallengeScalar};
 use ff::Field;
 pub use prover::ProverSHPLONK;
 use std::collections::BTreeSet;
 pub use verifier::VerifierSHPLONK;
+
+#[cfg(feature = "multicore")]
+use crate::multicore::ParallelIterator;
 
 #[derive(Clone, Copy, Debug)]
 struct U {}
@@ -118,7 +121,8 @@ where
                 .into_par_iter()
                 .map(|commitment| {
                     let evals: Vec<F> = rotations_vec
-                        .par_iter()
+                        .as_slice()
+                        .into_par_iter()
                         .map(|&&rotation| get_eval(commitment, rotation))
                         .collect();
                     Commitment((commitment, evals))

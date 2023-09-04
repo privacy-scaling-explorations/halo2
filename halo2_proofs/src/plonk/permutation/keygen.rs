@@ -4,13 +4,15 @@ use group::Curve;
 use super::{Argument, ProvingKey, VerifyingKey};
 use crate::{
     arithmetic::{parallelize, CurveAffine},
-    multicore::{IndexedParallelIterator, ParallelIterator},
     plonk::{Any, Column, Error},
     poly::{
         commitment::{Blind, Params},
         EvaluationDomain,
     },
 };
+
+#[cfg(feature = "multicore")]
+use crate::multicore::{IndexedParallelIterator, ParallelIterator};
 
 #[cfg(feature = "thread-safe-region")]
 use std::collections::{BTreeSet, HashMap};
