@@ -30,7 +30,6 @@ harness = false
 [[bench]]
 name = "commit_zk"
 harness = false
-required-features = ["multicore"]
 
 [[bench]]
 name = "hashtocurve"
