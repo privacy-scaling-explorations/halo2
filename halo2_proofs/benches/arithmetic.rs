@@ -2,7 +2,8 @@
 extern crate criterion;
 
 use crate::arithmetic::{best_multiexp, CurveAffine};
-use crate::halo2curves::pasta::{EqAffine, Fp};
+// use crate::halo2curves::pasta::{EqAffine, Fp};
+use crate::halo2curves::bn256::{G1Affine, Fr};
 use ff::PrimeField;
 use halo2_proofs::*;
 
@@ -32,7 +33,7 @@ where
 fn criterion_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("msm");
     for size in 8..10 {
-        let (point_vec, scalar_vec) = generate_msm_inputs::<EqAffine, Fp>(size);
+        let (point_vec, scalar_vec) = generate_msm_inputs::<G1Affine, Fr>(size);
         let point_vec = black_box(point_vec);
         let scalar_vec = black_box(scalar_vec);
         group.bench_with_input(BenchmarkId::new("Baseline", size), &size, |b, _size| {
