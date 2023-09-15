@@ -99,19 +99,11 @@ where
     /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
     /// does not perform any checks
-    pub fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
-        reader: &mut R,
-        format: SerdeFormat,
-        #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-    ) -> io::Result<Self> {
+    pub fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         let mut k = [0u8; 4];
         reader.read_exact(&mut k)?;
         let k = u32::from_be_bytes(k);
-        let (domain, cs, _) = keygen::create_domain::<C, ConcreteCircuit>(
-            k,
-            #[cfg(feature = "circuit-params")]
-            params,
-        );
+        let (domain, cs) = keygen::create_domain::<C>(k);
         let mut num_fixed_columns = [0u8; 4];
         reader.read_exact(&mut num_fixed_columns)?;
         let num_fixed_columns = u32::from_be_bytes(num_fixed_columns);
@@ -153,17 +145,8 @@ where
     }
 
     /// Reads a verification key from a slice of bytes using [`Self::read`].
-    pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
-        mut bytes: &[u8],
-        format: SerdeFormat,
-        #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-    ) -> io::Result<Self> {
-        Self::read::<_, ConcreteCircuit>(
-            &mut bytes,
-            format,
-            #[cfg(feature = "circuit-params")]
-            params,
-        )
+    pub fn from_bytes(mut bytes: &[u8], format: SerdeFormat) -> io::Result<Self> {
+        Self::read::<_>(&mut bytes, format)
     }
 }
 
@@ -349,17 +332,8 @@ where
     /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
     /// does not perform any checks
-    pub fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
-        reader: &mut R,
-        format: SerdeFormat,
-        #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-    ) -> io::Result<Self> {
-        let vk = VerifyingKey::<C>::read::<R, ConcreteCircuit>(
-            reader,
-            format,
-            #[cfg(feature = "circuit-params")]
-            params,
-        )?;
+    pub fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
+        let vk = VerifyingKey::<C>::read::<R>(reader, format)?;
         let l0 = Polynomial::read(reader, format)?;
         let l_last = Polynomial::read(reader, format)?;
         let l_active_row = Polynomial::read(reader, format)?;
@@ -389,17 +363,8 @@ where
     }
 
     /// Reads a proving key from a slice of bytes using [`Self::read`].
-    pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
-        mut bytes: &[u8],
-        format: SerdeFormat,
-        #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-    ) -> io::Result<Self> {
-        Self::read::<_, ConcreteCircuit>(
-            &mut bytes,
-            format,
-            #[cfg(feature = "circuit-params")]
-            params,
-        )
+    pub fn from_bytes(mut bytes: &[u8], format: SerdeFormat) -> io::Result<Self> {
+        Self::read::<_>(&mut bytes, format)
     }
 }
 

@@ -143,13 +143,7 @@ fn main() {
     let f = File::open("serialization-test.pk").unwrap();
     let mut reader = BufReader::new(f);
     #[allow(clippy::unit_arg)]
-    let pk = ProvingKey::<G1Affine>::read::<_, StandardPlonk>(
-        &mut reader,
-        SerdeFormat::RawBytes,
-        #[cfg(feature = "circuit-params")]
-        circuit.params(),
-    )
-    .unwrap();
+    let pk = ProvingKey::<G1Affine>::read::<_>(&mut reader, SerdeFormat::RawBytes).unwrap();
 
     std::fs::remove_file("serialization-test.pk").unwrap();
 

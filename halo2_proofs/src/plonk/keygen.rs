@@ -23,29 +23,33 @@ use crate::{
     },
 };
 
-pub(crate) fn create_domain<C, ConcreteCircuit>(
-    k: u32,
-    #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-) -> (
-    EvaluationDomain<C::Scalar>,
-    ConstraintSystem<C::Scalar>,
-    ConcreteCircuit::Config,
-)
+pub(crate) fn create_domain<C>(k: u32) -> (EvaluationDomain<C::Scalar>, ConstraintSystem<C::Scalar>)
 where
     C: CurveAffine,
-    ConcreteCircuit: Circuit<C::Scalar>,
 {
-    let mut cs = ConstraintSystem::default();
-    #[cfg(feature = "circuit-params")]
-    let config = ConcreteCircuit::configure_with_params(&mut cs, params);
-    #[cfg(not(feature = "circuit-params"))]
-    let config = ConcreteCircuit::configure(&mut cs);
+    let cs = ConstraintSystem::default();
 
     let degree = cs.degree();
 
     let domain = EvaluationDomain::new(degree as u32, k);
 
-    (domain, cs, config)
+    (domain, cs)
+}
+
+pub(crate) fn create_config<C, ConcreteCircuit>(
+    cs: &mut ConstraintSystem<C::Scalar>,
+    #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
+) -> ConcreteCircuit::Config
+where
+    C: CurveAffine,
+    ConcreteCircuit: Circuit<C::Scalar>,
+{
+    #[cfg(feature = "circuit-params")]
+    let config = ConcreteCircuit::configure_with_params(cs, params);
+    #[cfg(not(feature = "circuit-params"))]
+    let config = ConcreteCircuit::configure(cs);
+
+    config
 }
 
 /// Assembly to be used in circuit synthesis.
@@ -213,8 +217,9 @@ where
     ConcreteCircuit: Circuit<C::Scalar>,
     C::Scalar: FromUniformBytes<64>,
 {
-    let (domain, cs, config) = create_domain::<C, ConcreteCircuit>(
-        params.k(),
+    let (domain, mut cs) = create_domain::<C>(params.k());
+    let config = create_config::<C, ConcreteCircuit>(
+        &mut cs,
         #[cfg(feature = "circuit-params")]
         circuit.params(),
     );
