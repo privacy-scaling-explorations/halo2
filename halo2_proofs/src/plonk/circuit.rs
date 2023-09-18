@@ -11,6 +11,7 @@ use ff::Field;
 use sealed::SealedPhase;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::iter::{Product, Sum};
 use std::{
     convert::TryFrom,
     ops::{Neg, Sub},
@@ -1352,6 +1353,34 @@ impl<F: Field> Mul<F> for Expression<F> {
     }
 }
 
+impl<F: Field> Sum<Self> for Expression<F> {
+    fn sum<I: Iterator<Item = Self>>(mut iter: I) -> Self {
+        if let Some(mut result) = iter.next() {
+            for term in iter {
+                result = result + term;
+            }
+
+            result
+        } else {
+            Self::Constant(F::ZERO)
+        }
+    }
+}
+
+impl<F: Field> Product<Self> for Expression<F> {
+    fn product<I: Iterator<Item = Self>>(mut iter: I) -> Self {
+        if let Some(mut result) = iter.next() {
+            for term in iter {
+                result = result * term;
+            }
+
+            result
+        } else {
+            Self::Constant(F::ONE)
+        }
+    }
+}
+
 /// Represents an index into a vector where each entry corresponds to a distinct
 /// point that polynomials are queried at.
 #[derive(Copy, Clone, Debug)]
@@ -2437,5 +2466,49 @@ impl<'a, F: Field> VirtualCells<'a, F> {
     /// Query a challenge
     pub fn query_challenge(&mut self, challenge: Challenge) -> Expression<F> {
         Expression::Challenge(challenge)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Expression;
+    use halo2curves::bn256::Fr;
+
+    #[test]
+    fn iter_sum() {
+        let exprs: Vec<Expression<Fr>> = vec![
+            Expression::Constant(1.into()),
+            Expression::Constant(2.into()),
+            Expression::Constant(3.into()),
+        ];
+        let happened: Expression<Fr> = exprs.into_iter().sum();
+        let expected: Expression<Fr> = Expression::Sum(
+            Box::new(Expression::Sum(
+                Box::new(Expression::Constant(1.into())),
+                Box::new(Expression::Constant(2.into())),
+            )),
+            Box::new(Expression::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
+    }
+
+    #[test]
+    fn iter_product() {
+        let exprs: Vec<Expression<Fr>> = vec![
+            Expression::Constant(1.into()),
+            Expression::Constant(2.into()),
+            Expression::Constant(3.into()),
+        ];
+        let happened: Expression<Fr> = exprs.into_iter().product();
+        let expected: Expression<Fr> = Expression::Product(
+            Box::new(Expression::Product(
+                Box::new(Expression::Constant(1.into())),
+                Box::new(Expression::Constant(2.into())),
+            )),
+            Box::new(Expression::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
     }
 }
