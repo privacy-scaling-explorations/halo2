@@ -1354,30 +1354,16 @@ impl<F: Field> Mul<F> for Expression<F> {
 }
 
 impl<F: Field> Sum<Self> for Expression<F> {
-    fn sum<I: Iterator<Item = Self>>(mut iter: I) -> Self {
-        if let Some(mut result) = iter.next() {
-            for term in iter {
-                result = result + term;
-            }
-
-            result
-        } else {
-            Self::Constant(F::ZERO)
-        }
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, x| acc + x)
+            .unwrap_or(Expression::Constant(F::ZERO))
     }
 }
 
 impl<F: Field> Product<Self> for Expression<F> {
-    fn product<I: Iterator<Item = Self>>(mut iter: I) -> Self {
-        if let Some(mut result) = iter.next() {
-            for term in iter {
-                result = result * term;
-            }
-
-            result
-        } else {
-            Self::Constant(F::ONE)
-        }
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, x| acc * x)
+            .unwrap_or(Expression::Constant(F::ONE))
     }
 }
 
