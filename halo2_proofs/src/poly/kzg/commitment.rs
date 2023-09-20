@@ -88,7 +88,10 @@ where
         };
 
         let mut g_lagrange_projective = vec![E::G1::identity(); n as usize];
-        let root = E::Scalar::ROOT_OF_UNITY.pow_vartime([1 << (E::Scalar::S - k)]);
+        let mut root = E::Scalar::ROOT_OF_UNITY;
+        for _ in k..E::Scalar::S {
+             root = root.square();
+         }
         let n_inv = E::Scalar::from(n)
             .invert()
             .expect("inversion should be ok for n = 1<<k");
