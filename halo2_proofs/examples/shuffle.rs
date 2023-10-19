@@ -57,11 +57,11 @@ impl<const W: usize> MyConfig<W> {
     fn configure<F: Field>(meta: &mut ConstraintSystem<F>) -> Self {
         let [q_shuffle, q_first, q_last] = [(); 3].map(|_| meta.selector());
         // First phase
-        let original = [(); W].map(|_| meta.advice_column_in(FirstPhase));
-        let shuffled = [(); W].map(|_| meta.advice_column_in(FirstPhase));
+        let original = [(); W].map(|_| meta.advice_column_in(FirstPhase, true));
+        let shuffled = [(); W].map(|_| meta.advice_column_in(FirstPhase, true));
         let [theta, gamma] = [(); 2].map(|_| meta.challenge_usable_after(FirstPhase));
         // Second phase
-        let z = meta.advice_column_in(SecondPhase);
+        let z = meta.advice_column_in(SecondPhase, true);
 
         meta.create_gate("z should start with 1", |_| {
             let one = Expression::Constant(F::ONE);
