@@ -1687,9 +1687,34 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
         }
     }
 
+    /// Returns the constraint system
+    pub fn cs(&self) -> &ConstraintSystem<F> {
+        &self.cs
+    }
+
+    /// Returns the usable rows
+    pub fn usable_rows(&self) -> &Range<usize> {
+        &self.usable_rows
+    }
+
+    /// Returns the list of Advice Columns used within a MockProver instance and the associated values contained on each Cell.
+    pub fn advice(&self) -> &Vec<Vec<CellValue<F>>> {
+        &self.advice
+    }
+
     /// Returns the list of Fixed Columns used within a MockProver instance and the associated values contained on each Cell.
     pub fn fixed(&self) -> &Vec<Vec<CellValue<F>>> {
         &self.fixed
+    }
+
+    /// Returns the list of Selector Columns used within a MockProver instance and the associated values contained on each Cell.
+    pub fn selectors(&self) -> &Vec<Vec<bool>> {
+        &self.selectors
+    }
+
+    /// Returns the list of Instance Columns used within a MockProver instance and the associated values contained on each Cell.
+    pub fn instance(&self) -> &Vec<Vec<F>> {
+        &self.instance
     }
 
     /// Returns the permutation argument (`Assembly`) used within a MockProver instance.
