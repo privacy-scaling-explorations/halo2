@@ -320,9 +320,7 @@ where
                     k: params.k(),
                     current_phase,
                     advice: vec![domain.empty_lagrange_assigned(); meta.num_advice_columns],
-                    unblinded_advice: HashSet::from_iter(
-                        meta.unblinded_advice_columns.clone().into_iter(),
-                    ),
+                    unblinded_advice: HashSet::from_iter(meta.unblinded_advice_columns.clone()),
                     instances,
                     challenges: &challenges,
                     // The prover will not be allowed to assign values to advice
