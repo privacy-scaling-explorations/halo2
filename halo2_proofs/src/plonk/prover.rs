@@ -371,9 +371,10 @@ where
                 }
 
                 // Compute commitments to advice column polynomials
-                let blinds: Vec<_> = (0..meta.num_advice_columns)
+                let blinds: Vec<_> = column_indices
+                    .iter()
                     .map(|i| {
-                        if witness.unblinded_advice.contains(&i) {
+                        if witness.unblinded_advice.contains(i) {
                             Blind::default()
                         } else {
                             Blind(Scheme::Scalar::random(&mut rng))
