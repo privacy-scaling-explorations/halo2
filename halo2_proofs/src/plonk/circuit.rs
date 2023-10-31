@@ -2153,7 +2153,7 @@ impl<F: Field> ConstraintSystem<F> {
         self.advice_column_in(FirstPhase)
     }
 
-    /// Allocate a new advice column in given phase
+    /// Allocate a new unblinded advice column in given phase
     pub fn unblinded_advice_column_in<P: Phase>(&mut self, phase: P) -> Column<Advice> {
         let phase = phase.to_sealed();
         if let Some(previous_phase) = phase.prev() {
