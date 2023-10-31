@@ -355,14 +355,18 @@ where
                 );
 
                 // Add blinding factors to advice columns
-                for (column_index, advice_values) in &mut advice_values.iter_mut().enumerate() {
-                    for cell in &mut advice_values[unusable_rows_start..] {
-                        *cell = Scheme::Scalar::random(&mut rng);
-                        if witness.unblinded_advice.contains(&column_index) {
-                            *cell = Blind::default().0;
-                        } else {
+                for (column_index, advice_values) in column_indices.iter().zip(&mut advice_values) {
+                    if witness.unblinded_advice.contains(column_index) {
+                        for cell in &mut advice_values[unusable_rows_start..] {
                             *cell = Scheme::Scalar::random(&mut rng);
                         }
+                    } else {
+                        #[cfg(feature = "sanity-checks")]
+                        for cell in &advice_values[unusable_rows_start..] {
+                            assert_eq!(*cell, Scheme::Scalar::ZERO);
+                        }
+                    }
+                }
                     }
                 }
 
