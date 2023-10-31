@@ -367,8 +367,6 @@ where
                         }
                     }
                 }
-                    }
-                }
 
                 // Compute commitments to advice column polynomials
                 let blinds: Vec<_> = column_indices
