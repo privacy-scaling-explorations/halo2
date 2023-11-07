@@ -2153,7 +2153,7 @@ impl<F: Field> ConstraintSystem<F> {
         self.advice_column_in(FirstPhase)
     }
 
-    /// Allocate a new unblinded advice column in given phase. The allows for the generation of deterministic commitments to advice columns
+    /// Allocate a new unblinded advice column in given phase. This allows for the generation of deterministic commitments to advice columns
     /// which can be used to split large circuits into smaller ones, whose proofs can then be "joined" together by their common witness commitments.
     pub fn unblinded_advice_column_in<P: Phase>(&mut self, phase: P) -> Column<Advice> {
         let phase = phase.to_sealed();
