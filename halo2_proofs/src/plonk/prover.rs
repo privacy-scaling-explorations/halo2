@@ -356,7 +356,7 @@ where
 
                 // Add blinding factors to advice columns
                 for (column_index, advice_values) in column_indices.iter().zip(&mut advice_values) {
-                    if witness.unblinded_advice.contains(column_index) {
+                    if !witness.unblinded_advice.contains(column_index) {
                         for cell in &mut advice_values[unusable_rows_start..] {
                             *cell = Scheme::Scalar::random(&mut rng);
                         }
