@@ -2222,6 +2222,10 @@ impl<F: Field> ConstraintSystem<F> {
     }
 
     /// Allocate a new advice column in given phase
+    ///
+    /// # Panics
+    ///
+    /// It panics if previous phase before the given one doesn't have advice column allocated.
     pub fn advice_column_in<P: Phase>(&mut self, phase: P) -> Column<Advice> {
         let phase = phase.to_sealed();
         if let Some(previous_phase) = phase.prev() {
@@ -2252,6 +2256,10 @@ impl<F: Field> ConstraintSystem<F> {
     }
 
     /// Requests a challenge that is usable after the given phase.
+    ///
+    /// # Panics
+    ///
+    /// It panics if the given phase doesn't have advice column allocated.
     pub fn challenge_usable_after<P: Phase>(&mut self, phase: P) -> Challenge {
         let phase = phase.to_sealed();
         self.assert_phase_exists(
