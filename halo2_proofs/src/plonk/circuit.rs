@@ -1771,6 +1771,12 @@ impl<F: Field> ConstraintSystem<F> {
         let table_map = table_map(&mut cells)
             .into_iter()
             .map(|(mut input, mut table)| {
+                if input.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
+                if table.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);
                 (input, table)
