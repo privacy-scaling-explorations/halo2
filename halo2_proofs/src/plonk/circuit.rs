@@ -11,6 +11,7 @@ use ff::Field;
 use sealed::SealedPhase;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::iter::{Product, Sum};
 use std::{
     convert::TryFrom,
     ops::{Neg, Sub},
@@ -478,7 +479,7 @@ impl Selector {
 }
 
 /// Query of fixed column at a certain relative location
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct FixedQuery {
     /// Query index
     pub(crate) index: Option<usize>,
@@ -501,7 +502,7 @@ impl FixedQuery {
 }
 
 /// Query of advice column at a certain relative location
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct AdviceQuery {
     /// Query index
     pub(crate) index: Option<usize>,
@@ -531,7 +532,7 @@ impl AdviceQuery {
 }
 
 /// Query of instance column at a certain relative location
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct InstanceQuery {
     /// Query index
     pub(crate) index: Option<usize>,
@@ -792,7 +793,7 @@ pub trait Circuit<F: Field> {
 }
 
 /// Low-degree expression representing an identity that must hold over the committed columns.
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Expression<F> {
     /// This is a constant polynomial
     Constant(F),
@@ -1352,6 +1353,20 @@ impl<F: Field> Mul<F> for Expression<F> {
     }
 }
 
+impl<F: Field> Sum<Self> for Expression<F> {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, x| acc + x)
+            .unwrap_or(Expression::Constant(F::ZERO))
+    }
+}
+
+impl<F: Field> Product<Self> for Expression<F> {
+    fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.reduce(|acc, x| acc * x)
+            .unwrap_or(Expression::Constant(F::ONE))
+    }
+}
+
 /// Represents an index into a vector where each entry corresponds to a distinct
 /// point that polynomials are queried at.
 #[derive(Copy, Clone, Debug)]
@@ -1540,6 +1555,9 @@ pub struct ConstraintSystem<F: Field> {
     pub(crate) num_selectors: usize,
     pub(crate) num_challenges: usize,
 
+    /// Contains the index of each advice column that is left unblinded.
+    pub(crate) unblinded_advice_columns: Vec<usize>,
+
     /// Contains the phase for each advice column. Should have same length as num_advice_columns.
     pub(crate) advice_column_phase: Vec<sealed::Phase>,
     /// Contains the phase for each challenge. Should have same length as num_challenges.
@@ -1622,7 +1640,11 @@ impl<'a, F: Field> std::fmt::Debug for PinnedConstraintSystem<'a, F> {
             .field("instance_queries", self.instance_queries)
             .field("fixed_queries", self.fixed_queries)
             .field("permutation", self.permutation)
-            .field("lookups", self.lookups)
+            .field("lookups", self.lookups);
+        if !self.shuffles.is_empty() {
+            debug_struct.field("shuffles", self.shuffles);
+        }
+        debug_struct
             .field("constants", self.constants)
             .field("minimum_degree", self.minimum_degree);
         debug_struct.finish()
@@ -1647,6 +1669,7 @@ impl<F: Field> Default for ConstraintSystem<F> {
             num_instance_columns: 0,
             num_selectors: 0,
             num_challenges: 0,
+            unblinded_advice_columns: Vec::new(),
             advice_column_phase: Vec::new(),
             challenge_phase: Vec::new(),
             selector_map: vec![],
@@ -1752,6 +1775,12 @@ impl<F: Field> ConstraintSystem<F> {
         let table_map = table_map(&mut cells)
             .into_iter()
             .map(|(mut input, mut table)| {
+                if input.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
+                if table.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);
                 (input, table)
@@ -2004,7 +2033,45 @@ impl<F: Field> ConstraintSystem<F> {
             .into_iter()
             .map(|a| a.unwrap())
             .collect::<Vec<_>>();
+        self.replace_selectors_with_fixed(&selector_replacements);
 
+        (self, polys)
+    }
+
+    /// Does not combine selectors and directly replaces them everywhere with fixed columns.
+    pub fn directly_convert_selectors_to_fixed(
+        mut self,
+        selectors: Vec<Vec<bool>>,
+    ) -> (Self, Vec<Vec<F>>) {
+        // The number of provided selector assignments must be the number we
+        // counted for this constraint system.
+        assert_eq!(selectors.len(), self.num_selectors);
+
+        let (polys, selector_replacements): (Vec<_>, Vec<_>) = selectors
+            .into_iter()
+            .map(|selector| {
+                let poly = selector
+                    .iter()
+                    .map(|b| if *b { F::ONE } else { F::ZERO })
+                    .collect::<Vec<_>>();
+                let column = self.fixed_column();
+                let rotation = Rotation::cur();
+                let expr = Expression::Fixed(FixedQuery {
+                    index: Some(self.query_fixed_index(column, rotation)),
+                    column_index: column.index,
+                    rotation,
+                });
+                (poly, expr)
+            })
+            .unzip();
+
+        self.replace_selectors_with_fixed(&selector_replacements);
+        self.num_selectors = 0;
+
+        (self, polys)
+    }
+
+    fn replace_selectors_with_fixed(&mut self, selector_replacements: &[Expression<F>]) {
         fn replace_selectors<F: Field>(
             expr: &mut Expression<F>,
             selector_replacements: &[Expression<F>],
@@ -2035,7 +2102,7 @@ impl<F: Field> ConstraintSystem<F> {
 
         // Substitute selectors for the real fixed columns in all gates
         for expr in self.gates.iter_mut().flat_map(|gate| gate.polys.iter_mut()) {
-            replace_selectors(expr, &selector_replacements, false);
+            replace_selectors(expr, selector_replacements, false);
         }
 
         // Substitute non-simple selectors for the real fixed columns in all
@@ -2046,7 +2113,7 @@ impl<F: Field> ConstraintSystem<F> {
                 .iter_mut()
                 .chain(lookup.table_expressions.iter_mut())
         }) {
-            replace_selectors(expr, &selector_replacements, true);
+            replace_selectors(expr, selector_replacements, true);
         }
 
         for expr in self.shuffles.iter_mut().flat_map(|shuffle| {
@@ -2055,10 +2122,8 @@ impl<F: Field> ConstraintSystem<F> {
                 .iter_mut()
                 .chain(shuffle.shuffle_expressions.iter_mut())
         }) {
-            replace_selectors(expr, &selector_replacements, true);
+            replace_selectors(expr, selector_replacements, true);
         }
-
-        (self, polys)
     }
 
     /// Allocate a new (simple) selector. Simple selectors cannot be added to
@@ -2124,12 +2189,43 @@ impl<F: Field> ConstraintSystem<F> {
         tmp
     }
 
+    /// Allocate a new unblinded advice column at `FirstPhase`
+    pub fn unblinded_advice_column(&mut self) -> Column<Advice> {
+        self.unblinded_advice_column_in(FirstPhase)
+    }
+
     /// Allocate a new advice column at `FirstPhase`
     pub fn advice_column(&mut self) -> Column<Advice> {
         self.advice_column_in(FirstPhase)
     }
 
+    /// Allocate a new unblinded advice column in given phase. This allows for the generation of deterministic commitments to advice columns
+    /// which can be used to split large circuits into smaller ones, whose proofs can then be "joined" together by their common witness commitments.
+    pub fn unblinded_advice_column_in<P: Phase>(&mut self, phase: P) -> Column<Advice> {
+        let phase = phase.to_sealed();
+        if let Some(previous_phase) = phase.prev() {
+            self.assert_phase_exists(
+                previous_phase,
+                format!("Column<Advice> in later phase {:?}", phase).as_str(),
+            );
+        }
+
+        let tmp = Column {
+            index: self.num_advice_columns,
+            column_type: Advice { phase },
+        };
+        self.unblinded_advice_columns.push(tmp.index);
+        self.num_advice_columns += 1;
+        self.num_advice_queries.push(0);
+        self.advice_column_phase.push(phase);
+        tmp
+    }
+
     /// Allocate a new advice column in given phase
+    ///
+    /// # Panics
+    ///
+    /// It panics if previous phase before the given one doesn't have advice column allocated.
     pub fn advice_column_in<P: Phase>(&mut self, phase: P) -> Column<Advice> {
         let phase = phase.to_sealed();
         if let Some(previous_phase) = phase.prev() {
@@ -2160,6 +2256,10 @@ impl<F: Field> ConstraintSystem<F> {
     }
 
     /// Requests a challenge that is usable after the given phase.
+    ///
+    /// # Panics
+    ///
+    /// It panics if the given phase doesn't have advice column allocated.
     pub fn challenge_usable_after<P: Phase>(&mut self, phase: P) -> Challenge {
         let phase = phase.to_sealed();
         self.assert_phase_exists(
@@ -2437,5 +2537,49 @@ impl<'a, F: Field> VirtualCells<'a, F> {
     /// Query a challenge
     pub fn query_challenge(&mut self, challenge: Challenge) -> Expression<F> {
         Expression::Challenge(challenge)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Expression;
+    use halo2curves::bn256::Fr;
+
+    #[test]
+    fn iter_sum() {
+        let exprs: Vec<Expression<Fr>> = vec![
+            Expression::Constant(1.into()),
+            Expression::Constant(2.into()),
+            Expression::Constant(3.into()),
+        ];
+        let happened: Expression<Fr> = exprs.into_iter().sum();
+        let expected: Expression<Fr> = Expression::Sum(
+            Box::new(Expression::Sum(
+                Box::new(Expression::Constant(1.into())),
+                Box::new(Expression::Constant(2.into())),
+            )),
+            Box::new(Expression::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
+    }
+
+    #[test]
+    fn iter_product() {
+        let exprs: Vec<Expression<Fr>> = vec![
+            Expression::Constant(1.into()),
+            Expression::Constant(2.into()),
+            Expression::Constant(3.into()),
+        ];
+        let happened: Expression<Fr> = exprs.into_iter().product();
+        let expected: Expression<Fr> = Expression::Product(
+            Box::new(Expression::Product(
+                Box::new(Expression::Constant(1.into())),
+                Box::new(Expression::Constant(2.into())),
+            )),
+            Box::new(Expression::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
     }
 }
