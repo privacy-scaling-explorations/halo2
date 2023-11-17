@@ -27,7 +27,7 @@ pub struct ProverQuery<'com, C: CurveAffine> {
     pub(crate) blind: Blind<C::Scalar>,
 }
 
-#[doc(hidden)]
+
 #[derive(Copy, Clone)]
 pub struct PolynomialPointer<'com, C: CurveAffine> {
     pub(crate) poly: &'com Polynomial<C::Scalar, Coeff>,
@@ -54,6 +54,24 @@ impl<'com, C: CurveAffine> Query<C::Scalar> for ProverQuery<'com, C> {
         PolynomialPointer {
             poly: self.poly,
             blind: self.blind,
+        }
+    }
+}
+
+
+impl<'com, C: CurveAffine> ProverQuery<'com, C> {
+    /// create a new prover query
+    pub fn new_query( 
+        point:C::Scalar, 
+        poly:&'com Polynomial<C::Scalar, Coeff>,
+        blind: Blind<C::Scalar>
+    ) -> Self
+    {
+
+        ProverQuery{ 
+            point:point, 
+            poly:poly, 
+            blind:blind
         }
     }
 }
