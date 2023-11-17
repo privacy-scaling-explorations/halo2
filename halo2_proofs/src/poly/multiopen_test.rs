@@ -299,4 +299,116 @@ mod test {
     }
 
 
+     fn create_proof_sh_plonk<
+        'params,
+        Scheme: CommitmentScheme,
+        P: Prover<'params, Scheme>,
+        E: EncodedChallenge<Scheme::Curve>,
+        TW: TranscriptWriterBuffer<Vec<u8>, Scheme::Curve, E>,
+    >(
+        params: &'params Scheme::ParamsProver,
+        // a list of point x_1,x_2,...x_n
+        points_list: Vec<Scheme::Scalar>,
+        // a list of polynomials p_1(x), p_2(x),...,p_n(x)
+        polynomial_list: Vec<Polynomial<Scheme::Scalar, Coeff>>,
+        // the list of commitment of p_1(x),p_2(x),...,p_n(x)
+        commitment_list:Vec<Scheme::Curve>,
+    ) -> Vec<u8>
+    where
+        Scheme::Scalar: WithSmallOrderMulGroup<3>,
+    {
+        assert!(points_list.len()==polynomial_list.len());
+        assert!(points_list.len()==commitment_list.len());
+        // this function, given a list of points x_1,x_2,...,x_n
+        // and polynomials p_1(x),p_2(x),...,p_n(x)
+        // create a witness for the value p_1(x_1), p_2(x_2),...,p_n(x_n)
+        let mut transcript = TW::init(Vec::new());
+
+        let blind = Blind::new(&mut OsRng);
+        // Add the commitment the polynomial p_i(x) to transcript
+        for i in 0..polynomial_list.len() {
+            transcript.write_point(commitment_list[i]).unwrap();
+        }
+        // evaluate the values p_i(x_i) for i=1,2,...,n
+        for i in 0..polynomial_list.len() {
+            let av = eval_polynomial(&polynomial_list[i], points_list[i]);
+            transcript.write_scalar(av).unwrap();
+        }
+
+        // this query is used to list all the values p_1(x_1), p_2(x_2),...,p_n(x_n)
+        // in the query list of shplonk prover
+
+        let mut queries: Vec<ProverQuery<'_, <Scheme as CommitmentScheme>::Curve>> = Vec::new();
+        for i in 0..polynomial_list.len() {
+            let temp=ProverQuery::new_query(
+                points_list[i], &polynomial_list[i],blind
+            );
+            queries.push(temp);
+        }
+        // create the proof
+        let prover = P::new(params);
+        prover
+            .create_proof(&mut OsRng, &mut transcript, queries)
+            .unwrap();
+
+        transcript.finalize()
+    }
+
+    //Verify KZG openings
+    // Used to create a friendly KZG API verification function
+    fn verify_shplonk<
+        'a,
+        'params,
+        Scheme: CommitmentScheme,
+        Vr: Verifier<'params, Scheme>,
+        E: EncodedChallenge<Scheme::Curve>,
+        Tr: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
+        Strategy: VerificationStrategy<'params, Scheme, Vr, Output = Strategy>,
+    >(
+        params: &'params Scheme::ParamsVerifier,
+        // // a list of point x_1,x_2,...x_n
+        points_list: Vec<Scheme::Scalar>,
+        // the proof of opening
+        proof: &'a [u8],
+    ) -> bool {
+        let verifier = Vr::new(params);
+
+        let mut transcript = Tr::init(proof);
+        // read commitment list from transcript
+        let mut commitment_list = Vec::new();
+        for i in 0..points_list.len() {
+            let temp = transcript.read_point().unwrap();
+            commitment_list.push(temp);
+        }
+        // read the point list from transcript
+        let mut polynomial_list = Vec::new();
+        for i in 0..points_list.len() {
+            let temp: Scheme::Scalar = transcript.read_scalar().unwrap();
+            polynomial_list.push(temp);
+        }
+        // add the queries
+        let mut queries = Vec::new();
+        for i in 0..points_list.len() {
+            let temp =  VerifierQuery::new_commitment(
+                &commitment_list[i],
+                points_list[i],
+                polynomial_list[i]);
+
+            queries.push(temp);
+        }
+        // now, we apply the verify function from SHPLONK to return the result
+        let strategy = Strategy::new(params);
+        let strategy = strategy
+            .process(|msm_accumulator| {
+                verifier
+                    .verify_proof(&mut transcript, queries.clone(), msm_accumulator)
+                    .map_err(|_| Error::Opening)
+            })
+            .unwrap();
+
+        strategy.finalize()
+    }
+
+
+
 }
