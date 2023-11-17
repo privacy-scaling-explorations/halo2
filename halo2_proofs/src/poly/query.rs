@@ -27,7 +27,6 @@ pub struct ProverQuery<'com, C: CurveAffine> {
     pub(crate) blind: Blind<C::Scalar>,
 }
 
-
 #[derive(Copy, Clone)]
 pub struct PolynomialPointer<'com, C: CurveAffine> {
     pub(crate) poly: &'com Polynomial<C::Scalar, Coeff>,
@@ -57,9 +56,6 @@ impl<'com, C: CurveAffine> Query<C::Scalar> for ProverQuery<'com, C> {
         }
     }
 }
-
-
-
 
 impl<'com, C: CurveAffine, M: MSM<C>> VerifierQuery<'com, C, M> {
     /// Create a new verifier query based on a commitment
