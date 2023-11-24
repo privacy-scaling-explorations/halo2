@@ -17,7 +17,7 @@ pub trait Query<F>: Sized + Clone + Send + Sync {
 }
 
 /// A polynomial query at a point
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ProverQuery<'com, C: CurveAffine> {
     /// Point at which polynomial is queried
     pub(crate) point: C::Scalar,
@@ -93,7 +93,7 @@ impl<'com, C: CurveAffine, M: MSM<C>> VerifierQuery<'com, C, M> {
 }
 
 /// A polynomial query at a point
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct VerifierQuery<'com, C: CurveAffine, M: MSM<C>> {
     /// Point at which polynomial is queried
     pub(crate) point: C::Scalar,
