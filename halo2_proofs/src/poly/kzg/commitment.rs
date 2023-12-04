@@ -141,7 +141,7 @@ where
         Self {
             k,
             n: 1 << k,
-            g,
+            g.clone(),
             g_lagrange: match g_lagrange {
                 Some(g_l) => g_l,
                 None => g_to_lagrange(g.iter().map(PrimeCurveAffine::to_curve).collect(), k),
