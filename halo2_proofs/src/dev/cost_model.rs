@@ -1,17 +1,10 @@
 //! The cost estimator takes high-level parameters for a circuit design, and estimates the
 //! verification cost, as well as resulting proof size.
 
-use std::{
-    cmp, fmt, iter,
-    num::ParseIntError,
-    str::FromStr,
-    time::{Duration, Instant},
-};
+use std::{cmp, iter, num::ParseIntError, str::FromStr};
 
-use crate::{arithmetic::best_multiexp, plonk::Circuit};
+use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
-use group::{Curve, Group};
-use halo2curves::pasta::pallas;
 
 use super::MockProver;
 

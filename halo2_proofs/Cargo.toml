@@ -74,6 +74,7 @@ criterion = "0.3"
 gumdrop = "0.8"
 proptest = "1"
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+halo2_gadgets = { path = "../halo2_gadgets" }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
 getrandom = { version = "0.2", features = ["js"] }
@@ -101,3 +102,7 @@ bench = false
 [[example]]
 name = "circuit-layout"
 required-features = ["test-dev-graph"]
+
+[[example]]
+name = "proof-size"
+required-features = ["cost-estimator"]
