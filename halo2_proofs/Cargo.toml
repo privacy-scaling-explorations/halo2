@@ -106,3 +106,7 @@ required-features = ["test-dev-graph"]
 [[example]]
 name = "proof-size"
 required-features = ["cost-estimator"]
+
+[[example]]
+name = "cost-model"
+required-features = ["cost-estimator"]
