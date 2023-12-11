@@ -1,4 +1,5 @@
-//! The cost estimator takes high-level parameters for a circuit design, and estimates the verification cost, as well as resulting proof size.
+//! The cost estimator takes high-level parameters for a circuit design, and estimates the
+//! verification cost, as well as resulting proof size.
 
 use std::{
     cmp, fmt, iter,
@@ -13,42 +14,6 @@ use group::{Curve, Group};
 use halo2curves::pasta::pallas;
 
 use super::MockProver;
-
-/// Structure storing scalars and bases used in multiexp estimation
-pub struct Estimator {
-    /// Scalars for estimating multiexp performance.
-    multiexp_scalars: Vec<pallas::Scalar>,
-    /// Bases for estimating multiexp performance.
-    multiexp_bases: Vec<pallas::Affine>,
-}
-
-impl fmt::Debug for Estimator {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Estimator")
-    }
-}
-
-impl Estimator {
-    fn random(k: usize) -> Self {
-        let max_size = 1 << (k + 1);
-        let mut rng = rand_core::OsRng;
-
-        Estimator {
-            multiexp_scalars: (0..max_size)
-                .map(|_| pallas::Scalar::random(&mut rng))
-                .collect(),
-            multiexp_bases: (0..max_size)
-                .map(|_| pallas::Point::random(&mut rng).to_affine())
-                .collect(),
-        }
-    }
-
-    fn multiexp(&self, size: usize) -> Duration {
-        let start = Instant::now();
-        best_multiexp(&self.multiexp_scalars[..size], &self.multiexp_bases[..size]);
-        Instant::now().duration_since(start)
-    }
-}
 
 /// Options to build a circuit specifiction to measure the cost model of.
 #[derive(Debug)]
@@ -187,9 +152,6 @@ pub struct ModelCircuit {
     pub column_queries: usize,
     /// Number of distinct sets of points in the multiopening argument.
     pub point_sets: usize,
-
-    /// Estimator of cost for the multiexp
-    pub estimator: Estimator,
 }
 
 impl From<CostOptions> for ModelCircuit {
@@ -225,7 +187,6 @@ impl From<CostOptions> for ModelCircuit {
             permutations: opts.permutation,
             column_queries,
             point_sets,
-            estimator: Estimator::random(opts.k),
         }
     }
 }
@@ -269,35 +230,11 @@ impl ModelCircuit {
         plonk + vanishing + multiopen + polycomm
     }
 
-    /// Measures estimated verification time (based on doing a real-time measurement on multi-exponentiation using `Estimator`).
-    pub fn verification_time(&self) -> Duration {
-        // TODO: Estimate cost of BLAKE2b.
-
-        // TODO: This isn't accurate; most of these will have zero scalars.
-        let g_scalars = 1 << self.k;
-
-        // - f_commitment
-        // - q_commitments
-        let multiopen = 1 + self.column_queries;
-
-        // - \iota
-        // - Rounds
-        // - H
-        // - U
-        let polycomm = 1 + (2 * self.k) + 1 + 1;
-
-        self.estimator.multiexp(g_scalars + multiopen + polycomm)
-    }
-
     /// Generate a report.
     pub fn report(&self) -> String {
         let mut str = String::new();
         str.push_str(&format!("{:#?}", self));
         str.push_str(&format!("Proof size: {} bytes", self.proof_size()));
-        str.push_str(&format!(
-            "Verification: at least {}ms",
-            self.verification_time().as_micros() as f64 / 1_000f64
-        ));
         str
     }
 
@@ -317,10 +254,6 @@ impl ModelCircuit {
         w.write_record(["column_queries", &self.column_queries.to_string()])?;
         w.write_record(["point_sets", &self.point_sets.to_string()])?;
         w.write_record(["proof_size", &self.proof_size().to_string()])?;
-        w.write_record([
-            "verification_time",
-            &(self.verification_time().as_micros() as f64 / 1_000f64).to_string(),
-        ])?;
         Ok(())
     }
 }

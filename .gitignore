@@ -4,4 +4,3 @@ Cargo.lock
 .vscode
 **/*.html
 .DS_Store
-halo2_gadgets/proptest-regressions/utilities/

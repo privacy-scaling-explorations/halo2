@@ -60,8 +60,4 @@ fn main() {
     let c = ModelCircuit::from(opts.to_cost_options());
     println!("{:#?}", c);
     println!("Proof size: {} bytes", c.proof_size());
-    println!(
-        "Verification: at least {}ms",
-        c.verification_time().as_micros() as f64 / 1_000f64
-    );
 }
