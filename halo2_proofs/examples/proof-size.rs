@@ -12,7 +12,7 @@ use halo2_gadgets::poseidon::{
 use std::convert::TryInto;
 use std::marker::PhantomData;
 
-use halo2_proofs::dev::cost_model::from_circuit_to_model_circuit;
+use halo2_proofs::dev::cost_model::{from_circuit_to_model_circuit, CommitmentScheme};
 use rand_core::OsRng;
 
 #[derive(Clone, Copy)]
@@ -150,5 +150,8 @@ fn main() {
     };
 
     let model = from_circuit_to_model_circuit(K, &circuit, vec![vec![output]]);
-    println!("Cost of Poseidon with WIDTH = 12 and RATE = 11: {model:?}");
+    println!(
+        "Cost of Poseidon with WIDTH = 12 and RATE = 11: {:?}",
+        model.report::<56, 56>(CommitmentScheme::KZG)
+    );
 }

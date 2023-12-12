@@ -8,6 +8,15 @@ use ff::{Field, FromUniformBytes};
 
 use super::MockProver;
 
+/// Supported commitment schemes
+#[derive(Debug)]
+pub enum CommitmentScheme {
+    /// Inner Product Argument commitment scheme
+    IPA,
+    /// KZG commitment scheme
+    KZG,
+}
+
 /// Options to build a circuit specifiction to measure the cost model of.
 #[derive(Debug)]
 pub struct CostOptions {
@@ -186,14 +195,17 @@ impl From<CostOptions> for ModelCircuit {
 
 impl ModelCircuit {
     /// Size of the proof in bytes
-    pub fn proof_size(&self) -> usize {
-        let size = |points: usize, scalars: usize| points * 32 + scalars * 32;
+    pub fn proof_size<const COMM: usize, const SCALAR: usize>(
+        &self,
+        comm_scheme: CommitmentScheme,
+    ) -> usize {
+        let size = |points: usize, scalars: usize| points * COMM + scalars * SCALAR;
 
         // PLONK:
-        // - 32 bytes (commitment) per advice column
-        // - 3 * 32 bytes (commitments) + 5 * 32 bytes (evals) per lookup argument
-        // - 32 bytes (commitment) + 2 * 32 bytes (evals) per permutation argument
-        // - 32 bytes (eval) per column per permutation argument
+        // - COMM bytes (commitment) per advice column
+        // - 3 * COMM bytes (commitments) + 5 * SCALAR bytes (evals) per lookup argument
+        // - COMM bytes (commitment) + 2 * SCALAR bytes (evals) per permutation argument
+        // - COMM bytes (eval) per column per permutation argument
         let plonk = size(1, 0) * self.advice_columns
             + size(3, 5) * self.lookups
             + self
@@ -203,36 +215,55 @@ impl ModelCircuit {
                 .sum::<usize>();
 
         // Vanishing argument:
-        // - (max_deg - 1) * 32 bytes (commitments) + (max_deg - 1) * 32 bytes (h_evals)
+        // - (max_deg - 1) * COMM bytes (commitments) + (max_deg - 1) * SCALAR bytes (h_evals)
         //   for quotient polynomial
-        // - 32 bytes (eval) per column query
+        // - SCALAR bytes (eval) per column query
         let vanishing = size(self.max_deg - 1, self.max_deg - 1) + size(0, self.column_queries);
 
         // Multiopening argument:
-        // - f_commitment (32 bytes)
-        // - 32 bytes (evals) per set of points in multiopen argument
+        // - f_commitment (COMM bytes)
+        // - SCALAR bytes (evals) per set of points in multiopen argument
         let multiopen = size(1, self.point_sets);
 
-        // Polycommit:
-        // - s_poly commitment (32 bytes)
-        // - inner product argument (k rounds * 2 * 32 bytes)
-        // - a (32 bytes)
-        // - xi (32 bytes)
-        let polycomm = size(1 + 2 * self.k, 2);
+        let polycomm = match comm_scheme {
+            CommitmentScheme::IPA => {
+                // Polycommit IPA:
+                // - s_poly commitment (COMM bytes)
+                // - inner product argument (k rounds * 2 * COMM bytes)
+                // - a (SCALAR bytes)
+                // - xi (SCALAR bytes)
+                size(1 + 2 * self.k, 2)
+            }
+            CommitmentScheme::KZG => {
+                // Polycommit KZG:
+                // - quotient polynomial commitment (COMM bytes)
+                size(1, 0)
+            }
+        };
 
         plonk + vanishing + multiopen + polycomm
     }
 
     /// Generate a report.
-    pub fn report(&self) -> String {
+    pub fn report<const COMM: usize, const SCALAR: usize>(
+        &self,
+        comm_scheme: CommitmentScheme,
+    ) -> String {
         let mut str = String::new();
         str.push_str(&format!("{:#?}", self));
-        str.push_str(&format!("Proof size: {} bytes", self.proof_size()));
+        str.push_str(&format!(
+            "Proof size: {} bytes",
+            self.proof_size::<COMM, SCALAR>(comm_scheme)
+        ));
         str
     }
 
     /// Write a CSV report
-    pub fn report_csv<W: std::io::Write>(&self, w: &mut W) -> std::io::Result<()> {
+    pub fn report_csv<const COMM: usize, const SCALAR: usize, W: std::io::Write>(
+        &self,
+        w: &mut W,
+        comm_scheme: CommitmentScheme,
+    ) -> std::io::Result<()> {
         let mut w = csv::Writer::from_writer(w);
         w.write_record(["max_deg", &self.max_deg.to_string()])?;
         w.write_record(["advice_columns", &self.advice_columns.to_string()])?;
@@ -246,7 +277,10 @@ impl ModelCircuit {
         }])?;
         w.write_record(["column_queries", &self.column_queries.to_string()])?;
         w.write_record(["point_sets", &self.point_sets.to_string()])?;
-        w.write_record(["proof_size", &self.proof_size().to_string()])?;
+        w.write_record([
+            "proof_size",
+            &self.proof_size::<COMM, SCALAR>(comm_scheme).to_string(),
+        ])?;
         Ok(())
     }
 }

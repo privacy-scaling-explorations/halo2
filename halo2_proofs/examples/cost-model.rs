@@ -59,5 +59,5 @@ fn main() {
     let opts = CliCostOptions::parse_args_default_or_exit();
     let c = ModelCircuit::from(opts.to_cost_options());
     println!("{:#?}", c);
-    println!("Proof size: {} bytes", c.proof_size());
+    println!("Proof size: {} bytes", c.proof_size::<32, 32>(CommitmentScheme::IPA));
 }
