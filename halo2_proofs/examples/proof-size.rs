@@ -149,9 +149,9 @@ fn main() {
         _spec: PhantomData,
     };
 
-    let model = from_circuit_to_model_circuit(K, &circuit, vec![vec![output]]);
+    let model = from_circuit_to_model_circuit::<_, _,56, 56>(K, &circuit, vec![vec![output]], CommitmentScheme::KZGGWC);
     println!(
-        "Cost of Poseidon with WIDTH = 12 and RATE = 11: {:?}",
-        model.report::<56, 56>(CommitmentScheme::KZG)
+        "Cost of Poseidon with WIDTH = 12 and RATE = 11: \n{}",
+        serde_json::to_string_pretty(&model).unwrap()
     );
 }

@@ -5,19 +5,23 @@ use std::{cmp, iter, num::ParseIntError, str::FromStr};
 
 use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
+use serde::Deserialize;
+use serde_derive::Serialize;
 
 use super::MockProver;
 
 /// Supported commitment schemes
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum CommitmentScheme {
     /// Inner Product Argument commitment scheme
     IPA,
-    /// KZG commitment scheme
-    KZG,
+    /// KZG with GWC19 mutli-open strategy
+    KZGGWC,
+    /// KZG with BDFG20 mutli-open strategy
+    KZGSHPLONK,
 }
 
-/// Options to build a circuit specifiction to measure the cost model of.
+/// Options to build a circuit specification to measure the cost model of.
 #[derive(Debug)]
 pub struct CostOptions {
     /// An advice column with the given rotations. May be repeated.
@@ -105,7 +109,7 @@ impl Lookup {
 }
 
 /// Number of permutation enabled columns
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Permutation {
     columns: usize,
 }
@@ -138,7 +142,7 @@ impl Permutation {
 }
 
 /// High-level specifications of an abstract circuit.
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ModelCircuit {
     /// Power-of-2 bound on the number of rows in the circuit.
     pub k: usize,
@@ -154,25 +158,29 @@ pub struct ModelCircuit {
     pub column_queries: usize,
     /// Number of distinct sets of points in the multiopening argument.
     pub point_sets: usize,
+    /// Size of the proof for the circuit
+    pub size: usize,
 }
 
-impl From<CostOptions> for ModelCircuit {
-    fn from(opts: CostOptions) -> Self {
-        let max_deg = [1, opts.gate_degree]
+impl CostOptions {
+    /// Convert [CostOptions] to [ModelCircuit]. The proof sizè is computed depending on the base
+    /// and scalar field size of the curve used, together with the [CommitmentScheme].
+    pub fn into_model_circuit<const COMM: usize, const SCALAR: usize>(&self, comm_scheme: CommitmentScheme) -> ModelCircuit {
+        let max_deg = [1, self.gate_degree]
             .iter()
             .cloned()
-            .chain(opts.lookup.iter().map(|l| l.required_degree()))
-            .chain(opts.permutation.iter().map(|p| p.required_degree()))
+            .chain(self.lookup.iter().map(|l| l.required_degree()))
+            .chain(self.permutation.iter().map(|p| p.required_degree()))
             .max()
             .unwrap();
 
         let mut queries: Vec<_> = iter::empty()
-            .chain(opts.advice.iter())
-            .chain(opts.instance.iter())
-            .chain(opts.fixed.iter())
+            .chain(self.advice.iter())
+            .chain(self.instance.iter())
+            .chain(self.fixed.iter())
             .cloned()
-            .chain(opts.lookup.iter().flat_map(|l| l.queries()))
-            .chain(opts.permutation.iter().flat_map(|p| p.queries()))
+            .chain(self.lookup.iter().flat_map(|l| l.queries()))
+            .chain(self.permutation.iter().flat_map(|p| p.queries()))
             .chain(iter::repeat("0".parse().unwrap()).take(max_deg - 1))
             .collect();
 
@@ -181,49 +189,30 @@ impl From<CostOptions> for ModelCircuit {
         queries.dedup();
         let point_sets = queries.len();
 
-        ModelCircuit {
-            k: opts.k,
-            max_deg,
-            advice_columns: opts.advice.len(),
-            lookups: opts.lookup.len(),
-            permutations: opts.permutation,
-            column_queries,
-            point_sets,
-        }
-    }
-}
-
-impl ModelCircuit {
-    /// Size of the proof in bytes
-    pub fn proof_size<const COMM: usize, const SCALAR: usize>(
-        &self,
-        comm_scheme: CommitmentScheme,
-    ) -> usize {
-        let size = |points: usize, scalars: usize| points * COMM + scalars * SCALAR;
+        let comp_bytes = |points: usize, scalars: usize| points * COMM + scalars * SCALAR;
 
         // PLONK:
         // - COMM bytes (commitment) per advice column
         // - 3 * COMM bytes (commitments) + 5 * SCALAR bytes (evals) per lookup argument
         // - COMM bytes (commitment) + 2 * SCALAR bytes (evals) per permutation argument
         // - COMM bytes (eval) per column per permutation argument
-        let plonk = size(1, 0) * self.advice_columns
-            + size(3, 5) * self.lookups
-            + self
-                .permutations
-                .iter()
-                .map(|p| size(1, 2 + p.columns))
-                .sum::<usize>();
+        let plonk = comp_bytes(1, 0) * self.advice.len()
+            + comp_bytes(3, 5) * self.lookup.len()
+            + self.permutation
+            .iter()
+            .map(|p| comp_bytes(1, 2 + p.columns))
+            .sum::<usize>();
 
         // Vanishing argument:
         // - (max_deg - 1) * COMM bytes (commitments) + (max_deg - 1) * SCALAR bytes (h_evals)
         //   for quotient polynomial
         // - SCALAR bytes (eval) per column query
-        let vanishing = size(self.max_deg - 1, self.max_deg - 1) + size(0, self.column_queries);
+        let vanishing = comp_bytes(max_deg - 1, max_deg - 1) + comp_bytes(0, column_queries);
 
         // Multiopening argument:
         // - f_commitment (COMM bytes)
         // - SCALAR bytes (evals) per set of points in multiopen argument
-        let multiopen = size(1, self.point_sets);
+        let multiopen = comp_bytes(1, point_sets);
 
         let polycomm = match comm_scheme {
             CommitmentScheme::IPA => {
@@ -232,67 +221,43 @@ impl ModelCircuit {
                 // - inner product argument (k rounds * 2 * COMM bytes)
                 // - a (SCALAR bytes)
                 // - xi (SCALAR bytes)
-                size(1 + 2 * self.k, 2)
+                comp_bytes(1 + 2 * self.k, 2)
             }
-            CommitmentScheme::KZG => {
-                // Polycommit KZG:
+            CommitmentScheme::KZGGWC => {
+                // Polycommit GWC:
+                comp_bytes(1, 0)
+            }
+            CommitmentScheme::KZGSHPLONK => {
+                // Polycommit SHPLONK:
                 // - quotient polynomial commitment (COMM bytes)
-                size(1, 0)
+                comp_bytes(1, 0)
             }
         };
 
-        plonk + vanishing + multiopen + polycomm
-    }
+        let size = plonk + vanishing + multiopen + polycomm;
 
-    /// Generate a report.
-    pub fn report<const COMM: usize, const SCALAR: usize>(
-        &self,
-        comm_scheme: CommitmentScheme,
-    ) -> String {
-        let mut str = String::new();
-        str.push_str(&format!("{:#?}", self));
-        str.push_str(&format!(
-            "Proof size: {} bytes",
-            self.proof_size::<COMM, SCALAR>(comm_scheme)
-        ));
-        str
-    }
-
-    /// Write a CSV report
-    pub fn report_csv<const COMM: usize, const SCALAR: usize, W: std::io::Write>(
-        &self,
-        w: &mut W,
-        comm_scheme: CommitmentScheme,
-    ) -> std::io::Result<()> {
-        let mut w = csv::Writer::from_writer(w);
-        w.write_record(["max_deg", &self.max_deg.to_string()])?;
-        w.write_record(["advice_columns", &self.advice_columns.to_string()])?;
-        w.write_record(["lookups", &self.lookups.to_string()])?;
-        w.write_record(["permutations", &{
-            let mut str = String::new();
-            for p in self.permutations.iter() {
-                str.push_str(&format!(" {}", p.columns));
-            }
-            str
-        }])?;
-        w.write_record(["column_queries", &self.column_queries.to_string()])?;
-        w.write_record(["point_sets", &self.point_sets.to_string()])?;
-        w.write_record([
-            "proof_size",
-            &self.proof_size::<COMM, SCALAR>(comm_scheme).to_string(),
-        ])?;
-        Ok(())
+        ModelCircuit {
+            k: self.k,
+            max_deg,
+            advice_columns: self.advice.len(),
+            lookups: self.lookup.len(),
+            permutations: self.permutation.clone(),
+            column_queries,
+            point_sets,
+            size,
+        }
     }
 }
 
 /// Given a Plonk circuit, this function returns a [ModelCircuit]
-pub fn from_circuit_to_model_circuit<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>>(
+pub fn from_circuit_to_model_circuit<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>, const COMM: usize, const SCALAR: usize>(
     k: u32,
     circuit: &C,
     instances: Vec<Vec<F>>,
+    comm_scheme: CommitmentScheme,
 ) -> ModelCircuit {
     let options = from_circuit_to_cost_model_options(k, circuit, instances);
-    ModelCircuit::from(options)
+    options.into_model_circuit::<COMM, SCALAR>(comm_scheme)
 }
 
 /// Given a Plonk circuit, this function returns [CostOptions]
