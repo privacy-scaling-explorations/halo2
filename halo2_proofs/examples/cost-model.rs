@@ -57,6 +57,8 @@ impl CliCostOptions {
 
 fn main() {
     let opts = CliCostOptions::parse_args_default_or_exit();
-    let c = opts.to_cost_options().into_model_circuit::<32, 32>(CommitmentScheme::IPA);
+    let c = opts
+        .to_cost_options()
+        .into_model_circuit::<32, 32>(CommitmentScheme::IPA);
     println!("{:#?}", c);
 }

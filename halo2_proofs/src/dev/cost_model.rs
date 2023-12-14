@@ -1,8 +1,8 @@
 //! The cost estimator takes high-level parameters for a circuit design, and estimates the
 //! verification cost, as well as resulting proof size.
 
-use std::{iter, num::ParseIntError, str::FromStr};
 use std::collections::HashSet;
+use std::{iter, num::ParseIntError, str::FromStr};
 
 use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
@@ -122,34 +122,13 @@ impl Permutation {
 
 /// Structure holding the [Shuffle] related data for circuit benchmarks.
 #[derive(Debug, Clone)]
-pub struct Shuffle {
-    _columns: usize,
-    input_deg: usize,
-    shuffle_deg: usize,
-}
-
-impl FromStr for Shuffle {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut parts = s.split(',');
-        let _columns = parts.next().unwrap().parse()?;
-        let input_deg = parts.next().unwrap().parse()?;
-        let shuffle_deg = parts.next().unwrap().parse()?;
-        Ok(Shuffle {
-            _columns,
-            input_deg,
-            shuffle_deg,
-        })
-    }
-}
+pub struct Shuffle;
 
 impl Shuffle {
     fn queries(&self) -> impl Iterator<Item = Poly> {
         let shuffle = "0, 1".parse().unwrap();
 
-        iter::empty()
-            .chain(Some(shuffle))
+        iter::empty().chain(Some(shuffle))
     }
 }
 
@@ -179,7 +158,10 @@ pub struct ModelCircuit {
 impl CostOptions {
     /// Convert [CostOptions] to [ModelCircuit]. The proof sizè is computed depending on the base
     /// and scalar field size of the curve used, together with the [CommitmentScheme].
-    pub fn into_model_circuit<const COMM: usize, const SCALAR: usize>(&self, comm_scheme: CommitmentScheme) -> ModelCircuit {
+    pub fn into_model_circuit<const COMM: usize, const SCALAR: usize>(
+        &self,
+        comm_scheme: CommitmentScheme,
+    ) -> ModelCircuit {
         let mut queries: Vec<_> = iter::empty()
             .chain(self.advice.iter())
             .chain(self.instance.iter())
@@ -205,16 +187,18 @@ impl CostOptions {
         // - COMM bytes (eval) per column per permutation argument
         let plonk = comp_bytes(1, 0) * self.advice.len()
             + comp_bytes(3, 5) * self.lookup.len()
-            + self.permutation
-            .iter()
-            .map(|p| comp_bytes(1, 2 + p.columns))
-            .sum::<usize>();
+            + self
+                .permutation
+                .iter()
+                .map(|p| comp_bytes(1, 2 + p.columns))
+                .sum::<usize>();
 
         // Vanishing argument:
         // - (max_deg - 1) * COMM bytes (commitments) + (max_deg - 1) * SCALAR bytes (h_evals)
         //   for quotient polynomial
         // - SCALAR bytes (eval) per column query
-        let vanishing = comp_bytes(self.max_degree - 1, self.max_degree - 1) + comp_bytes(0, column_queries);
+        let vanishing =
+            comp_bytes(self.max_degree - 1, self.max_degree - 1) + comp_bytes(0, column_queries);
 
         // Multiopening argument:
         // - f_commitment (COMM bytes)
@@ -270,7 +254,12 @@ impl CostOptions {
 }
 
 /// Given a Plonk circuit, this function returns a [ModelCircuit]
-pub fn from_circuit_to_model_circuit<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>, const COMM: usize, const SCALAR: usize>(
+pub fn from_circuit_to_model_circuit<
+    F: Ord + Field + FromUniformBytes<64>,
+    C: Circuit<F>,
+    const COMM: usize,
+    const SCALAR: usize,
+>(
     k: u32,
     circuit: &C,
     instances: Vec<Vec<F>>,
@@ -316,28 +305,16 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         instance
     };
 
-    let lookup = {
-        cs.lookups().iter().map(|_| Lookup).collect::<Vec<_>>()
-    };
+    let lookup = { cs.lookups().iter().map(|_| Lookup).collect::<Vec<_>>() };
 
     let permutation = vec![Permutation {
         columns: cs.permutation().get_columns().len(),
     }];
 
-    let shuffle = {
-        let mut shuffle = vec![];
-        for l in cs.shuffles().iter() {
-            shuffle.push(Shuffle {
-                // this isn't actually used for estimation right now, so ignore it.
-                _columns: 1,
-                input_deg: l.input_expressions().iter().map(Expression::degree).max().unwrap(),
-                shuffle_deg: l.shuffle_expressions().iter().map(Expression::degree).max().unwrap(),
-            });
-        }
-        shuffle
-    };
+    let shuffle = { cs.shuffles.iter().map(|_| Shuffle).collect::<Vec<_>>() };
 
-    let gate_degree = cs.gates
+    let gate_degree = cs
+        .gates
         .iter()
         .flat_map(|gate| gate.polynomials().iter().map(|poly| poly.degree()))
         .max()
