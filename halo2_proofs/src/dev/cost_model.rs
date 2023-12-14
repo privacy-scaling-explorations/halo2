@@ -2,6 +2,7 @@
 //! verification cost, as well as resulting proof size.
 
 use std::{iter, num::ParseIntError, str::FromStr};
+use std::collections::HashSet;
 
 use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
@@ -191,8 +192,20 @@ impl CostOptions {
                 comp_bytes(1 + 2 * self.k, 2)
             }
             CommitmentScheme::KZGGWC => {
+                let mut nr_rotations = HashSet::new();
+                for poly in self.advice.iter() {
+                    nr_rotations.extend(poly.rotations.clone());
+                }
+                for poly in self.fixed.iter() {
+                    nr_rotations.extend(poly.rotations.clone());
+                }
+                for poly in self.instance.iter() {
+                    nr_rotations.extend(poly.rotations.clone());
+                }
+
                 // Polycommit GWC:
-                comp_bytes(1, 0)
+                // - number_rotations * COMM bytes
+                comp_bytes(nr_rotations.len(), 0)
             }
             CommitmentScheme::KZGSHPLONK => {
                 // Polycommit SHPLONK:
