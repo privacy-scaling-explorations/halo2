@@ -97,16 +97,6 @@ pub struct Permutation {
     columns: usize,
 }
 
-impl FromStr for Permutation {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Permutation {
-            columns: s.parse()?,
-        })
-    }
-}
-
 impl Permutation {
     fn queries(&self) -> impl Iterator<Item = Poly> {
         // - product commitments at x and x_inv
