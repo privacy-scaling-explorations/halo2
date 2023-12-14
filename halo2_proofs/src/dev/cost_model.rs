@@ -77,10 +77,10 @@ pub struct Lookup;
 
 impl Lookup {
     fn queries(&self) -> impl Iterator<Item = Poly> {
-        // - product commitments at x and x_inv
+        // - product commitments at x and \omega x
         // - input commitments at x and x_inv
         // - table commitments at x
-        let product = "0,-1".parse().unwrap();
+        let product = "0,1".parse().unwrap();
         let input = "0,-1".parse().unwrap();
         let table = "0".parse().unwrap();
 
@@ -116,6 +116,7 @@ pub struct Shuffle;
 
 impl Shuffle {
     fn queries(&self) -> impl Iterator<Item = Poly> {
+        // Open shuffle product commitment at x and \omega x
         let shuffle = "0, 1".parse().unwrap();
 
         iter::empty().chain(Some(shuffle))
