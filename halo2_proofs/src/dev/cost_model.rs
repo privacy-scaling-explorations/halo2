@@ -46,6 +46,9 @@ pub struct CostOptions {
     /// A permutation over N columns. May be repeated.
     pub permutation: Vec<Permutation>,
 
+    /// A shuffle over N columns with max input degree I and max shuffle degree T. May be repeated.
+    pub shuffle: Vec<Shuffle>,
+
     /// 2^K bound on the number of rows.
     pub k: usize,
 }
@@ -117,6 +120,39 @@ impl Permutation {
     }
 }
 
+/// Structure holding the [Shuffle] related data for circuit benchmarks.
+#[derive(Debug, Clone)]
+pub struct Shuffle {
+    _columns: usize,
+    input_deg: usize,
+    shuffle_deg: usize,
+}
+
+impl FromStr for Shuffle {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(',');
+        let _columns = parts.next().unwrap().parse()?;
+        let input_deg = parts.next().unwrap().parse()?;
+        let shuffle_deg = parts.next().unwrap().parse()?;
+        Ok(Shuffle {
+            _columns,
+            input_deg,
+            shuffle_deg,
+        })
+    }
+}
+
+impl Shuffle {
+    fn queries(&self) -> impl Iterator<Item = Poly> {
+        let shuffle = "0, 1".parse().unwrap();
+
+        iter::empty()
+            .chain(Some(shuffle))
+    }
+}
+
 /// High-level specifications of an abstract circuit.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ModelCircuit {
@@ -130,6 +166,8 @@ pub struct ModelCircuit {
     pub lookups: usize,
     /// Equality constraint permutation arguments.
     pub permutations: Vec<Permutation>,
+    /// Number of shuffle arguments
+    pub shuffles: usize,
     /// Number of distinct column queries across all gates.
     pub column_queries: usize,
     /// Number of distinct sets of points in the multiopening argument.
@@ -149,6 +187,7 @@ impl CostOptions {
             .cloned()
             .chain(self.lookup.iter().flat_map(|l| l.queries()))
             .chain(self.permutation.iter().flat_map(|p| p.queries()))
+            .chain(self.shuffle.iter().flat_map(|s| s.queries()))
             .chain(iter::repeat("0".parse().unwrap()).take(self.max_degree - 1))
             .collect();
 
@@ -222,6 +261,7 @@ impl CostOptions {
             advice_columns: self.advice.len(),
             lookups: self.lookup.len(),
             permutations: self.permutation.clone(),
+            shuffles: self.shuffle.len(),
             column_queries,
             point_sets,
             size,
@@ -284,6 +324,19 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         columns: cs.permutation().get_columns().len(),
     }];
 
+    let shuffle = {
+        let mut shuffle = vec![];
+        for l in cs.shuffles().iter() {
+            shuffle.push(Shuffle {
+                // this isn't actually used for estimation right now, so ignore it.
+                _columns: 1,
+                input_deg: l.input_expressions().iter().map(Expression::degree).max().unwrap(),
+                shuffle_deg: l.shuffle_expressions().iter().map(Expression::degree).max().unwrap(),
+            });
+        }
+        shuffle
+    };
+
     let gate_degree = cs.gates
         .iter()
         .flat_map(|gate| gate.polynomials().iter().map(|poly| poly.degree()))
@@ -300,6 +353,7 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         max_degree: cs.degree(),
         lookup,
         permutation,
+        shuffle,
         k,
     }
 }
