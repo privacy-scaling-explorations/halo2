@@ -44,7 +44,7 @@ pub struct CostOptions {
     pub lookup: Vec<Lookup>,
 
     /// A permutation over N columns. May be repeated.
-    pub permutation: Vec<Permutation>,
+    pub permutation: Permutation,
 
     /// A shuffle over N columns with max input degree I and max shuffle degree T. May be repeated.
     pub shuffle: Vec<Shuffle>,
@@ -134,8 +134,8 @@ pub struct ModelCircuit {
     pub advice_columns: usize,
     /// Number of lookup arguments.
     pub lookups: usize,
-    /// Equality constraint permutation arguments.
-    pub permutations: Vec<Permutation>,
+    /// Equality constraint enabled columns.
+    pub permutations: usize,
     /// Number of shuffle arguments
     pub shuffles: usize,
     /// Number of distinct column queries across all gates.
@@ -159,7 +159,7 @@ impl CostOptions {
             .chain(self.fixed.iter())
             .cloned()
             .chain(self.lookup.iter().flat_map(|l| l.queries()))
-            .chain(self.permutation.iter().flat_map(|p| p.queries()))
+            .chain(self.permutation.queries())
             .chain(self.shuffle.iter().flat_map(|s| s.queries()))
             .chain(iter::repeat("0".parse().unwrap()).take(self.max_degree - 1))
             .collect();
@@ -178,11 +178,7 @@ impl CostOptions {
         // - COMM bytes (eval) per column per permutation argument
         let plonk = comp_bytes(1, 0) * self.advice.len()
             + comp_bytes(3, 5) * self.lookup.len()
-            + self
-                .permutation
-                .iter()
-                .map(|p| comp_bytes(1, 2 + p.columns))
-                .sum::<usize>();
+            + comp_bytes(1, 2 + self.permutation.columns);
 
         // Vanishing argument:
         // - (max_deg - 1) * COMM bytes (commitments) + (max_deg - 1) * SCALAR bytes (h_evals)
@@ -235,7 +231,7 @@ impl CostOptions {
             max_deg: self.max_degree,
             advice_columns: self.advice.len(),
             lookups: self.lookup.len(),
-            permutations: self.permutation.clone(),
+            permutations: self.permutation.columns,
             shuffles: self.shuffle.len(),
             column_queries,
             point_sets,
@@ -298,9 +294,9 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
 
     let lookup = { cs.lookups().iter().map(|_| Lookup).collect::<Vec<_>>() };
 
-    let permutation = vec![Permutation {
+    let permutation = Permutation {
         columns: cs.permutation().get_columns().len(),
-    }];
+    };
 
     let shuffle = { cs.shuffles.iter().map(|_| Shuffle).collect::<Vec<_>>() };
 
