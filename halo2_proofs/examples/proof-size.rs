@@ -1,162 +1,101 @@
 use ff::Field;
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
-    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance},
+    plonk::{Advice, Circuit, Column, ConstraintSystem, Error},
 };
-use halo2curves::pasta::{pallas, Fp};
-
-use halo2_gadgets::poseidon::{
-    primitives::{self as poseidon, generate_constants, ConstantLength, Mds, Spec},
-    Hash, Pow5Chip, Pow5Config,
-};
-use std::convert::TryInto;
-use std::marker::PhantomData;
+use halo2curves::pasta::Fp;
 
 use halo2_proofs::dev::cost_model::{from_circuit_to_model_circuit, CommitmentScheme};
-use rand_core::OsRng;
+use halo2_proofs::plonk::{Expression, Selector, TableColumn};
+use halo2_proofs::poly::Rotation;
 
+// We use a lookup example
 #[derive(Clone, Copy)]
-struct HashCircuit<S, const WIDTH: usize, const RATE: usize, const L: usize>
-where
-    S: Spec<Fp, WIDTH, RATE> + Clone + Copy,
-{
-    message: Value<[Fp; L]>,
-    _spec: PhantomData<S>,
-}
+struct TestCircuit {}
 
 #[derive(Debug, Clone)]
-struct MyConfig<const WIDTH: usize, const RATE: usize, const L: usize> {
-    input: [Column<Advice>; L],
-    expected: Column<Instance>,
-    poseidon_config: Pow5Config<Fp, WIDTH, RATE>,
+struct MyConfig {
+    selector: Selector,
+    table: TableColumn,
+    advice: Column<Advice>,
 }
 
-impl<S, const WIDTH: usize, const RATE: usize, const L: usize> Circuit<Fp>
-    for HashCircuit<S, WIDTH, RATE, L>
-where
-    S: Spec<Fp, WIDTH, RATE> + Copy + Clone,
-{
-    type Config = MyConfig<WIDTH, RATE, L>;
+impl Circuit<Fp> for TestCircuit {
+    type Config = MyConfig;
     type FloorPlanner = SimpleFloorPlanner;
     #[cfg(feature = "circuit-params")]
     type Params = ();
 
     fn without_witnesses(&self) -> Self {
-        Self {
-            message: Value::unknown(),
-            _spec: PhantomData,
-        }
+        Self {}
     }
 
-    fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
-        let state = (0..WIDTH).map(|_| meta.advice_column()).collect::<Vec<_>>();
-        let expected = meta.instance_column();
-        meta.enable_equality(expected);
-        let partial_sbox = meta.advice_column();
+    fn configure(meta: &mut ConstraintSystem<Fp>) -> MyConfig {
+        let config = MyConfig {
+            selector: meta.complex_selector(),
+            table: meta.lookup_table_column(),
+            advice: meta.advice_column(),
+        };
 
-        let rc_a = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
-        let rc_b = (0..WIDTH).map(|_| meta.fixed_column()).collect::<Vec<_>>();
+        meta.lookup("lookup", |meta| {
+            let selector = meta.query_selector(config.selector);
+            let not_selector = Expression::Constant(Fp::ONE) - selector.clone();
+            let advice = meta.query_advice(config.advice, Rotation::cur());
+            vec![(selector * advice + not_selector, config.table)]
+        });
 
-        meta.enable_constant(rc_b[0]);
-
-        Self::Config {
-            input: state[..RATE].try_into().unwrap(),
-            expected,
-            poseidon_config: Pow5Chip::configure::<S>(
-                meta,
-                state.try_into().unwrap(),
-                partial_sbox,
-                rc_a.try_into().unwrap(),
-                rc_b.try_into().unwrap(),
-            ),
-        }
+        config
     }
 
-    fn synthesize(
-        &self,
-        config: Self::Config,
-        mut layouter: impl Layouter<Fp>,
-    ) -> Result<(), Error> {
-        let chip = Pow5Chip::construct(config.poseidon_config.clone());
+    fn synthesize(&self, config: MyConfig, mut layouter: impl Layouter<Fp>) -> Result<(), Error> {
+        layouter.assign_table(
+            || "8-bit table",
+            |mut table| {
+                for row in 0u64..(1 << 8) {
+                    table.assign_cell(
+                        || format!("row {}", row),
+                        config.table,
+                        row as usize,
+                        || Value::known(Fp::from(row + 1)),
+                    )?;
+                }
 
-        let message = layouter.assign_region(
-            || "load message",
-            |mut region| {
-                let message_word = |i: usize| {
-                    let value = self.message.map(|message_vals| message_vals[i]);
-                    region.assign_advice(
-                        || format!("load message_{}", i),
-                        config.input[i],
-                        0,
-                        || value,
-                    )
-                };
-
-                let message: Result<Vec<_>, Error> = (0..L).map(message_word).collect();
-                Ok(message?.try_into().unwrap())
+                Ok(())
             },
         )?;
 
-        let hasher = Hash::<_, _, S, ConstantLength<L>, WIDTH, RATE>::init(
-            chip,
-            layouter.namespace(|| "init"),
-        )?;
-        let output = hasher.hash(layouter.namespace(|| "hash"), message)?;
+        layouter.assign_region(
+            || "assign values",
+            |mut region| {
+                for offset in 0u64..(1 << 10) {
+                    config.selector.enable(&mut region, offset as usize)?;
+                    region.assign_advice(
+                        || format!("offset {}", offset),
+                        config.advice,
+                        offset as usize,
+                        || Value::known(Fp::from((offset % 256) + 1)),
+                    )?;
+                }
 
-        layouter.constrain_instance(output.cell(), config.expected, 0)
+                Ok(())
+            },
+        )
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct MySpec<const WIDTH: usize, const RATE: usize>;
-
-impl<const WIDTH: usize, const RATE: usize> Spec<Fp, WIDTH, RATE> for MySpec<WIDTH, RATE> {
-    fn full_rounds() -> usize {
-        8
-    }
-
-    fn partial_rounds() -> usize {
-        56
-    }
-
-    fn sbox(val: Fp) -> Fp {
-        val.pow_vartime([5])
-    }
-
-    fn secure_mds() -> usize {
-        0
-    }
-
-    fn constants() -> (Vec<[Fp; WIDTH]>, Mds<Fp, WIDTH>, Mds<Fp, WIDTH>) {
-        generate_constants::<_, Self, WIDTH, RATE>()
-    }
-}
-
-const K: u32 = 7;
+const K: u32 = 11;
 
 fn main() {
-    let rng = OsRng;
-    let message: [Fp; 11] = (0..11)
-        .map(|_| pallas::Base::random(rng))
-        .collect::<Vec<_>>()
-        .try_into()
-        .unwrap();
-    let output =
-        poseidon::Hash::<_, MySpec<12, 11>, ConstantLength<11>, 12, 11>::init().hash(message);
-
-    let circuit = HashCircuit::<MySpec<12, 11>, 12, 11, 11> {
-        message: Value::known(message),
-        _spec: PhantomData,
-    };
+    let circuit = TestCircuit {};
 
     let model = from_circuit_to_model_circuit::<_, _, 56, 56>(
         K,
         &circuit,
-        vec![vec![output]],
+        vec![],
         CommitmentScheme::KZGGWC,
     );
     println!(
-        "Cost of Poseidon with WIDTH = 12 and RATE = 11: \n{}",
+        "Cost of circuit with 8 bit lookup table: \n{}",
         serde_json::to_string_pretty(&model).unwrap()
     );
 }
