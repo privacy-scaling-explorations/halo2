@@ -319,9 +319,12 @@ pub struct MockProver<F: Field> {
     current_phase: sealed::Phase,
 }
 
+/// Instance Value
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum InstanceValue<F: Field> {
+pub enum InstanceValue<F: Field> {
+    /// Assigned instance value
     Assigned(F),
+    /// Padding
     Padding,
 }
 
@@ -1713,7 +1716,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
     }
 
     /// Returns the list of Instance Columns used within a MockProver instance and the associated values contained on each Cell.
-    pub fn instance(&self) -> &Vec<Vec<F>> {
+    pub fn instance(&self) -> &Vec<Vec<InstanceValue<F>>> {
         &self.instance
     }
 
