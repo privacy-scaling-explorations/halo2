@@ -8,8 +8,10 @@ pub(crate) mod verifier;
 #[derive(Clone)]
 pub struct Argument<F: Field> {
     pub(crate) name: String,
-    pub(crate) input_expressions: Vec<Expression<F>>,
-    pub(crate) table_expressions: Vec<Expression<F>>,
+    /// Visibility changed for analyzer
+    pub input_expressions: Vec<Expression<F>>,
+    /// Visibility changed for analyzer
+    pub table_expressions: Vec<Expression<F>>,
 }
 
 impl<F: Field> Debug for Argument<F> {

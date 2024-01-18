@@ -52,25 +52,33 @@ mod graph;
 pub use graph::{circuit_dot_graph, layout::CircuitLayout};
 
 #[derive(Debug)]
-struct Region {
+/// Visibility changed for analyzer
+pub struct Region {
     /// The name of the region. Not required to be unique.
-    name: String,
+    /// Visibility changed for analyzer
+    pub name: String,
     /// The columns involved in this region.
-    columns: HashSet<Column<Any>>,
+    /// Visibility changed for analyzer
+    pub columns: HashSet<Column<Any>>,
     /// The rows that this region starts and ends on, if known.
-    rows: Option<(usize, usize)>,
+    /// Visibility changed for analyzer
+    pub rows: Option<(usize, usize)>,
     /// The selectors that have been enabled in this region. All other selectors are by
     /// construction not enabled.
-    enabled_selectors: HashMap<Selector, Vec<usize>>,
+    /// Visibility changed for analyzer
+    pub enabled_selectors: HashMap<Selector, Vec<usize>>,
     /// Annotations given to Advice, Fixed or Instance columns within a region context.
-    annotations: HashMap<ColumnMetadata, String>,
+    /// Visibility changed for analyzer
+    pub annotations: HashMap<ColumnMetadata, String>,
     /// The cells assigned in this region. We store this as a `Vec` so that if any cells
     /// are double-assigned, they will be visibly darker.
-    cells: HashMap<(Column<Any>, usize), usize>,
+    /// Visibility changed for analyzer
+    pub cells: HashMap<(Column<Any>, usize), usize>,
 }
 
 impl Region {
-    fn update_extent(&mut self, column: Column<Any>, row: usize) {
+    /// Visibility changed for analyzer
+    pub fn update_extent(&mut self, column: Column<Any>, row: usize) {
         self.columns.insert(column);
 
         // The region start is the earliest row assigned to.

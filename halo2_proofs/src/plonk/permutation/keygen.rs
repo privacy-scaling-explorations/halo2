@@ -25,18 +25,22 @@ use std::collections::{BTreeSet, HashMap};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assembly {
     /// Columns that participate on the copy permutation argument.
-    columns: Vec<Column<Any>>,
+    /// Visibility changed for analyzer
+    pub columns: Vec<Column<Any>>,
     /// Mapping of the actual copies done.
-    mapping: Vec<Vec<(usize, usize)>>,
+    /// Visibility changed for analyzer
+    pub mapping: Vec<Vec<(usize, usize)>>,
     /// Some aux data used to swap positions directly when sorting.
     aux: Vec<Vec<(usize, usize)>>,
     /// More aux data
-    sizes: Vec<Vec<usize>>,
+    /// Visibility changed for analyzer
+    pub sizes: Vec<Vec<usize>>,
 }
 
 #[cfg(not(feature = "thread-safe-region"))]
 impl Assembly {
-    pub(crate) fn new(n: usize, p: &Argument) -> Self {
+    /// Visibility changed for analyzer
+    pub fn new(n: usize, p: &Argument) -> Self {
         // Initialize the copy vector to keep track of copy constraints in all
         // the permutation arguments.
         let mut columns = vec![];
@@ -55,8 +59,8 @@ impl Assembly {
             sizes: vec![vec![1usize; n]; p.columns.len()],
         }
     }
-
-    pub(crate) fn copy(
+    /// Visibility changed for analyzer
+    pub fn copy(
         &mut self,
         left_column: Column<Any>,
         left_row: usize,
