@@ -62,7 +62,7 @@ where
     /// - Otherwise: Writes an uncompressed curve element with coordinates in Montgomery form
     /// Writes a field element into raw bytes in its internal Montgomery representation,
     /// WITHOUT performing the expensive Montgomery reduction.
-    pub fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
+    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
         // Version byte that will be checked on read.
         writer.write_all(&[VERSION])?;
         let k = &self.domain.k();
@@ -99,7 +99,7 @@ where
     /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
     /// does not perform any checks
-    pub fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
+    pub(crate) fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
         reader: &mut R,
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
@@ -183,14 +183,14 @@ where
     }
 
     /// Writes a verifying key to a vector of bytes using [`Self::write`].
-    pub fn to_bytes(&self, format: SerdeFormat) -> Vec<u8> {
+    pub(crate) fn to_bytes(&self, format: SerdeFormat) -> Vec<u8> {
         let mut bytes = Vec::<u8>::with_capacity(self.bytes_length(format));
         Self::write(self, &mut bytes, format).expect("Writing to vector should not fail");
         bytes
     }
 
     /// Reads a verification key from a slice of bytes using [`Self::read`].
-    pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
+    pub(crate) fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
         mut bytes: &[u8],
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
@@ -290,17 +290,17 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     /// Returns `VerifyingKey` of permutation
-    pub fn permutation(&self) -> &permutation::VerifyingKey<C> {
+    pub(crate) fn permutation(&self) -> &permutation::VerifyingKey<C> {
         &self.permutation
     }
 
     /// Returns `ConstraintSystem`
-    pub fn cs(&self) -> &ConstraintSystem<C::Scalar> {
+    pub(crate) fn cs(&self) -> &ConstraintSystem<C::Scalar> {
         &self.cs
     }
 
     /// Returns representative of this `VerifyingKey` in transcripts
-    pub fn transcript_repr(&self) -> C::Scalar {
+    pub(crate) fn transcript_repr(&self) -> C::Scalar {
         self.transcript_repr
     }
 }
