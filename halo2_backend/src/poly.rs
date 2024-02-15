@@ -187,7 +187,11 @@ impl<F: SerdePrimeField, B> Polynomial<F, B> {
     }
 
     /// Writes polynomial to buffer using `SerdePrimeField::write`.  
-    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
+    pub(crate) fn write<W: io::Write>(
+        &self,
+        writer: &mut W,
+        format: SerdeFormat,
+    ) -> io::Result<()> {
         writer.write_all(&(self.values.len() as u32).to_be_bytes())?;
         for value in self.values.iter() {
             value.write(writer, format)?;

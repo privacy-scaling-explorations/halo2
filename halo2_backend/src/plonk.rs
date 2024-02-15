@@ -62,7 +62,11 @@ where
     /// - Otherwise: Writes an uncompressed curve element with coordinates in Montgomery form
     /// Writes a field element into raw bytes in its internal Montgomery representation,
     /// WITHOUT performing the expensive Montgomery reduction.
-    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
+    pub(crate) fn write<W: io::Write>(
+        &self,
+        writer: &mut W,
+        format: SerdeFormat,
+    ) -> io::Result<()> {
         // Version byte that will be checked on read.
         writer.write_all(&[VERSION])?;
         let k = &self.domain.k();
