@@ -17,7 +17,7 @@ pub mod verifier;
 
 /// The verifying key for a single permutation argument.
 #[derive(Clone, Debug)]
-pub(crate) struct VerifyingKey<C: CurveAffine> {
+pub struct VerifyingKey<C: CurveAffine> {
     commitments: Vec<C>,
 }
 
