@@ -66,14 +66,14 @@ where
     E::G1: CurveExt<AffineExt = E::G1Affine>,
 {
     /// Constructs an empty batch verifier
-    pub(crate) fn new(params: &'params ParamsKZG<E>) -> Self {
+    pub fn new(params: &'params ParamsKZG<E>) -> Self {
         AccumulatorStrategy {
             msm_accumulator: DualMSM::new(params),
         }
     }
 
     /// Constructs and initialized new batch verifier
-    pub(crate) fn with(msm_accumulator: DualMSM<'params, E>) -> Self {
+    pub fn with(msm_accumulator: DualMSM<'params, E>) -> Self {
         AccumulatorStrategy { msm_accumulator }
     }
 }
@@ -85,7 +85,7 @@ where
     E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
     E::G1: CurveExt<AffineExt = E::G1Affine>,
 {
-    pub msm: DualMSM<'params, E>,
+    pub(crate) msm: DualMSM<'params, E>,
 }
 
 impl<'params, E: MultiMillerLoop + Debug> SingleStrategy<'params, E>
