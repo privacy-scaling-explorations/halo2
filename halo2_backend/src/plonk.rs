@@ -183,7 +183,6 @@ where
     }
 
     /// Writes a verifying key to a vector of bytes using [`Self::write`].
-    #[allow(unused)]
     pub fn to_bytes(&self, format: SerdeFormat) -> Vec<u8> {
         let mut bytes = Vec::<u8>::with_capacity(self.bytes_length(format));
         Self::write(self, &mut bytes, format).expect("Writing to vector should not fail");
@@ -191,7 +190,6 @@ where
     }
 
     /// Reads a verification key from a slice of bytes using [`Self::read`].
-    #[allow(unused)]
     pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
         mut bytes: &[u8],
         format: SerdeFormat,
@@ -292,7 +290,6 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     /// Returns `VerifyingKey` of permutation
-    #[allow(unused)]
     pub fn permutation(&self) -> &permutation::VerifyingKey<C> {
         &self.permutation
     }
@@ -303,7 +300,6 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     /// Returns representative of this `VerifyingKey` in transcripts
-    #[allow(unused)]
     pub fn transcript_repr(&self) -> C::Scalar {
         self.transcript_repr
     }

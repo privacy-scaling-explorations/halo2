@@ -73,7 +73,6 @@ where
     }
 
     /// Constructs and initialized new batch verifier
-    #[allow(unused)]
     pub(crate) fn with(msm_accumulator: DualMSM<'params, E>) -> Self {
         AccumulatorStrategy { msm_accumulator }
     }

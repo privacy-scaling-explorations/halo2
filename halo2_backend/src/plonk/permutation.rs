@@ -23,7 +23,6 @@ pub struct VerifyingKey<C: CurveAffine> {
 
 impl<C: CurveAffine> VerifyingKey<C> {
     /// Returns commitments of sigma polynomials
-    #[allow(unused)]
     pub fn commitments(&self) -> &Vec<C> {
         &self.commitments
     }
