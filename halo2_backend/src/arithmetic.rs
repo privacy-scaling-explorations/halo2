@@ -1,11 +1,11 @@
 //! This module provides common utilities, traits and structures for group,
 //! field and polynomial arithmetic.
 
-use super::multicore;
 use group::{
     ff::{BatchInvert, PrimeField},
     Curve, Group, GroupOpsOwned, ScalarMulOwned,
 };
+use halo2_common::multicore;
 pub use halo2_middleware::ff::Field;
 
 pub use halo2curves::{CurveAffine, CurveExt};
@@ -531,7 +531,7 @@ pub fn powers<F: Field>(base: F) -> impl Iterator<Item = F> {
 use rand_core::OsRng;
 
 #[cfg(test)]
-use crate::halo2curves::pasta::Fp;
+use halo2curves::pasta::Fp;
 
 #[test]
 fn test_lagrange_interpolate() {
