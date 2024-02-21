@@ -89,7 +89,7 @@ fn multiexp_serial<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut 
                         other += a;
                         other
                     }
-                    Bucket::Projective(a) => other + &a,
+                    Bucket::Projective(a) => other + a,
                 }
             }
         }
