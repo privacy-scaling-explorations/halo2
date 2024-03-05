@@ -61,6 +61,7 @@ gumdrop = "0.8"
 proptest = "1"
 dhat = "0.3.2"
 serde_json = "1"
+ark-std = {version = "0.4", features = ["print-trace"]}
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
 getrandom = { version = "0.2", features = ["js"] }
@@ -82,6 +83,7 @@ sanity-checks = []
 batch = ["rand_core/getrandom"]
 circuit-params = ["halo2_common/circuit-params", "halo2_frontend/circuit-params", "halo2_backend/circuit-params"]
 heap-profiling = []
+perf-profiling = []
 cost-estimator = ["halo2_frontend/cost-estimator"]
 derive_serde = ["halo2curves/derive_serde"]
 

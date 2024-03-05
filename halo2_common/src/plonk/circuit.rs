@@ -11,6 +11,7 @@ use halo2_middleware::circuit::{
 use halo2_middleware::ff::Field;
 use halo2_middleware::metadata;
 use halo2_middleware::poly::Rotation;
+use itertools::Itertools;
 use sealed::SealedPhase;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -1176,6 +1177,72 @@ impl<F: Field> Expression<F> {
             &|a| a,
             &op,
             &op,
+            &|a, _| a,
+        )
+    }
+
+    /// Extracts all used instance columns in this expression
+    pub fn extract_instances(&self) -> Vec<usize> {
+        self.evaluate(
+            &|_| vec![],
+            &|_| vec![],
+            &|_| vec![],
+            &|_| vec![],
+            &|query| vec![query.column_index],
+            &|_| vec![],
+            &|a| a,
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
+            &|a, _| a,
+        )
+    }
+
+    /// Extracts all used advice columns in this expression
+    pub fn extract_advices(&self) -> Vec<usize> {
+        self.evaluate(
+            &|_| vec![],
+            &|_| vec![],
+            &|_| vec![],
+            &|query| vec![query.column_index],
+            &|_| vec![],
+            &|_| vec![],
+            &|a| a,
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
+            &|a, _| a,
+        )
+    }
+
+    /// Extracts all used fixed columns in this expression
+    pub fn extract_fixed(&self) -> Vec<usize> {
+        self.evaluate(
+            &|_| vec![],
+            &|_| vec![],
+            &|query| vec![query.column_index],
+            &|_| vec![],
+            &|_| vec![],
+            &|_| vec![],
+            &|a| a,
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
+            &|mut a, b| {
+                a.extend(b);
+                a.into_iter().unique().collect()
+            },
             &|a, _| a,
         )
     }

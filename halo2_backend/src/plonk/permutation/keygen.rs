@@ -380,7 +380,7 @@ pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
         });
     }
 
-    // Compute permutation polynomials, convert to coset form.
+    // Compute permutation polynomials.
     let mut permutations = vec![domain.empty_lagrange(); p.columns.len()];
     {
         parallelize(&mut permutations, |o, start| {
@@ -405,21 +405,9 @@ pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
         });
     }
 
-    let mut cosets = vec![domain.empty_extended(); p.columns.len()];
-    {
-        parallelize(&mut cosets, |o, start| {
-            for (x, coset) in o.iter_mut().enumerate() {
-                let i = start + x;
-                let poly = polys[i].clone();
-                *coset = domain.coeff_to_extended(poly);
-            }
-        });
-    }
-
     ProvingKey {
         permutations,
         polys,
-        cosets,
     }
 }
 

@@ -581,7 +581,6 @@ impl<
             *gamma,
             *theta,
             &lookups,
-            &shuffles,
             &permutations,
         );
 

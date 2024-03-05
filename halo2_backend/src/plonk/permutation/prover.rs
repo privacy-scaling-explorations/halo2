@@ -12,7 +12,7 @@ use crate::{
     plonk::{self, permutation::ProvingKey, ChallengeBeta, ChallengeGamma, ChallengeX},
     poly::{
         commitment::{Blind, Params},
-        Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, ProverQuery,
+        Coeff, LagrangeCoeff, Polynomial, ProverQuery,
     },
     transcript::{EncodedChallenge, TranscriptWrite},
 };
@@ -25,7 +25,6 @@ use halo2_middleware::poly::Rotation;
 
 pub(crate) struct CommittedSet<C: CurveAffine> {
     pub(crate) permutation_product_poly: Polynomial<C::Scalar, Coeff>,
-    pub(crate) permutation_product_coset: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
     permutation_product_blind: Blind<C::Scalar>,
 }
 
@@ -175,10 +174,7 @@ pub(in crate::plonk) fn permutation_commit<
         let permutation_product_commitment_projective = params.commit_lagrange(&z, blind);
         let permutation_product_blind = blind;
         let z = domain.lagrange_to_coeff(z);
-        let permutation_product_poly = z.clone();
-
-        let permutation_product_coset = domain.coeff_to_extended(z.clone());
-
+        let permutation_product_poly = z;
         let permutation_product_commitment = permutation_product_commitment_projective.to_affine();
 
         // Hash the permutation product commitment
@@ -186,7 +182,6 @@ pub(in crate::plonk) fn permutation_commit<
 
         sets.push(CommittedSet {
             permutation_product_poly,
-            permutation_product_coset,
             permutation_product_blind,
         });
     }

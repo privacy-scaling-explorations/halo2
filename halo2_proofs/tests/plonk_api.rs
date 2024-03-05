@@ -1,6 +1,10 @@
 #![allow(clippy::many_single_char_names)]
 #![allow(clippy::op_ref)]
 
+#[cfg(feature = "heap-profiling")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
 use assert_matches::assert_matches;
 use ff::{FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_proofs::arithmetic::Field;
@@ -23,7 +27,14 @@ use std::marker::PhantomData;
 
 #[test]
 fn plonk_api() {
+    #[cfg(not(any(feature = "perf-profiling", feature = "heap-profiling")))]
     const K: u32 = 5;
+
+    #[cfg(any(feature = "perf-profiling", feature = "heap-profiling"))]
+    const K: u32 = 21;
+
+    #[cfg(feature = "perf-profiling")]
+    use ark_std::{end_timer, start_timer};
 
     /// This represents an advice column at a certain row in the ConstraintSystem
     #[derive(Copy, Clone, Debug)]
@@ -469,6 +480,8 @@ fn plonk_api() {
     where
         Scheme::Scalar: Ord + WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
+        #[cfg(feature = "heap-profiling")]
+        let _profiler = dhat::Profiler::new_heap();
         let (a, instance, lookup_table) = common!(Scheme);
 
         let circuit: MyCircuit<Scheme::Scalar> = MyCircuit {
@@ -487,6 +500,9 @@ fn plonk_api() {
             &mut transcript,
         )
         .expect("proof generation should not fail");
+
+        #[cfg(feature = "heap-profiling")]
+        drop(_profiler);
 
         // Check this circuit is satisfied.
         let prover = match MockProver::run(K, &circuit, vec![vec![instance]]) {
@@ -538,6 +554,7 @@ fn plonk_api() {
         use halo2curves::bn256::Bn256;
 
         type Scheme = KZGCommitmentScheme<Bn256>;
+        #[cfg(not(any(feature = "perf-profiling", feature = "heap-profiling")))]
         bad_keys!(Scheme);
 
         let params = ParamsKZG::<Bn256>::new(K);
@@ -545,9 +562,15 @@ fn plonk_api() {
 
         let pk = keygen::<KZGCommitmentScheme<_>>(&params);
 
+        #[cfg(feature = "perf-profiling")]
+        let a = start_timer!(|| format!("Proof Gen for K={} GWC, `plonk_api` test", K));
+
         let proof = create_proof::<_, ProverGWC<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
             rng, &params, &pk,
         );
+
+        #[cfg(feature = "perf-profiling")]
+        end_timer!(a);
 
         let verifier_params = params.verifier_params();
 
@@ -567,6 +590,7 @@ fn plonk_api() {
         use halo2curves::bn256::Bn256;
 
         type Scheme = KZGCommitmentScheme<Bn256>;
+        #[cfg(not(any(feature = "perf-profiling", feature = "heap-profiling")))]
         bad_keys!(Scheme);
 
         let params = ParamsKZG::<Bn256>::new(K);
@@ -574,9 +598,15 @@ fn plonk_api() {
 
         let pk = keygen::<KZGCommitmentScheme<_>>(&params);
 
+        #[cfg(feature = "perf-profiling")]
+        let a = start_timer!(|| format!("Proof Gen for K={} SHPLONK, `plonk_api` test", K));
+
         let proof = create_proof::<_, ProverSHPLONK<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
             rng, &params, &pk,
         );
+
+        #[cfg(feature = "perf-profiling")]
+        end_timer!(a);
 
         let verifier_params = params.verifier_params();
 
@@ -619,6 +649,7 @@ fn plonk_api() {
 
         // Check that the verification key has not changed unexpectedly
         {
+            // TODO(Remove)
             //panic!("{:#?}", pk.get_vk().pinned());
             assert_eq!(
                 format!("{:#?}", pk.get_vk().pinned()),
@@ -1020,7 +1051,9 @@ fn plonk_api() {
         }
     }
 
+    #[cfg(not(any(feature = "perf-profiling", feature = "heap-profiling")))]
     test_plonk_api_ipa();
+
     test_plonk_api_gwc();
     test_plonk_api_shplonk();
 }
