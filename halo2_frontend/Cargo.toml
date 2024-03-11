@@ -59,6 +59,7 @@ test-dev-graph = [
 ]
 bits = ["halo2curves/bits"]
 gadget-traces = ["backtrace"]
+thread-safe-region = []
 sanity-checks = []
 circuit-params = []
 heap-profiling = []
