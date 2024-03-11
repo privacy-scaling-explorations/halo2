@@ -143,7 +143,6 @@ impl Assembly {
     }
 }
 
-
 #[cfg(feature = "thread-safe-region")]
 /// Struct that accumulates all the necessary data in order to construct the permutation argument.
 #[derive(Clone, Debug, PartialEq, Eq)]
