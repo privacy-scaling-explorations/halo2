@@ -13,20 +13,13 @@ use crate::{
 use halo2_middleware::circuit::ColumnMid;
 use halo2_middleware::permutation::{ArgumentMid, AssemblyMid};
 
-// NOTE: Temporarily disabled thread-safe-region feature.  Regions are a frontend concept, so the
-// thread-safe support for them should be only in the frontend package.
-// TODO: Bring the thread-safe region feature back
-// https://github.com/privacy-scaling-explorations/halo2/issues/258
+#[cfg(feature = "thread-safe-region")]
+use crate::multicore::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
-// #[cfg(feature = "thread-safe-region")]
-// use crate::multicore::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-
-/*
 #[cfg(feature = "thread-safe-region")]
 use std::collections::{BTreeSet, HashMap};
-*/
 
-// #[cfg(not(feature = "thread-safe-region"))]
+#[cfg(not(feature = "thread-safe-region"))]
 /// Struct that accumulates all the necessary data in order to construct the permutation argument.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Assembly {
@@ -40,7 +33,7 @@ pub struct Assembly {
     sizes: Vec<Vec<usize>>,
 }
 
-// #[cfg(not(feature = "thread-safe-region"))]
+#[cfg(not(feature = "thread-safe-region"))]
 impl Assembly {
     pub(crate) fn new_from_assembly_mid(
         n: usize,
@@ -150,7 +143,7 @@ impl Assembly {
     }
 }
 
-/*
+
 #[cfg(feature = "thread-safe-region")]
 /// Struct that accumulates all the necessary data in order to construct the permutation argument.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -345,7 +338,6 @@ impl Assembly {
         })
     }
 }
-*/
 
 pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
     params: &P,
