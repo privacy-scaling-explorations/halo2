@@ -7,7 +7,6 @@
 #![deny(unsafe_code)]
 
 pub mod multicore;
-pub mod plonk;
 
 pub use halo2curves;
 

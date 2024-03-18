@@ -1,3 +1,10 @@
+//! This module provides an implementation of a variant of (Turbo)[PLONK][plonk]
+//! that is designed specifically for the polynomial commitment scheme described
+//! in the [Halo][halo] paper.
+//!
+//! [halo]: https://eprint.iacr.org/2019/1021
+//! [plonk]: https://eprint.iacr.org/2019/953
+
 use blake2b_simd::Params as Blake2bParams;
 use group::ff::{Field, FromUniformBytes, PrimeField};
 
