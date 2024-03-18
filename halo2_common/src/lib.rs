@@ -6,8 +6,6 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(unsafe_code)]
 
-pub mod multicore;
-
 pub use halo2curves;
 
 // TODO: Everything that is moved from this crate to frontend or backend should recover the

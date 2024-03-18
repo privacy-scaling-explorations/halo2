@@ -5,4 +5,4 @@ pub mod poly;
 pub mod transcript;
 
 // Internal re-exports
-pub use halo2_common::multicore;
+pub use halo2_middleware::multicore;

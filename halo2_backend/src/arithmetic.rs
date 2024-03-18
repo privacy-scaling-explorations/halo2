@@ -5,7 +5,7 @@ use group::{
     ff::{BatchInvert, PrimeField},
     Curve, GroupOpsOwned, ScalarMulOwned,
 };
-use halo2_common::multicore;
+use halo2_middleware::multicore;
 pub use halo2_middleware::ff::Field;
 
 use halo2curves::fft::best_fft;
