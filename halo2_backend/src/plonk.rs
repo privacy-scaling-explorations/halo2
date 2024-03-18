@@ -4,7 +4,7 @@ use group::ff::{Field, FromUniformBytes, PrimeField};
 use crate::arithmetic::CurveAffine;
 use crate::helpers::{
     polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdeCurveAffine,
-    SerdePrimeField,
+    SerdePrimeField, SerdeFormat,
 };
 use crate::plonk::circuit::{ConstraintSystemBack, PinnedConstraintSystem};
 use crate::poly::{
@@ -13,7 +13,6 @@ use crate::poly::{
 };
 use crate::transcript::{ChallengeScalar, EncodedChallenge, Transcript};
 pub(crate) use evaluation::Evaluator;
-use halo2_common::SerdeFormat;
 
 use std::io;
 

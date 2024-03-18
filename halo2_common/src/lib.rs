@@ -6,12 +6,10 @@
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(unsafe_code)]
 
-pub mod helpers;
 pub mod multicore;
 pub mod plonk;
 
 pub use halo2curves;
-pub use helpers::SerdeFormat;
 
 // TODO: Everything that is moved from this crate to frontend or backend should recover the
 // pub(crate) status whenever possible.
