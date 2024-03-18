@@ -4,7 +4,6 @@ use std::io;
 
 use crate::poly::Polynomial;
 
-
 /// This enum specifies how various types are serialized and deserialized.
 #[derive(Clone, Copy, Debug)]
 pub enum SerdeFormat {

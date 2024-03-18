@@ -16,11 +16,11 @@ use crate::{
         FirstPhase, FloorPlanner, Phase, Selector,
     },
 };
+use halo2_middleware::circuit::{Advice, Any, ColumnMid, Fixed, Instance};
+use halo2_middleware::ff::{Field, FromUniformBytes};
 use halo2_middleware::multicore::{
     IntoParallelIterator, IntoParallelRefIterator, ParallelIterator, ParallelSliceMut,
 };
-use halo2_middleware::circuit::{Advice, Any, ColumnMid, Fixed, Instance};
-use halo2_middleware::ff::{Field, FromUniformBytes};
 
 pub mod metadata;
 use metadata::Column as ColumnMetadata;

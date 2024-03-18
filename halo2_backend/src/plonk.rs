@@ -11,7 +11,7 @@ use group::ff::{Field, FromUniformBytes, PrimeField};
 use crate::arithmetic::CurveAffine;
 use crate::helpers::{
     polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdeCurveAffine,
-    SerdePrimeField, SerdeFormat,
+    SerdeFormat, SerdePrimeField,
 };
 use crate::plonk::circuit::{ConstraintSystemBack, PinnedConstraintSystem};
 use crate::poly::{

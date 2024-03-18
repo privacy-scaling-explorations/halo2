@@ -1,11 +1,11 @@
 //! Verifying/Proving key of a permutation argument, with its serialization.
 
+use crate::helpers::{SerdeCurveAffine, SerdeFormat, SerdePrimeField};
 use crate::{
     arithmetic::CurveAffine,
     helpers::{polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice},
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
 };
-use crate::helpers::{SerdeCurveAffine, SerdePrimeField, SerdeFormat};
 // TODO: Remove the renaming
 pub use halo2_middleware::permutation::ArgumentMid as Argument;
 
