@@ -46,6 +46,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           override: false
+          default: true
       - name: Add target
         run: rustup target add ${{ matrix.target }}
       - name: Run script file
