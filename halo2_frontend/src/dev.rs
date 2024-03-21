@@ -16,9 +16,6 @@ use crate::{
         Expression, FirstPhase, Fixed, FloorPlanner, Instance, Phase, Selector,
     },
 };
-use halo2_common::multicore::{
-    IntoParallelIterator, IntoParallelRefIterator, ParallelIterator, ParallelSliceMut,
-};
 use halo2_middleware::circuit::{Any, ColumnMid};
 use halo2_middleware::ff::{Field, FromUniformBytes};
 use halo2_middleware::multicore::{
