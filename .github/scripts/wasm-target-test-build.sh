@@ -1,3 +1,5 @@
+#!/bin/sh
+
 GIT_ROOT=$(pwd)
 
 cd /tmp
