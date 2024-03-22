@@ -20,7 +20,6 @@ use crate::{
         EvaluationDomain,
     },
 };
-use halo2_common::plonk::Queries;
 use halo2_middleware::circuit::{
     Any, ColumnMid, CompiledCircuitV2, ConstraintSystemMid, ExpressionMid, VarMid,
 };
@@ -198,7 +197,7 @@ impl QueriesMap {
             .map
             .entry((col, rot))
             .or_insert_with(|| match col.column_type {
-                Any::Advice(_) => {
+                Any::Advice => {
                     self.advice.push((col, rot));
                     self.advice.len() - 1
                 }
@@ -219,7 +218,7 @@ impl QueriesMap {
         match expr {
             ExpressionMid::Constant(c) => ExpressionBack::Constant(*c),
             ExpressionMid::Var(VarMid::Query(query)) => {
-                let column = ColumnMid::new(query.column_index, query.column_type);
+                let column = ColumnMid::new(query.column_type, query.column_index);
                 let index = self.add(column, query.rotation);
                 ExpressionBack::Var(VarBack::Query(QueryBack {
                     index,
@@ -336,16 +335,7 @@ fn collect_queries<F: Field>(
 
     // Each column used in a copy constraint involves a query at rotation current.
     for column in &cs_mid.permutation.columns {
-        match column.column_type {
-            Any::Instance => {
-                queries.add(ColumnMid::new(column.index, Any::Instance), Rotation::cur())
-            }
-            Any::Fixed => queries.add(ColumnMid::new(column.index, Any::Fixed), Rotation::cur()),
-            Any::Advice(advice) => queries.add(
-                ColumnMid::new(column.index, Any::Advice(advice)),
-                Rotation::cur(),
-            ),
-        };
+        queries.add(*column, Rotation::cur());
     }
 
     let mut num_advice_queries = vec![0; cs_mid.num_advice_columns];
@@ -383,5 +373,63 @@ impl<F: Field> From<ConstraintSystemMid<F>> for ConstraintSystemBack<F> {
             shuffles,
             minimum_degree: cs_mid.minimum_degree,
         }
+    }
+}
+
+/// List of queries (columns and rotations) used by a circuit
+#[derive(Debug, Clone)]
+pub struct Queries {
+    /// List of unique advice queries
+    pub advice: Vec<(ColumnMid, Rotation)>,
+    /// List of unique instance queries
+    pub instance: Vec<(ColumnMid, Rotation)>,
+    /// List of unique fixed queries
+    pub fixed: Vec<(ColumnMid, Rotation)>,
+    /// Contains an integer for each advice column
+    /// identifying how many distinct queries it has
+    /// so far; should be same length as cs.num_advice_columns.
+    pub num_advice_queries: Vec<usize>,
+}
+
+impl Queries {
+    /// Returns the minimum necessary rows that need to exist in order to
+    /// account for e.g. blinding factors.
+    pub fn minimum_rows(&self) -> usize {
+        self.blinding_factors() // m blinding factors
+            + 1 // for l_{-(m + 1)} (l_last)
+            + 1 // for l_0 (just for extra breathing room for the permutation
+                // argument, to essentially force a separation in the
+                // permutation polynomial between the roles of l_last, l_0
+                // and the interstitial values.)
+            + 1 // for at least one row
+    }
+
+    /// Compute the number of blinding factors necessary to perfectly blind
+    /// each of the prover's witness polynomials.
+    pub fn blinding_factors(&self) -> usize {
+        // All of the prover's advice columns are evaluated at no more than
+        let factors = *self.num_advice_queries.iter().max().unwrap_or(&1);
+        // distinct points during gate checks.
+
+        // - The permutation argument witness polynomials are evaluated at most 3 times.
+        // - Each lookup argument has independent witness polynomials, and they are
+        //   evaluated at most 2 times.
+        let factors = std::cmp::max(3, factors);
+
+        // Each polynomial is evaluated at most an additional time during
+        // multiopen (at x_3 to produce q_evals):
+        let factors = factors + 1;
+
+        // h(x) is derived by the other evaluations so it does not reveal
+        // anything; in fact it does not even appear in the proof.
+
+        // h(x_3) is also not revealed; the verifier only learns a single
+        // evaluation of a polynomial in x_1 which has h(x_3) and another random
+        // polynomial evaluated at x_3 as coefficients -- this random polynomial
+        // is "random_poly" in the vanishing argument.
+
+        // Add an additional blinding factor as a slight defense against
+        // off-by-one errors.
+        factors + 1
     }
 }
