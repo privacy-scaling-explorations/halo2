@@ -751,6 +751,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
             v
         }));
 
+        #[cfg(feature = "thread-safe-region")]
         prover.permutation.copies.sort();
 
         Ok(prover)

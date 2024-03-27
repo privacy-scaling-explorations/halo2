@@ -113,6 +113,7 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     fixed.extend(selector_polys);
 
     // sort the "copies" for deterministic ordering
+    #[cfg(feature = "thread-safe-region")]
     assembly.permutation.copies.sort();
 
     let preprocessing = PreprocessingV2 {
