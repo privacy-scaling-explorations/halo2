@@ -113,7 +113,7 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     fixed.extend(selector_polys);
 
     // sort the "copies" for deterministic ordering
-    assembly.permutation.copies.sort_by(|a, b| a.0.cmp(&b.0));
+    assembly.permutation.copies.sort();
 
     let preprocessing = PreprocessingV2 {
         permutation: halo2_middleware::permutation::AssemblyMid {

@@ -751,6 +751,8 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
             v
         }));
 
+        prover.permutation.copies.sort();
+
         Ok(prover)
     }
 
