@@ -162,7 +162,7 @@ impl<C: CurveAffine> VerifyingKey<C> {
     where
         C: SerdeCurveAffine,
     {
-        6 /* VERSION(u8 = 1 byte) + "domain.k"(u8 = 1 byte) + num_fixed_columns(u32 = 4 bytes) */
+        6 // VERSION(u8 = 1 byte) + "domain.k"(u8 = 1 byte) + num_fixed_columns(u32 = 4 bytes)
         + (self.fixed_commitments.len() * C::byte_length(format))
         + self.permutation.bytes_length(format)
     }
