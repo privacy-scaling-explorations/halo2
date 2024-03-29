@@ -294,6 +294,7 @@ where
     {
         let scalar_len = C::Scalar::default().to_repr().as_ref().len();
         self.vk.bytes_length(format)
+            + 12 // bytes used for encoding the length of "l0", "l_last" & "l_active_row" polys
             + scalar_len * (self.l0.len() + self.l_last.len() + self.l_active_row.len())
             + polynomial_slice_byte_length(&self.fixed_values)
             + polynomial_slice_byte_length(&self.fixed_polys)
