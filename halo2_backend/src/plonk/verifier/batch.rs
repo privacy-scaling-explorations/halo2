@@ -64,7 +64,7 @@ struct BatchItem<C: CurveAffine> {
 /// A verifier that checks multiple proofs in a batch. **This requires the
 /// `batch` crate feature to be enabled.**
 #[derive(Debug, Default)]
-pub struct BatchVerifier<C: CurveAffine> {
+pub(crate) struct BatchVerifier<C: CurveAffine> {
     items: Vec<BatchItem<C>>,
 }
 
@@ -73,12 +73,12 @@ where
     C::Scalar: FromUniformBytes<64>,
 {
     /// Constructs a new batch verifier.
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self { items: vec![] }
     }
 
     /// Adds a proof to the batch.
-    pub fn add_proof(&mut self, instances: Vec<Vec<Vec<C::Scalar>>>, proof: Vec<u8>) {
+    pub(crate) fn add_proof(&mut self, instances: Vec<Vec<Vec<C::Scalar>>>, proof: Vec<u8>) {
         self.items.push(BatchItem { instances, proof })
     }
 
@@ -90,7 +90,7 @@ where
     /// This uses [`OsRng`] internally instead of taking an `R: RngCore` argument, because
     /// the internal parallelization requires access to a RNG that is guaranteed to not
     /// clone its internal state when shared between threads.
-    pub fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
+    pub(crate) fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
         fn accumulate_msm<'params, C: CurveAffine>(
             mut acc: MSMIPA<'params, C>,
             msm: MSMIPA<'params, C>,

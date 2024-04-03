@@ -94,7 +94,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
     /// Identifier for this expression. Expressions with identical identifiers
     /// do the same calculation (but the expressions don't need to be exactly equal
     /// in how they are composed e.g. `1 + 2` and `2 + 1` can have the same identifier).
-    pub fn identifier(&self) -> String {
+    pub(crate) fn identifier(&self) -> String {
         let mut cursor = std::io::Cursor::new(Vec::new());
         self.write_identifier(&mut cursor).unwrap();
         String::from_utf8(cursor.into_inner()).unwrap()
@@ -113,7 +113,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
     }
 
     /// Approximate the computational complexity of this expression.
-    pub fn complexity(&self) -> usize {
+    pub(crate) fn complexity(&self) -> usize {
         match self {
             Expression::Constant(_) => 0,
             Expression::Var(v) => v.complexity(),
@@ -124,7 +124,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
     }
 
     /// Square this expression.
-    pub fn square(self) -> Self {
+    pub(crate) fn square(self) -> Self {
         self.clone() * self
     }
 }

@@ -27,8 +27,8 @@ pub mod kzg;
 #[cfg(test)]
 mod multiopen_test;
 
-pub use domain::*;
-pub use query::{ProverQuery, VerifierQuery};
+pub(crate) use domain::*;
+pub(crate) use query::{ProverQuery, VerifierQuery};
 pub use strategy::{Guard, VerificationStrategy};
 
 // TODO: move everything from the poly module to the backend.  This requires that the frontend
@@ -232,7 +232,7 @@ impl<'a, F: Field, B: Basis> Sub<&'a Polynomial<F, B>> for Polynomial<F, B> {
 
 impl<F: Field> Polynomial<F, LagrangeCoeff> {
     /// Rotates the values in a Lagrange basis polynomial by `Rotation`
-    pub fn rotate(&self, rotation: Rotation) -> Polynomial<F, LagrangeCoeff> {
+    pub(crate) fn rotate(&self, rotation: Rotation) -> Polynomial<F, LagrangeCoeff> {
         let mut values = self.values.clone();
         if rotation.0 < 0 {
             values.rotate_right((-rotation.0) as usize);

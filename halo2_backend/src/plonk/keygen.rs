@@ -375,23 +375,23 @@ impl<F: Field> From<ConstraintSystemMid<F>> for ConstraintSystemBack<F> {
 
 /// List of queries (columns and rotations) used by a circuit
 #[derive(Debug, Clone)]
-pub struct Queries {
+pub(crate) struct Queries {
     /// List of unique advice queries
-    pub advice: Vec<(ColumnMid, Rotation)>,
+    pub(crate) advice: Vec<(ColumnMid, Rotation)>,
     /// List of unique instance queries
-    pub instance: Vec<(ColumnMid, Rotation)>,
+    pub(crate) instance: Vec<(ColumnMid, Rotation)>,
     /// List of unique fixed queries
-    pub fixed: Vec<(ColumnMid, Rotation)>,
+    pub(crate) fixed: Vec<(ColumnMid, Rotation)>,
     /// Contains an integer for each advice column
     /// identifying how many distinct queries it has
     /// so far; should be same length as cs.num_advice_columns.
-    pub num_advice_queries: Vec<usize>,
+    pub(crate) num_advice_queries: Vec<usize>,
 }
 
 impl Queries {
     /// Returns the minimum necessary rows that need to exist in order to
     /// account for e.g. blinding factors.
-    pub fn minimum_rows(&self) -> usize {
+    pub(crate) fn minimum_rows(&self) -> usize {
         self.blinding_factors() // m blinding factors
             + 1 // for l_{-(m + 1)} (l_last)
             + 1 // for l_0 (just for extra breathing room for the permutation
@@ -403,7 +403,7 @@ impl Queries {
 
     /// Compute the number of blinding factors necessary to perfectly blind
     /// each of the prover's witness polynomials.
-    pub fn blinding_factors(&self) -> usize {
+    pub(crate) fn blinding_factors(&self) -> usize {
         // All of the prover's advice columns are evaluated at no more than
         let factors = *self.num_advice_queries.iter().max().unwrap_or(&1);
         // distinct points during gate checks.
