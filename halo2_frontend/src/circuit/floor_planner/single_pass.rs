@@ -40,7 +40,7 @@ impl FloorPlanner for SimpleFloorPlanner {
 }
 
 /// A [`Layouter`] for a single-chip circuit.
-pub struct SingleChipLayouter<'a, F: Field, CS: Assignment<F> + 'a> {
+pub(crate) struct SingleChipLayouter<'a, F: Field, CS: Assignment<F> + 'a> {
     cs: &'a mut CS,
     constants: Vec<Column<Fixed>>,
     /// Stores the starting row for each region.

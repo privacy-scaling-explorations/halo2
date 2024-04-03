@@ -133,7 +133,7 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     ))
 }
 
-pub struct WitnessCollection<'a, F: Field> {
+pub(crate) struct WitnessCollection<'a, F: Field> {
     k: u32,
     current_phase: sealed::Phase,
     advice_column_phase: &'a Vec<sealed::Phase>,
@@ -458,7 +458,7 @@ pub trait Chip<F: Field>: Sized {
 
 /// Index of a region in a layouter
 #[derive(Clone, Copy, Debug)]
-pub struct RegionIndex(usize);
+pub(crate) struct RegionIndex(usize);
 
 impl From<usize> for RegionIndex {
     fn from(idx: usize) -> RegionIndex {
@@ -476,7 +476,7 @@ impl std::ops::Deref for RegionIndex {
 
 /// Starting row of a region in a layouter
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct RegionStart(usize);
+pub(crate) struct RegionStart(usize);
 
 impl From<usize> for RegionStart {
     fn from(idx: usize) -> RegionStart {
@@ -496,7 +496,7 @@ impl std::ops::Deref for RegionStart {
 #[derive(Clone, Copy, Debug)]
 pub struct Cell {
     /// Identifies the region in which this cell resides.
-    pub region_index: RegionIndex,
+    pub(crate) region_index: RegionIndex,
     /// The relative offset of this cell within its region.
     pub row_offset: usize,
     /// The column of this cell.

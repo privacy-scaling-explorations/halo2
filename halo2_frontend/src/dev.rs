@@ -50,7 +50,7 @@ pub use graph::{circuit_dot_graph, layout::CircuitLayout};
 
 /// Region of assignments that are done during synthesis.
 #[derive(Debug)]
-pub struct Region {
+struct Region {
     /// The name of the region. Not required to be unique.
     name: String,
     /// The columns involved in this region.
@@ -1271,12 +1271,12 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
     }
 
     /// Returns the permutation argument (`Assembly`) used within a MockProver instance.
-    pub fn permutation(&self) -> &permutation::Assembly {
+    pub(crate) fn permutation(&self) -> &permutation::Assembly {
         &self.permutation
     }
 
     /// Returns the Regions used during synthesis.
-    pub fn regions(&self) -> &[Region] {
+    fn regions(&self) -> &[Region] {
         &self.regions
     }
 }

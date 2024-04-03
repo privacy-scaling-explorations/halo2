@@ -139,7 +139,7 @@ pub trait RegionLayouter<F: Field>: fmt::Debug + SyncDeps {
 /// The shape of a region. For a region at a certain index, we track
 /// the set of columns it uses as well as the number of rows it uses.
 #[derive(Clone, Debug)]
-pub struct RegionShape {
+pub(crate) struct RegionShape {
     pub region_index: RegionIndex,
     pub columns: HashSet<RegionColumn>,
     pub row_count: usize,
