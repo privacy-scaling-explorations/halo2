@@ -85,26 +85,31 @@ impl Region {
     }
 
     /// Returns the name of the region.
+    #[allow(dead_code)]
     pub fn name(&self) -> &String {
         &self.name
     }
 
     /// Returns the columns involved in this region.
+    #[allow(dead_code)]
     pub fn columns(&self) -> &HashSet<Column<Any>> {
         &self.columns
     }
 
     /// Returns the rows that this region starts and ends on, if known.
+    #[allow(dead_code)]
     pub fn rows(&self) -> Option<(usize, usize)> {
         self.rows
     }
 
     /// Returns the selectors that have been enabled in this region.
+    #[allow(dead_code)]
     pub fn enabled_selectors(&self) -> &HashMap<Selector, Vec<usize>> {
         &self.enabled_selectors
     }
 
     /// Returns the annotations given to Advice, Fixed or Instance columns within a region context.
+    #[allow(dead_code)]
     pub fn annotations(&self) -> &HashMap<ColumnMetadata, String> {
         &self.annotations
     }
@@ -1271,11 +1276,13 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
     }
 
     /// Returns the permutation argument (`Assembly`) used within a MockProver instance.
+    #[allow(dead_code)]
     pub(crate) fn permutation(&self) -> &permutation::Assembly {
         &self.permutation
     }
 
     /// Returns the Regions used during synthesis.
+    #[allow(dead_code)]
     fn regions(&self) -> &[Region] {
         &self.regions
     }

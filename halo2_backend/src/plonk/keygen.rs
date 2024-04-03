@@ -391,6 +391,7 @@ pub(crate) struct Queries {
 impl Queries {
     /// Returns the minimum necessary rows that need to exist in order to
     /// account for e.g. blinding factors.
+    #[allow(dead_code)]
     pub(crate) fn minimum_rows(&self) -> usize {
         self.blinding_factors() // m blinding factors
             + 1 // for l_{-(m + 1)} (l_last)
@@ -403,6 +404,7 @@ impl Queries {
 
     /// Compute the number of blinding factors necessary to perfectly blind
     /// each of the prover's witness polynomials.
+    #[allow(dead_code)]
     pub(crate) fn blinding_factors(&self) -> usize {
         // All of the prover's advice columns are evaluated at no more than
         let factors = *self.num_advice_queries.iter().max().unwrap_or(&1);

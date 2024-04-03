@@ -230,11 +230,13 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     /// Returns commitments of fixed polynomials
+    #[allow(dead_code)]
     pub(crate) fn fixed_commitments(&self) -> &Vec<C> {
         &self.fixed_commitments
     }
 
     /// Returns `VerifyingKey` of permutation
+    #[allow(dead_code)]
     pub(crate) fn permutation(&self) -> &permutation::VerifyingKey<C> {
         &self.permutation
     }

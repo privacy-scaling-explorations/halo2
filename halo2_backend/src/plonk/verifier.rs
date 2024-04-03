@@ -21,8 +21,6 @@ use crate::transcript::{read_n_scalars, EncodedChallenge, TranscriptRead};
 
 #[cfg(feature = "batch")]
 mod batch;
-#[cfg(feature = "batch")]
-pub(crate) use batch::BatchVerifier;
 
 /// Returns a boolean indicating whether or not the proof is valid.  Verifies a single proof (not
 /// batched).

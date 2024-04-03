@@ -232,6 +232,7 @@ impl<'a, F: Field, B: Basis> Sub<&'a Polynomial<F, B>> for Polynomial<F, B> {
 
 impl<F: Field> Polynomial<F, LagrangeCoeff> {
     /// Rotates the values in a Lagrange basis polynomial by `Rotation`
+    #[allow(dead_code)]
     pub(crate) fn rotate(&self, rotation: Rotation) -> Polynomial<F, LagrangeCoeff> {
         let mut values = self.values.clone();
         if rotation.0 < 0 {

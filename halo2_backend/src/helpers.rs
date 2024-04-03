@@ -105,6 +105,7 @@ impl<F: PrimeField + SerdeObject> SerdePrimeField for F {}
 /// Convert a slice of `bool` into a `u8`.
 ///
 /// Panics if the slice has length greater than 8.
+#[allow(dead_code)]
 pub(crate) fn pack(bits: &[bool]) -> u8 {
     let mut value = 0u8;
     assert!(bits.len() <= 8);
@@ -115,6 +116,7 @@ pub(crate) fn pack(bits: &[bool]) -> u8 {
 }
 
 /// Writes the first `bits.len()` bits of a `u8` into `bits`.
+#[allow(dead_code)]
 pub(crate) fn unpack(byte: u8, bits: &mut [bool]) {
     for (bit_index, bit) in bits.iter_mut().enumerate() {
         *bit = (byte >> bit_index) & 1 == 1;
