@@ -513,7 +513,7 @@ impl<F> From<Expression<F>> for ExpressionMid<F> {
 
 impl<F: Field> Expression<F> {
     /// Make side effects
-    pub(crate) fn query_cells(&mut self, cells: &mut VirtualCells<'_, F>) {
+    pub fn query_cells(&mut self, cells: &mut VirtualCells<'_, F>) {
         match self {
             Expression::Constant(_) => (),
             Expression::Selector(selector) => {

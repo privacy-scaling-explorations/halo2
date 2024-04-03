@@ -163,7 +163,7 @@ fn first_fit_region(
 
 /// Positions the regions starting at the earliest row for which none of the columns are
 /// in use, taking into account gaps between earlier regions.
-pub(crate) fn slot_in(
+fn slot_in(
     region_shapes: Vec<RegionShape>,
 ) -> (Vec<(RegionStart, RegionShape)>, CircuitAllocations) {
     // Tracks the empty regions for each column.
