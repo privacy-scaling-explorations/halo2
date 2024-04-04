@@ -83,36 +83,6 @@ impl Region {
         }
         self.rows = Some((start, end));
     }
-
-    /// Returns the name of the region.
-    fn name(&self) -> &String {
-        &self.name
-    }
-
-    /// Returns the columns involved in this region.
-    fn columns(&self) -> &HashSet<Column<Any>> {
-        &self.columns
-    }
-
-    /// Returns the rows that this region starts and ends on, if known.
-    fn rows(&self) -> Option<(usize, usize)> {
-        self.rows
-    }
-
-    /// Returns the selectors that have been enabled in this region.
-    fn enabled_selectors(&self) -> &HashMap<Selector, Vec<usize>> {
-        &self.enabled_selectors
-    }
-
-    /// Returns the annotations given to Advice, Fixed or Instance columns within a region context.
-    fn annotations(&self) -> &HashMap<ColumnMetadata, String> {
-        &self.annotations
-    }
-
-    /// Returns the cells assigned in this region.
-    fn cells(&self) -> &HashMap<(Column<Any>, usize), usize> {
-        &self.cells
-    }
 }
 
 /// The value of a particular cell within the circuit.
@@ -1268,18 +1238,6 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
     /// Returns the list of Instance Columns used within a MockProver instance and the associated values contained on each Cell.
     pub fn instance(&self) -> &Vec<Vec<InstanceValue<F>>> {
         &self.instance
-    }
-
-    /// Returns the permutation argument (`Assembly`) used within a MockProver instance.
-    #[allow(dead_code)]
-    pub(crate) fn permutation(&self) -> &permutation::Assembly {
-        &self.permutation
-    }
-
-    /// Returns the Regions used during synthesis.
-    #[allow(dead_code)]
-    fn regions(&self) -> &[Region] {
-        &self.regions
     }
 }
 

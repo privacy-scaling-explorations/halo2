@@ -17,17 +17,11 @@ pub(crate) mod verifier;
 
 /// The verifying key for a single permutation argument.
 #[derive(Clone, Debug)]
-pub struct VerifyingKey<C: CurveAffine> {
+pub(crate) struct VerifyingKey<C: CurveAffine> {
     commitments: Vec<C>,
 }
 
 impl<C: CurveAffine> VerifyingKey<C> {
-    /// Returns commitments of sigma polynomials
-    #[allow(dead_code)]
-    pub(crate) fn commitments(&self) -> &Vec<C> {
-        &self.commitments
-    }
-
     pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
         C: SerdeCurveAffine,

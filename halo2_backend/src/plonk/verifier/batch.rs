@@ -55,7 +55,6 @@ impl<'params, C: CurveAffine>
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 struct BatchItem<C: CurveAffine> {
     instances: Vec<Vec<Vec<C::ScalarExt>>>,
@@ -64,9 +63,8 @@ struct BatchItem<C: CurveAffine> {
 
 /// A verifier that checks multiple proofs in a batch. **This requires the
 /// `batch` crate feature to be enabled.**
-#[allow(dead_code)]
 #[derive(Debug, Default)]
-pub(crate) struct BatchVerifier<C: CurveAffine> {
+pub struct BatchVerifier<C: CurveAffine> {
     items: Vec<BatchItem<C>>,
 }
 
@@ -75,14 +73,12 @@ where
     C::Scalar: FromUniformBytes<64>,
 {
     /// Constructs a new batch verifier.
-    #[allow(dead_code)]
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self { items: vec![] }
     }
 
     /// Adds a proof to the batch.
-    #[allow(dead_code)]
-    pub(crate) fn add_proof(&mut self, instances: Vec<Vec<Vec<C::Scalar>>>, proof: Vec<u8>) {
+    pub fn add_proof(&mut self, instances: Vec<Vec<Vec<C::Scalar>>>, proof: Vec<u8>) {
         self.items.push(BatchItem { instances, proof })
     }
 
@@ -94,7 +90,7 @@ where
     /// This uses [`OsRng`] internally instead of taking an `R: RngCore` argument, because
     /// the internal parallelization requires access to a RNG that is guaranteed to not
     /// clone its internal state when shared between threads.
-    pub(crate) fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
+    pub fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
         fn accumulate_msm<'params, C: CurveAffine>(
             mut acc: MSMIPA<'params, C>,
             msm: MSMIPA<'params, C>,
