@@ -65,8 +65,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
         }
     }
 
-    #[allow(dead_code)]
-    fn write_identifier<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
+    pub fn write_identifier<W: std::io::Write>(&self, writer: &mut W) -> std::io::Result<()> {
         match self {
             Expression::Constant(scalar) => write!(writer, "{scalar:?}"),
             Expression::Var(v) => v.write_identifier(writer),
@@ -95,8 +94,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
     /// Identifier for this expression. Expressions with identical identifiers
     /// do the same calculation (but the expressions don't need to be exactly equal
     /// in how they are composed e.g. `1 + 2` and `2 + 1` can have the same identifier).
-    #[allow(dead_code)]
-    pub(crate) fn identifier(&self) -> String {
+    pub fn identifier(&self) -> String {
         let mut cursor = std::io::Cursor::new(Vec::new());
         self.write_identifier(&mut cursor).unwrap();
         String::from_utf8(cursor.into_inner()).unwrap()
@@ -115,7 +113,7 @@ impl<F: Field, V: Variable> Expression<F, V> {
     }
 
     /// Approximate the computational complexity of this expression.
-    pub(crate) fn complexity(&self) -> usize {
+    pub fn complexity(&self) -> usize {
         match self {
             Expression::Constant(_) => 0,
             Expression::Var(v) => v.complexity(),
@@ -123,11 +121,6 @@ impl<F: Field, V: Variable> Expression<F, V> {
             Expression::Sum(a, b) => a.complexity() + b.complexity() + 15,
             Expression::Product(a, b) => a.complexity() + b.complexity() + 30,
         }
-    }
-
-    /// Square this expression.
-    pub(crate) fn square(self) -> Self {
-        self.clone() * self
     }
 }
 

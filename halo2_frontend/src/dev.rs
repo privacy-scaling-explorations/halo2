@@ -85,37 +85,32 @@ impl Region {
     }
 
     /// Returns the name of the region.
-    #[allow(dead_code)]
-    pub fn name(&self) -> &String {
+    fn name(&self) -> &String {
         &self.name
     }
 
     /// Returns the columns involved in this region.
-    #[allow(dead_code)]
-    pub fn columns(&self) -> &HashSet<Column<Any>> {
+    fn columns(&self) -> &HashSet<Column<Any>> {
         &self.columns
     }
 
     /// Returns the rows that this region starts and ends on, if known.
-    #[allow(dead_code)]
-    pub fn rows(&self) -> Option<(usize, usize)> {
+    fn rows(&self) -> Option<(usize, usize)> {
         self.rows
     }
 
     /// Returns the selectors that have been enabled in this region.
-    #[allow(dead_code)]
-    pub fn enabled_selectors(&self) -> &HashMap<Selector, Vec<usize>> {
+    fn enabled_selectors(&self) -> &HashMap<Selector, Vec<usize>> {
         &self.enabled_selectors
     }
 
     /// Returns the annotations given to Advice, Fixed or Instance columns within a region context.
-    #[allow(dead_code)]
-    pub fn annotations(&self) -> &HashMap<ColumnMetadata, String> {
+    fn annotations(&self) -> &HashMap<ColumnMetadata, String> {
         &self.annotations
     }
 
     /// Returns the cells assigned in this region.
-    pub fn cells(&self) -> &HashMap<(Column<Any>, usize), usize> {
+    fn cells(&self) -> &HashMap<(Column<Any>, usize), usize> {
         &self.cells
     }
 }

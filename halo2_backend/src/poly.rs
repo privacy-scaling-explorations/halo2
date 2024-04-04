@@ -31,12 +31,7 @@ pub(crate) use domain::*;
 pub(crate) use query::{ProverQuery, VerifierQuery};
 pub use strategy::{Guard, VerificationStrategy};
 
-// TODO: move everything from the poly module to the backend.  This requires that the frontend
-// works without Poly (and just Vec<F>).
-// https://github.com/privacy-scaling-explorations/halo2/issues/257
-
 /// This is an error that could occur during proving or circuit synthesis.
-// TODO: these errors need to be cleaned up
 #[derive(Debug)]
 pub enum Error {
     /// OpeningProof is not well-formed
@@ -232,8 +227,7 @@ impl<'a, F: Field, B: Basis> Sub<&'a Polynomial<F, B>> for Polynomial<F, B> {
 
 impl<F: Field> Polynomial<F, LagrangeCoeff> {
     /// Rotates the values in a Lagrange basis polynomial by `Rotation`
-    #[allow(dead_code)]
-    pub(crate) fn rotate(&self, rotation: Rotation) -> Polynomial<F, LagrangeCoeff> {
+    pub fn rotate(&self, rotation: Rotation) -> Polynomial<F, LagrangeCoeff> {
         let mut values = self.values.clone();
         if rotation.0 < 0 {
             values.rotate_right((-rotation.0) as usize);
