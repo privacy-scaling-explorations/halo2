@@ -266,7 +266,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    fn keygen(k: u32) -> (ParamsIPA<EqAffine>, ProvingKey<EqAffine>) {
+    fn keygen(k: u32) -> (ParamsIPA<EqAffine>, ProvingKey<EqAffine>, bool) {
         let params: ParamsIPA<EqAffine> = ParamsIPA::new(k);
         let empty_circuit: MyCircuit<Fp> = MyCircuit {
             a: Value::unknown(),
@@ -274,10 +274,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         };
         let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
         let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
-        (params, pk)
+        let compress_selectors = true; // legacy "keygen_vk" & "keygen_pk" compress selectors by default
+        (params, pk, compress_selectors)
     }
 
-    fn prover(k: u32, params: &ParamsIPA<EqAffine>, pk: &ProvingKey<EqAffine>) -> Vec<u8> {
+    fn prover(
+        k: u32,
+        params: &ParamsIPA<EqAffine>,
+        pk: &ProvingKey<EqAffine>,
+        compress_selectors: bool,
+    ) -> Vec<u8> {
         let rng = OsRng;
 
         let circuit: MyCircuit<Fp> = MyCircuit {
@@ -289,7 +295,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
             params,
             pk,
-            true,
+            compress_selectors,
             &[circuit],
             &[&[]],
             rng,
@@ -319,13 +325,13 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut prover_group = c.benchmark_group("plonk-prover");
     prover_group.sample_size(10);
     for k in k_range.clone() {
-        let (params, pk) = keygen(k);
+        let (params, pk, compress_selectors) = keygen(k);
 
         prover_group.bench_with_input(
             BenchmarkId::from_parameter(k),
             &(k, &params, &pk),
             |b, &(k, params, pk)| {
-                b.iter(|| prover(k, params, pk));
+                b.iter(|| prover(k, params, pk, compress_selectors));
             },
         );
     }
@@ -333,8 +339,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut verifier_group = c.benchmark_group("plonk-verifier");
     for k in k_range {
-        let (params, pk) = keygen(k);
-        let proof = prover(k, &params, &pk);
+        let (params, pk, compress_selectors) = keygen(k);
+        let proof = prover(k, &params, &pk, compress_selectors);
 
         verifier_group.bench_with_input(
             BenchmarkId::from_parameter(k),
