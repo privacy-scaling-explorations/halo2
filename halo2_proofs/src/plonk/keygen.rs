@@ -9,7 +9,7 @@ use halo2_frontend::plonk::Circuit;
 use halo2_middleware::ff::FromUniformBytes;
 
 /// Generate a `VerifyingKey` from an instance of `Circuit`.
-/// By default, selector compression is turned **off**.
+/// By default, selector compression is turned **ON**.
 pub fn keygen_vk<'params, C, P, ConcreteCircuit>(
     params: &P,
     circuit: &ConcreteCircuit,
@@ -38,9 +38,7 @@ where
     C::Scalar: FromUniformBytes<64>,
 {
     let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
-    let mut vk = keygen_vk_v2(params, &compiled_circuit)?;
-    vk.compress_selectors = Some(compress_selectors);
-    Ok(vk)
+    Ok(keygen_vk_v2(params, &compiled_circuit)?)
 }
 
 /// Generate a `ProvingKey` from a `VerifyingKey` and an instance of `Circuit`.
@@ -54,10 +52,23 @@ where
     P: Params<'params, C>,
     ConcreteCircuit: Circuit<C::Scalar>,
 {
-    let (compiled_circuit, _, _) = compile_circuit(
-        params.k(),
-        circuit,
-        vk.compress_selectors.unwrap_or_default(),
-    )?;
+    keygen_pk_custom(params, vk, circuit, true)
+}
+
+/// Generate a `ProvingKey` from an instance of `Circuit`.
+///
+/// The selector compression optimization is turned on only if `compress_selectors` is `true`.
+pub fn keygen_pk_custom<'params, C, P, ConcreteCircuit>(
+    params: &P,
+    vk: VerifyingKey<C>,
+    circuit: &ConcreteCircuit,
+    compress_selectors: bool,
+) -> Result<ProvingKey<C>, Error>
+where
+    C: CurveAffine,
+    P: Params<'params, C>,
+    ConcreteCircuit: Circuit<C::Scalar>,
+{
+    let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
     Ok(keygen_pk_v2(params, vk, &compiled_circuit)?)
 }

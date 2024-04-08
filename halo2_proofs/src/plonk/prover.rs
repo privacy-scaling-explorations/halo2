@@ -35,7 +35,7 @@ where
         return Err(Error::Backend(ErrorBack::InvalidInstances));
     }
     let (config, cs, _) = compile_circuit_cs::<_, ConcreteCircuit>(
-        pk.get_vk().compress_selectors.unwrap_or_default(),
+        true,
         #[cfg(feature = "circuit-params")]
         circuits[0].params(),
     );
