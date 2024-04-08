@@ -167,6 +167,7 @@ fn main() {
     >(
         &params,
         &pk,
+        compress_selectors,
         &[circuit],
         &[instances],
         OsRng,

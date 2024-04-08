@@ -520,6 +520,7 @@ fn test_mycircuit_full_legacy() {
     let start = Instant::now();
     let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk.clone(), &circuit).expect("keygen_pk should not fail");
+    let compress_selectors = true; // legacy "keygen_vk" & "keygen_pk" compress selectors by default
     println!("Keygen: {:?}", start.elapsed());
 
     // Proving
@@ -534,6 +535,7 @@ fn test_mycircuit_full_legacy() {
     create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
         &params,
         &pk,
+        compress_selectors,
         &[circuit],
         &[instances_slice],
         &mut rng,

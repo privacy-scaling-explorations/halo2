@@ -289,6 +289,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
             params,
             pk,
+            true,
             &[circuit],
             &[&[]],
             rng,

@@ -42,6 +42,7 @@ where
 }
 
 /// Generate a `ProvingKey` from a `VerifyingKey` and an instance of `Circuit`.
+/// By default, selector compression is turned **ON**.
 pub fn keygen_pk<'params, C, P, ConcreteCircuit>(
     params: &P,
     vk: VerifyingKey<C>,
