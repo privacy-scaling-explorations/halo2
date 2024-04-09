@@ -100,14 +100,12 @@ fn test_create_proof() {
     let params: ParamsKZG<Bn256> = ParamsKZG::setup(3, OsRng);
     let vk = keygen_vk(&params, &MyCircuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk, &MyCircuit).expect("keygen_pk should not fail");
-    let compress_selectors = true; // legacy "keygen_vk" & "keygen_pk" compress selectors by default
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
     // Create proof with wrong number of instances
     let proof = create_proof::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>(
         &params,
         &pk,
-        compress_selectors,
         &[MyCircuit, MyCircuit],
         &[],
         OsRng,

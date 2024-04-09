@@ -451,9 +451,7 @@ fn plonk_api() {
         }};
     }
 
-    fn keygen<Scheme: CommitmentScheme>(
-        params: &Scheme::ParamsProver,
-    ) -> (ProvingKey<Scheme::Curve>, bool)
+    fn keygen<Scheme: CommitmentScheme>(params: &Scheme::ParamsProver) -> ProvingKey<Scheme::Curve>
     where
         Scheme::Scalar: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
     {
@@ -468,9 +466,7 @@ fn plonk_api() {
 
         let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
 
-        let compress_selectors = true; // legacy "keygen_vk" & "keygen_pk" compress selectors by default
-
-        (pk, compress_selectors)
+        pk
     }
 
     fn create_proof<
@@ -484,7 +480,6 @@ fn plonk_api() {
         rng: R,
         params: &'params Scheme::ParamsProver,
         pk: &ProvingKey<Scheme::Curve>,
-        compress_selectors: bool,
     ) -> Vec<u8>
     where
         Scheme::Scalar: Ord + WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
@@ -501,7 +496,6 @@ fn plonk_api() {
         create_plonk_proof::<Scheme, P, _, _, _, _>(
             params,
             pk,
-            compress_selectors,
             &[circuit.clone(), circuit.clone()],
             &[&[&[instance]], &[&[instance]]],
             rng,
@@ -564,13 +558,10 @@ fn plonk_api() {
         let params = ParamsKZG::<Bn256>::new(K);
         let rng = OsRng;
 
-        let (pk, compress_selectors) = keygen::<KZGCommitmentScheme<_>>(&params);
+        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
 
         let proof = create_proof::<_, ProverGWC<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng,
-            &params,
-            &pk,
-            compress_selectors,
+            rng, &params, &pk,
         );
 
         let verifier_params = params.verifier_params();
@@ -596,13 +587,10 @@ fn plonk_api() {
         let params = ParamsKZG::<Bn256>::new(K);
         let rng = OsRng;
 
-        let (pk, compress_selectors) = keygen::<KZGCommitmentScheme<_>>(&params);
+        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
 
         let proof = create_proof::<_, ProverSHPLONK<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng,
-            &params,
-            &pk,
-            compress_selectors,
+            rng, &params, &pk,
         );
 
         let verifier_params = params.verifier_params();
@@ -628,13 +616,10 @@ fn plonk_api() {
         let params = ParamsIPA::<EqAffine>::new(K);
         let rng = OsRng;
 
-        let (pk, compress_selectors) = keygen::<IPACommitmentScheme<EqAffine>>(&params);
+        let pk = keygen::<IPACommitmentScheme<EqAffine>>(&params);
 
         let proof = create_proof::<_, ProverIPA<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng,
-            &params,
-            &pk,
-            compress_selectors,
+            rng, &params, &pk,
         );
 
         let verifier_params = params.verifier_params();

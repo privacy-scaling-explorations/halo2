@@ -478,7 +478,6 @@ where
     let params = ParamsIPA::<C>::new(k);
     let vk = keygen_vk(&params, &circuit).unwrap();
     let pk = keygen_pk(&params, vk, &circuit).unwrap();
-    let compress_selectors = true; // legacy "keygen_vk" & "keygen_pk" compress selectors by default
 
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
@@ -486,7 +485,6 @@ where
         create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
             &params,
             &pk,
-            compress_selectors,
             &[circuit],
             &[&[&instances]],
             OsRng,
