@@ -464,9 +464,7 @@ fn plonk_api() {
         // Initialize the proving key
         let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
 
-        let pk = keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail");
-
-        pk
+        keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail")
     }
 
     fn create_proof<
