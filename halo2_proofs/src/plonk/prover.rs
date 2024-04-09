@@ -122,7 +122,7 @@ fn test_create_proof() {
     create_proof::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>(
         &params,
         &pk,
-        true,
+        compress_selectors,
         &[MyCircuit, MyCircuit],
         &[&[], &[]],
         OsRng,
