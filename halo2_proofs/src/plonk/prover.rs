@@ -31,31 +31,9 @@ pub fn create_proof<
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
-    if circuits.len() != instances.len() {
-        return Err(Error::Backend(ErrorBack::InvalidInstances));
-    }
-    // This `create_proof` func is the legacy one, assuming that `compress_selectors: true`.
-    let (config, cs, _) = compile_circuit_cs::<_, ConcreteCircuit>(
-        true,
-        #[cfg(feature = "circuit-params")]
-        circuits[0].params(),
-    );
-    let mut witness_calcs: Vec<_> = circuits
-        .iter()
-        .enumerate()
-        .map(|(i, circuit)| WitnessCalculator::new(params.k(), circuit, &config, &cs, instances[i]))
-        .collect();
-    let mut prover = ProverV2::<Scheme, P, _, _, _>::new(params, pk, instances, rng, transcript)?;
-    let mut challenges = HashMap::new();
-    let phases = prover.phases().to_vec();
-    for phase in phases.iter() {
-        let mut witnesses = Vec::with_capacity(circuits.len());
-        for witness_calc in witness_calcs.iter_mut() {
-            witnesses.push(witness_calc.calc(*phase, &challenges)?);
-        }
-        challenges = prover.commit_phase(*phase, witnesses).unwrap();
-    }
-    Ok(prover.create_proof()?)
+    create_proof_custom::<Scheme, P, E, R, T, ConcreteCircuit>(
+        params, pk, true, circuits, instances, rng, transcript,
+    )
 }
 
 /// This creates a proof for the provided `circuit` when given the public
