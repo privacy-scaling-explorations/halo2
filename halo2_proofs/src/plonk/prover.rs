@@ -5,8 +5,40 @@ use halo2_backend::plonk::{prover::ProverV2, ProvingKey};
 use halo2_frontend::circuit::{compile_circuit_cs, WitnessCalculator};
 use halo2_frontend::plonk::Circuit;
 use halo2_middleware::ff::{FromUniformBytes, WithSmallOrderMulGroup};
+use halo2_middleware::zal::{
+    impls::{PlonkEngine, PlonkEngineConfig},
+    traits::MsmAccel,
+};
 use rand_core::RngCore;
 use std::collections::HashMap;
+
+/// This creates a proof for the provided `circuit` when given the public
+/// parameters `params` and the proving key [`ProvingKey`] that was
+/// generated previously for the same circuit. The provided `instances`
+/// are zero-padded internally.
+pub fn create_proof_with_engine<
+    'params,
+    Scheme: CommitmentScheme,
+    P: Prover<'params, Scheme>,
+    E: EncodedChallenge<Scheme::Curve>,
+    R: RngCore,
+    T: TranscriptWrite<Scheme::Curve, E>,
+    ConcreteCircuit: Circuit<Scheme::Scalar>,
+    M: MsmAccel<Scheme::Curve>,
+>(
+    engine: PlonkEngine<Scheme::Curve, M>,
+    params: &'params Scheme::ParamsProver,
+    pk: &ProvingKey<Scheme::Curve>,
+    circuits: &[ConcreteCircuit],
+    instances: &[&[&[Scheme::Scalar]]],
+    rng: R,
+    transcript: &mut T,
+) -> Result<(), Error>
+where
+    Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
+{
+    create_proof_custom_with_engine::<Scheme, P, E, R, T, ConcreteCircuit, M>(engine, params, pk, true, circuits, instances, rng, transcript)
+}
 
 /// This creates a proof for the provided `circuit` when given the public
 /// parameters `params` and the proving key [`ProvingKey`] that was
@@ -31,8 +63,9 @@ pub fn create_proof<
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
-    create_proof_custom::<Scheme, P, E, R, T, ConcreteCircuit>(
-        params, pk, true, circuits, instances, rng, transcript,
+    let engine = PlonkEngineConfig::build_default();
+    create_proof_with_engine::<Scheme, P, _, _, _, _, _>(
+        engine, params, pk, circuits, instances, rng, transcript,
     )
 }
 
@@ -41,7 +74,7 @@ where
 /// generated previously for the same circuit. The provided `instances`
 /// are zero-padded internally.
 /// In addition, this needs the `compress_selectors` field.
-pub fn create_proof_custom<
+pub fn create_proof_custom_with_engine<
     'params,
     Scheme: CommitmentScheme,
     P: Prover<'params, Scheme>,
@@ -49,7 +82,9 @@ pub fn create_proof_custom<
     R: RngCore,
     T: TranscriptWrite<Scheme::Curve, E>,
     ConcreteCircuit: Circuit<Scheme::Scalar>,
+    M: MsmAccel<Scheme::Curve>,
 >(
+    engine: PlonkEngine<Scheme::Curve, M>,
     params: &'params Scheme::ParamsProver,
     pk: &ProvingKey<Scheme::Curve>,
     compress_selectors: bool,
@@ -74,7 +109,9 @@ where
         .enumerate()
         .map(|(i, circuit)| WitnessCalculator::new(params.k(), circuit, &config, &cs, instances[i]))
         .collect();
-    let mut prover = ProverV2::<Scheme, P, _, _, _>::new(params, pk, instances, rng, transcript)?;
+    let mut prover = ProverV2::<Scheme, P, _, _, _, _>::new_with_engine(
+        engine, params, pk, instances, rng, transcript,
+    )?;
     let mut challenges = HashMap::new();
     let phases = prover.phases().to_vec();
     for phase in phases.iter() {
@@ -203,8 +240,10 @@ fn test_create_proof_custom() {
     let pk = keygen_pk_custom(&params, vk, &MyCircuit, compress_selectors)
         .expect("keygen_pk_custom should not fail");
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
-
-    create_proof_custom::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>(
+    let engine = PlonkEngineConfig::build_default();
+    
+    create_proof_custom_with_engine::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _, _>(
+        engine,
         &params,
         &pk,
         compress_selectors,
