@@ -37,7 +37,9 @@ pub fn create_proof_with_engine<
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
-    create_proof_custom_with_engine::<Scheme, P, E, R, T, ConcreteCircuit, M>(engine, params, pk, true, circuits, instances, rng, transcript)
+    create_proof_custom_with_engine::<Scheme, P, E, R, T, ConcreteCircuit, M>(
+        engine, params, pk, true, circuits, instances, rng, transcript,
+    )
 }
 
 /// This creates a proof for the provided `circuit` when given the public
@@ -74,6 +76,7 @@ where
 /// generated previously for the same circuit. The provided `instances`
 /// are zero-padded internally.
 /// In addition, this needs the `compress_selectors` field.
+#[allow(clippy::too_many_arguments)]
 pub fn create_proof_custom_with_engine<
     'params,
     Scheme: CommitmentScheme,
@@ -241,7 +244,7 @@ fn test_create_proof_custom() {
         .expect("keygen_pk_custom should not fail");
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
     let engine = PlonkEngineConfig::build_default();
-    
+
     create_proof_custom_with_engine::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _, _>(
         engine,
         &params,
