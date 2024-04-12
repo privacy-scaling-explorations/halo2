@@ -1,6 +1,6 @@
 use crate::plonk::Error;
 use halo2_backend::plonk::{
-    keygen::{keygen_pk_v2, keygen_vk_v2},
+    keygen::{keygen_pk as backend_keygen_pk, keygen_vk as backend_keygen_vk},
     ProvingKey, VerifyingKey,
 };
 use halo2_backend::{arithmetic::CurveAffine, poly::commitment::Params};
@@ -47,7 +47,7 @@ where
     C::Scalar: FromUniformBytes<64>,
 {
     let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
-    Ok(keygen_vk_v2(params, &compiled_circuit)?)
+    Ok(backend_keygen_vk(params, &compiled_circuit)?)
 }
 
 /// Generate a `ProvingKey` from a `VerifyingKey` and an instance of `Circuit`.
@@ -89,5 +89,5 @@ where
     ConcreteCircuit: Circuit<C::Scalar>,
 {
     let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
-    Ok(keygen_pk_v2(params, vk, &compiled_circuit)?)
+    Ok(backend_keygen_pk(params, vk, &compiled_circuit)?)
 }
