@@ -27,7 +27,7 @@ pub mod kzg;
 #[cfg(test)]
 mod multiopen_test;
 
-pub(crate) use domain::*;
+pub use domain::*;
 pub(crate) use query::{ProverQuery, VerifierQuery};
 pub use strategy::{Guard, VerificationStrategy};
 
