@@ -12,10 +12,7 @@ use super::{
 };
 use crate::dev::metadata::Constraint;
 use crate::dev::{Instance, Value};
-use crate::plonk::{
-    circuit::expression::{Column, Expression},
-    ConstraintSystem, Gate,
-};
+use crate::plonk::{Column, ConstraintSystem, Expression, Gate};
 use halo2_middleware::circuit::{Any, ColumnMid};
 
 mod emitter;

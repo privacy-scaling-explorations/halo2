@@ -9,9 +9,8 @@ use crate::circuit::{
     AssignedCell, Cell, Layouter, Region, Table, Value,
 };
 use crate::plonk::{
-    circuit::expression::{Challenge, Column},
-    Advice, Assigned, Assignment, Circuit, ConstraintSystem, Error, Fixed, FloorPlanner, Instance,
-    Selector,
+    Advice, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
+    FloorPlanner, Instance, Selector,
 };
 
 /// A helper type that augments a [`FloorPlanner`] with [`tracing`] spans and events.
