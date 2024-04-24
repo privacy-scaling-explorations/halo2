@@ -86,10 +86,6 @@ impl<F: Field> Assignment<F> for Assembly<F> {
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
-        if !self.usable_rows.contains(&row) {
-            return Err(Error::not_enough_rows_available(self.k));
-        }
-
         *self
             .fixed
             .get_mut(column.index())
@@ -120,10 +116,6 @@ impl<F: Field> Assignment<F> for Assembly<F> {
         from_row: usize,
         to: Value<Assigned<F>>,
     ) -> Result<(), Error> {
-        if !self.usable_rows.contains(&from_row) {
-            return Err(Error::not_enough_rows_available(self.k));
-        }
-
         let col = self
             .fixed
             .get_mut(column.index())
