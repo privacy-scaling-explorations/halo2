@@ -1,5 +1,5 @@
 use crate::plonk::{
-    compress_selectors, lookup, permutation, phase::sealed, shuffle, Advice, Column, Expression,
+    compress_selectors, lookup, permutation, sealed, shuffle, Advice, Column, Expression,
     FirstPhase, Fixed, FixedQuery, Instance, Phase, TableColumn,
 };
 use core::cmp::max;

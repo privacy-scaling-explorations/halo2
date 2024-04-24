@@ -3,6 +3,8 @@ use halo2_middleware::{circuit::ColumnMid, poly::Rotation};
 
 use crate::plonk::{circuit::Any, Advice, ColumnType, Expression, Fixed, Instance};
 
+use sealed::SealedPhase;
+
 /// A column with an index and type
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub struct Column<C: ColumnType> {
@@ -175,12 +177,139 @@ pub struct TableColumn {
     /// This inner column MUST NOT be exposed in the public API, or else chip developers
     /// can load lookup tables into their circuits without default-value-filling the
     /// columns, which can cause soundness bugs.
-    pub(super) inner: Column<Fixed>,
+    pub(crate) inner: Column<Fixed>,
 }
 
 impl TableColumn {
     /// Returns inner column
     pub fn inner(&self) -> Column<Fixed> {
         self.inner
+    }
+}
+
+pub mod sealed {
+    /// Phase of advice column
+    #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+    pub struct Phase(pub u8);
+
+    impl Phase {
+        pub fn prev(&self) -> Option<Phase> {
+            self.0.checked_sub(1).map(Phase)
+        }
+    }
+
+    impl SealedPhase for Phase {
+        fn to_sealed(self) -> Phase {
+            self
+        }
+    }
+
+    /// Sealed trait to help keep `Phase` private.
+    pub trait SealedPhase {
+        fn to_sealed(self) -> Phase;
+    }
+}
+
+/// Phase of advice column
+pub trait Phase: SealedPhase {}
+
+impl<P: SealedPhase> Phase for P {}
+
+/// First phase
+#[derive(Debug)]
+pub struct FirstPhase;
+
+impl SealedPhase for FirstPhase {
+    fn to_sealed(self) -> sealed::Phase {
+        sealed::Phase(0)
+    }
+}
+
+/// Second phase
+#[derive(Debug)]
+pub struct SecondPhase;
+
+impl SealedPhase for SecondPhase {
+    fn to_sealed(self) -> sealed::Phase {
+        sealed::Phase(1)
+    }
+}
+
+/// Third phase
+#[derive(Debug)]
+pub struct ThirdPhase;
+
+impl SealedPhase for ThirdPhase {
+    fn to_sealed(self) -> sealed::Phase {
+        sealed::Phase(2)
+    }
+}
+
+/// Query of fixed column at a certain relative location
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FixedQuery {
+    /// Query index
+    pub index: Option<usize>,
+    /// Column index
+    pub column_index: usize,
+    /// Rotation of this query
+    pub rotation: Rotation,
+}
+
+impl FixedQuery {
+    /// Column index
+    pub fn column_index(&self) -> usize {
+        self.column_index
+    }
+
+    /// Rotation of this query
+    pub fn rotation(&self) -> Rotation {
+        self.rotation
+    }
+}
+
+/// Query of advice column at a certain relative location
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct AdviceQuery {
+    /// Query index
+    pub index: Option<usize>,
+    /// Column index
+    pub column_index: usize,
+    /// Rotation of this query
+    pub rotation: Rotation,
+}
+
+impl AdviceQuery {
+    /// Column index
+    pub fn column_index(&self) -> usize {
+        self.column_index
+    }
+
+    /// Rotation of this query
+    pub fn rotation(&self) -> Rotation {
+        self.rotation
+    }
+}
+
+/// Query of instance column at a certain relative location
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct InstanceQuery {
+    /// Query index
+    pub index: Option<usize>,
+    /// Column index
+    pub column_index: usize,
+    /// Rotation of this query
+    pub rotation: Rotation,
+}
+
+impl InstanceQuery {
+    /// Column index
+    pub fn column_index(&self) -> usize {
+        self.column_index
+    }
+
+    /// Rotation of this query
+    pub fn rotation(&self) -> Rotation {
+        self.rotation
     }
 }

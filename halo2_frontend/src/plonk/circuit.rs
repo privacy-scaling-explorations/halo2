@@ -6,19 +6,14 @@ use halo2_middleware::circuit::Any;
 use halo2_middleware::ff::Field;
 use halo2_middleware::poly::Rotation;
 
-pub mod column;
 pub mod compress_selectors;
 pub mod constraint_system;
 pub mod expression;
-pub mod phase;
-pub mod query;
+pub mod helpers;
 
-pub use column::*;
 pub use constraint_system::*;
 pub use expression::*;
-pub use phase::*;
-pub use query::*;
-
+pub use helpers::*;
 /// A column type
 pub trait ColumnType:
     'static + Sized + Copy + std::fmt::Debug + PartialEq + Eq + Into<Any>
