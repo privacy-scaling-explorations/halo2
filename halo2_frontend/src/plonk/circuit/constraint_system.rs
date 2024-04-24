@@ -1,7 +1,6 @@
 use crate::plonk::{
-    compress_selectors, lookup, permutation, phase::sealed, shuffle, Advice, Challenge, Column,
-    Constraint, Expression, FirstPhase, Fixed, FixedQuery, Gate, Instance, Phase, Selector,
-    SelectorsToFixed, TableColumn, VirtualCells,
+    compress_selectors, lookup, permutation, phase::sealed, shuffle, Advice, Column, Expression,
+    FirstPhase, Fixed, FixedQuery, Instance, Phase, TableColumn,
 };
 use core::cmp::max;
 use halo2_middleware::circuit::{Any, ColumnMid, ConstraintSystemMid, GateMid};
@@ -10,6 +9,10 @@ use halo2_middleware::poly::Rotation;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt::Debug;
+
+pub mod helpers;
+
+pub use helpers::*;
 
 impl<F: Field> From<ConstraintSystem<F>> for ConstraintSystemMid<F> {
     fn from(cs: ConstraintSystem<F>) -> Self {
