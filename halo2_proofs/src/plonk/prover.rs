@@ -102,8 +102,7 @@ where
     if circuits.len() != instances.len() {
         return Err(Error::Backend(ErrorBack::InvalidInstances));
     }
-    let (config, cs, _) = compile_circuit_cs::<_, ConcreteCircuit>(
-        compress_selectors,
+    let (config, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
         #[cfg(feature = "circuit-params")]
         circuits[0].params(),
     );

@@ -50,8 +50,7 @@ pub fn vk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Sca
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, cs, _) = compile_circuit_cs::<_, ConcreteCircuit>(
-        compress_selectors,
+    let (_, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
         #[cfg(feature = "circuit-params")]
         params,
     );
@@ -80,8 +79,7 @@ pub fn pk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Sca
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, cs, _) = compile_circuit_cs::<_, ConcreteCircuit>(
-        compress_selectors,
+    let (_, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
         #[cfg(feature = "circuit-params")]
         params,
     );
