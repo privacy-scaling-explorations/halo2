@@ -5,7 +5,7 @@ use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
     Advice, Assignment, Circuit, ConstraintSystem, FirstPhase, Fixed, FloorPlanner, Instance,
-    SecondPhase, SelectorsToFixed, ThirdPhase,
+    SecondPhase, ThirdPhase,
 };
 use halo2_middleware::circuit::{Any, CompiledCircuit, Preprocessing};
 use halo2_middleware::ff::{BatchInvert, Field};
