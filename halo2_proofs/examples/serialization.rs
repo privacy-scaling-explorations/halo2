@@ -147,7 +147,6 @@ fn main() {
     let pk = pk_read::<G1Affine, _, StandardPlonk>(
         &mut reader,
         SerdeFormat::RawBytes,
-        compress_selectors,
         #[cfg(feature = "circuit-params")]
         circuit.params(),
     )

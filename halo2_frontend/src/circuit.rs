@@ -45,7 +45,6 @@ pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
     let config = ConcreteCircuit::configure_with_params(&mut cs, params);
     #[cfg(not(feature = "circuit-params"))]
     let config = ConcreteCircuit::configure(&mut cs);
-    let cs = cs;
 
     (config, cs)
 }
