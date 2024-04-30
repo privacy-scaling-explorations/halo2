@@ -108,8 +108,12 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
         cs.constants.clone(),
     )?;
 
+    // Consider that "cs.num_fixed_columns" already increased by 
+    // "selector_polys"(number of `fixed` columns converted from `selector`s) 
+    // in "compile_circuit_cs" step
     let mut fixed = batch_invert_assigned(assembly.fixed);
     let selector_polys = selectors_to_fixed.convert(assembly.selectors);
+    fixed.truncate(cs.num_fixed_columns - selector_polys.len());
     fixed.extend(selector_polys);
 
     // sort the "copies" for deterministic ordering
