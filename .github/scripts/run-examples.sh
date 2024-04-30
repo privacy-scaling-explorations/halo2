@@ -11,12 +11,12 @@ EXAMPLES_WITHOUT_FEATURES=$(echo "$EXAMPLES_WITHOUT_FEATURES" | grep -vFx "$(ech
 EXAMPLES=$(echo "$EXAMPLES_WITH_FEATURES $EXAMPLES_WITHOUT_FEATURES" | tr ' ' '\n' | sort -u | tr '\n' ' ')
 
 # Run the examples
-for example in ${{ steps.get-examples.outputs.examples }}; do
-    if [[ "$example" == *"#"* ]]; then
-        name=$(echo $example | cut -d '#' -f 1)
-        features=$(echo $example | cut -d '#' -f 2)
-        cargo run --package halo2_proofs --example $name --features $features
-    else
-        cargo run --package halo2_proofs --example $example
-    fi
+for example in $EXAMPLES; do
+if [[ "$example" == *"#"* ]]; then
+    name=$(echo $example | cut -d '#' -f 1)
+    features=$(echo $example | cut -d '#' -f 2)
+    cargo run --package halo2_proofs --example $name --features $features
+else
+    cargo run --package halo2_proofs --example $example
+fi
 done
