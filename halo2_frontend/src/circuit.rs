@@ -1,11 +1,11 @@
 //! Traits and structs for implementing circuit components.
 
-use crate::plonk::{self, SelectorsToFixed};
+use crate::plonk;
 use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
     Advice, Assignment, Circuit, ConstraintSystem, FirstPhase, Fixed, FloorPlanner, Instance,
-    SecondPhase, ThirdPhase,
+    SecondPhase, SelectorsToFixed, ThirdPhase,
 };
 use halo2_middleware::circuit::{Any, CompiledCircuit, Preprocessing};
 use halo2_middleware::ff::{BatchInvert, Field};
