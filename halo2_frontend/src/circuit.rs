@@ -1,6 +1,6 @@
 //! Traits and structs for implementing circuit components.
 
-use crate::plonk;
+use crate::plonk::{self, SelectorsToFixed};
 use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
@@ -38,15 +38,27 @@ pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 /// The `ConstraintSystem<F>` can be converted to `ConstraintSystemMid<F>` to be used to interface
 /// with the backend.
 pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
+    compress_selectors: bool,
     #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-) -> (ConcreteCircuit::Config, ConstraintSystem<F>) {
+) -> (
+    ConcreteCircuit::Config,
+    ConstraintSystem<F>,
+    SelectorsToFixed,
+) {
     let mut cs = ConstraintSystem::default();
     #[cfg(feature = "circuit-params")]
     let config = ConcreteCircuit::configure_with_params(&mut cs, params);
     #[cfg(not(feature = "circuit-params"))]
     let config = ConcreteCircuit::configure(&mut cs);
+    let cs = cs;
 
-    (config, cs)
+    let (cs, selectors_to_fixed) = if compress_selectors {
+        cs.selectors_to_fixed_compressed()
+    } else {
+        cs.selectors_to_fixed_direct()
+    };
+
+    (config, cs, selectors_to_fixed)
 }
 
 /// Compile a circuit.  Runs configure and synthesize on the circuit in order to materialize the
@@ -69,7 +81,9 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
 > {
     let n = 2usize.pow(k);
 
-    let (config, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
+    // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
+    let (config, cs, selectors_to_fixed) = compile_circuit_cs::<_, ConcreteCircuit>(
+        compress_selectors,
         #[cfg(feature = "circuit-params")]
         circuit.params(),
     );
@@ -93,13 +107,6 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
         config.clone(),
         cs.constants.clone(),
     )?;
-
-    // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
-    let (cs, selectors_to_fixed) = if compress_selectors {
-        cs.selectors_to_fixed_compressed()
-    } else {
-        cs.selectors_to_fixed_direct()
-    };
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
     let selector_polys = selectors_to_fixed.convert(assembly.selectors);
