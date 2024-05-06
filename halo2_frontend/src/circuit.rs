@@ -78,10 +78,8 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     )?;
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
-    println!("before: {}", fixed.len());
     let (cs, selector_polys) = cs.compress_selectors(assembly.selectors);
     fixed.extend(selector_polys);
-    println!("after: {}", fixed.len());
 
     // sort the "copies" for deterministic ordering
     #[cfg(feature = "thread-safe-region")]
