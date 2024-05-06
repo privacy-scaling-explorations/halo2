@@ -5,7 +5,7 @@ use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
     Advice, Assignment, Circuit, ConstraintSystem, FirstPhase, Fixed, FloorPlanner, Instance,
-    SecondPhase, SelectorsToFixed, ThirdPhase,
+    SecondPhase, ThirdPhase,
 };
 use halo2_middleware::circuit::{Any, CompiledCircuit, Preprocessing};
 use halo2_middleware::ff::{BatchInvert, Field};
@@ -38,12 +38,10 @@ pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 /// The `ConstraintSystem<F>` can be converted to `ConstraintSystemMid<F>` to be used to interface
 /// with the backend.
 pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
-    compress_selectors: bool,
     #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
 ) -> (
     ConcreteCircuit::Config,
     ConstraintSystem<F>,
-    SelectorsToFixed,
 ) {
     let mut cs = ConstraintSystem::default();
     #[cfg(feature = "circuit-params")]
@@ -52,13 +50,7 @@ pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
     let config = ConcreteCircuit::configure(&mut cs);
     let cs = cs;
 
-    let (cs, selectors_to_fixed) = if compress_selectors {
-        cs.selectors_to_fixed_compressed()
-    } else {
-        cs.selectors_to_fixed_direct()
-    };
-
-    (config, cs, selectors_to_fixed)
+    (config, cs)
 }
 
 /// Compile a circuit.  Runs configure and synthesize on the circuit in order to materialize the
@@ -82,8 +74,7 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     let n = 2usize.pow(k);
 
     // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
-    let (config, cs, selectors_to_fixed) = compile_circuit_cs::<_, ConcreteCircuit>(
-        compress_selectors,
+    let (config, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
         #[cfg(feature = "circuit-params")]
         circuit.params(),
     );
@@ -108,13 +99,17 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
         cs.constants.clone(),
     )?;
 
-    // Consider that "cs.num_fixed_columns" already increased by
-    // "selector_polys"(number of `fixed` columns converted from `selector`s)
-    // in "compile_circuit_cs" step
     let mut fixed = batch_invert_assigned(assembly.fixed);
-    let selector_polys = selectors_to_fixed.convert(assembly.selectors);
-    fixed.truncate(cs.num_fixed_columns - selector_polys.len());
-    fixed.extend(selector_polys);
+    println!("before: {}", fixed.len());
+    // fixed.truncate(cs.num_fixed_columns - selector_polys.len());
+    let (cs, selectors_to_fixed) = if compress_selectors {
+        cs.compress_selectors(assembly.selectors)
+    } else {
+        cs.directly_convert_selectors_to_fixed(assembly.selectors)
+    };
+    // let selector_polys = selectors_to_fixed.convert(assembly.selectors);
+    fixed.extend(selectors_to_fixed);
+    println!("after: {}", fixed.len());
 
     // sort the "copies" for deterministic ordering
     #[cfg(feature = "thread-safe-region")]

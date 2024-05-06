@@ -48,6 +48,15 @@ impl StandardPlonkConfig {
 
         [a, b, c].map(|column| meta.enable_equality(column));
 
+        // // TEST for "compress_selectors" logic correctness
+        // let s = meta.selector();
+        // meta.create_gate("selector gate", |meta| {
+        //     let s = meta.query_selector(s);
+        //     let a = meta.query_advice(a, Rotation::cur());
+        //     let b = meta.query_advice(b, Rotation::cur());
+        //     vec![s * (a - b)]
+        // });
+
         meta.create_gate(
             "q_a·a + q_b·b + q_c·c + q_ab·a·b + constant + instance = 0",
             |meta| {

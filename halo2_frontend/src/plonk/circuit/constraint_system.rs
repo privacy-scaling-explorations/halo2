@@ -638,19 +638,23 @@ impl<F: Field> ConstraintSystem<F> {
         });
     }
 
-    /// Transform this `ConstraintSystem` into an equivalent one that replaces the selector columns
-    /// by fixed columns applying compression where possible.
+    /// This will compress selectors together depending on their provided
+    /// assignments. This `ConstraintSystem` will then be modified to add new
+    /// fixed columns (representing the actual selectors) and will return the
+    /// polynomials for those columns. Finally, an internal map is updated to
+    /// find which fixed column corresponds with a given `Selector`.
     ///
-    /// Panics if called twice.
-    pub fn selectors_to_fixed_compressed(mut self) -> (Self, SelectorsToFixed) {
-        if self.selectors_to_fixed {
-            panic!("the selectors have already been transformed to fixed columns");
-        }
+    /// Do not call this twice. Yes, this should be a builder pattern instead.
+    pub fn compress_selectors(mut self, selectors: Vec<Vec<bool>>) -> (Self, Vec<Vec<F>>) {
+        // The number of provided selector assignments must be the number we
+        // counted for this constraint system.
+        assert_eq!(selectors.len(), self.num_selectors);
+
         // Compute the maximal degree of every selector. We only consider the
         // expressions in gates, as lookup arguments cannot support simple
         // selectors. Selectors that are complex or do not appear in any gates
         // will have degree zero.
-        let mut degrees = vec![0; self.num_selectors];
+        let mut degrees = vec![0; selectors.len()];
         for expr in self.gates.iter().flat_map(|gate| gate.polys.iter()) {
             if let Some(selector) = expr.extract_simple_selector() {
                 degrees[selector.0] = max(degrees[selector.0], expr.degree());
@@ -660,22 +664,20 @@ impl<F: Field> ConstraintSystem<F> {
         // We will not increase the degree of the constraint system, so we limit
         // ourselves to the largest existing degree constraint.
         let max_degree = self.degree();
-        let selectors_to_fixed = SelectorsToFixed {
-            compress: true,
-            num_selectors: self.num_selectors,
-            max_degree,
-            degrees: degrees.clone(),
-        };
 
         let mut new_columns = vec![];
-        let (_, selector_assignment) = compress_selectors::process(
-            (0..self.num_selectors)
+        let (polys, selector_assignment) = compress_selectors::process(
+            selectors
+                .into_iter()
                 .zip(degrees)
-                .map(|(i, max_degree)| compress_selectors::SelectorDescription {
-                    selector: i,
-                    activations: vec![],
-                    max_degree,
-                })
+                .enumerate()
+                .map(
+                    |(i, (activations, max_degree))| compress_selectors::SelectorDescription {
+                        selector: i,
+                        activations,
+                        max_degree,
+                    },
+                )
                 .collect(),
             max_degree,
             || {
@@ -705,68 +707,41 @@ impl<F: Field> ConstraintSystem<F> {
             .map(|a| a.unwrap())
             .collect::<Vec<_>>();
         self.replace_selectors_with_fixed(&selector_replacements);
-        self.selectors_to_fixed = true;
 
-        (self, selectors_to_fixed)
-    }
-
-    /// This will compress selectors together depending on their provided
-    /// assignments. This `ConstraintSystem` will then be modified to add new
-    /// fixed columns (representing the actual selectors) and will return the
-    /// polynomials for those columns. Finally, an internal map is updated to
-    /// find which fixed column corresponds with a given `Selector`.
-    ///
-    /// Do not call this twice. Yes, this should be a builder pattern instead.
-    #[deprecated(note = "Use `selectors_to_fixed_compressed` instead")]
-    pub fn compress_selectors(self, selectors: Vec<Vec<bool>>) -> (Self, Vec<Vec<F>>) {
-        let (cs, selectors_to_fixed) = self.selectors_to_fixed_compressed();
-        let fixed_polys = selectors_to_fixed.convert(selectors);
-
-        (cs, fixed_polys)
-    }
-
-    /// Transform this `ConstraintSystem` into an equivalent one that replaces the selector columns
-    /// by fixed columns with a direct mapping.
-    ///
-    /// Panics if called twice.
-    pub fn selectors_to_fixed_direct(mut self) -> (Self, SelectorsToFixed) {
-        if self.selectors_to_fixed {
-            panic!("the selectors have already been transformed to fixed columns");
-        }
-        let selectors_to_fixed = SelectorsToFixed {
-            compress: false,
-            num_selectors: self.num_selectors,
-            max_degree: 0,
-            degrees: vec![],
-        };
-
-        let selector_replacements: Vec<_> = (0..self.num_selectors)
-            .map(|_| {
-                let column = self.fixed_column();
-                let rotation = Rotation::cur();
-                Expression::Fixed(FixedQuery {
-                    index: Some(self.query_fixed_index(column, rotation)),
-                    column_index: column.index,
-                    rotation,
-                })
-            })
-            .collect();
-
-        self.replace_selectors_with_fixed(&selector_replacements);
-        self.selectors_to_fixed = true;
-        (self, selectors_to_fixed)
+        (self, polys)
     }
 
     /// Does not combine selectors and directly replaces them everywhere with fixed columns.
-    #[deprecated(note = "Use `selectors_to_fixed_direct` instead")]
     pub fn directly_convert_selectors_to_fixed(
-        self,
+        mut self,
         selectors: Vec<Vec<bool>>,
     ) -> (Self, Vec<Vec<F>>) {
-        let (cs, selectors_to_fixed) = self.selectors_to_fixed_direct();
-        let fixed_polys = selectors_to_fixed.convert(selectors);
+        // The number of provided selector assignments must be the number we
+        // counted for this constraint system.
+        assert_eq!(selectors.len(), self.num_selectors);
 
-        (cs, fixed_polys)
+        let (polys, selector_replacements): (Vec<_>, Vec<_>) = selectors
+            .into_iter()
+            .map(|selector| {
+                let poly = selector
+                    .iter()
+                    .map(|b| if *b { F::ONE } else { F::ZERO })
+                    .collect::<Vec<_>>();
+                let column = self.fixed_column();
+                let rotation = Rotation::cur();
+                let expr = Expression::Fixed(FixedQuery {
+                    index: Some(self.query_fixed_index(column, rotation)),
+                    column_index: column.index,
+                    rotation,
+                });
+                (poly, expr)
+            })
+            .unzip();
+
+        self.replace_selectors_with_fixed(&selector_replacements);
+        self.num_selectors = 0;
+
+        (self, polys)
     }
 
     fn replace_selectors_with_fixed(&mut self, selector_replacements: &[Expression<F>]) {
