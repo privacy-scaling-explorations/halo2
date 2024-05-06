@@ -276,9 +276,6 @@ pub struct ConstraintSystem<F: Field> {
     /// fixed column that they were compressed into. This is just used by dev
     /// tooling right now.
     pub(crate) selector_map: Vec<Column<Fixed>>,
-    /// Status boolean indicating wether the selectors have been already transformed to fixed columns
-    /// or not.
-    selectors_to_fixed: bool,
 
     pub(crate) gates: Vec<Gate<F>>,
     pub(crate) advice_queries: Vec<(Column<Advice>, Rotation)>,
@@ -371,7 +368,6 @@ impl<F: Field> Default for ConstraintSystem<F> {
             advice_column_phase: Vec::new(),
             challenge_phase: Vec::new(),
             selector_map: vec![],
-            selectors_to_fixed: false,
             gates: vec![],
             fixed_queries: Vec::new(),
             advice_queries: Vec::new(),
