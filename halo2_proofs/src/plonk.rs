@@ -13,9 +13,9 @@ mod verifier {
 }
 
 use halo2_frontend::circuit::compile_circuit;
-pub use keygen::{keygen_pk, keygen_vk};
+pub use keygen::{keygen_pk, keygen_vk_custom, keygen_vk};
 
-pub use prover::{create_proof, create_proof_with_engine};
+pub use prover::{create_proof, create_proof_custom_with_engine, create_proof_with_engine};
 pub use verifier::verify_proof;
 
 pub use error::Error;
@@ -46,11 +46,12 @@ pub fn vk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Sca
     format: SerdeFormat,
     k: u32,
     circuit: &ConcreteCircuit,
+    compress_selectors: bool,
 ) -> io::Result<VerifyingKey<C>>
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, _, cs) = compile_circuit(k, circuit)
+    let (_, _, cs) = compile_circuit(k, circuit, compress_selectors)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     let cs_mid: ConstraintSystemMid<_> = cs.into();
     VerifyingKey::read(reader, format, cs_mid.into())
@@ -73,11 +74,12 @@ pub fn pk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Sca
     format: SerdeFormat,
     k: u32,
     circuit: &ConcreteCircuit,
+    compress_selectors: bool,
 ) -> io::Result<ProvingKey<C>>
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, _, cs) = compile_circuit(k, circuit)
+    let (_, _, cs) = compile_circuit(k, circuit, compress_selectors)
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     let cs_mid: ConstraintSystemMid<_> = cs.into();
     ProvingKey::read(reader, format, cs_mid.into())

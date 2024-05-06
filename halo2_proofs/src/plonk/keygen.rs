@@ -24,7 +24,29 @@ where
     ConcreteCircuit: Circuit<C::Scalar>,
     C::Scalar: FromUniformBytes<64>,
 {
-    let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit)?;
+    keygen_vk_custom(params, circuit, true)
+}
+
+/// Generate a `VerifyingKey` from an instance of `Circuit`.
+///
+/// The selector compression optimization is turned on only if `compress_selectors` is `true`.
+///
+/// **NOTE**: This `keygen_vk_custom` MUST share the same `compress_selectors` with
+/// `ProvingKey` generation process.
+/// Otherwise, the user could get unmatching pk/vk pair.  
+/// Hence, it is HIGHLY recommended to pair this util with `keygen_pk_custom`.
+pub fn keygen_vk_custom<'params, C, P, ConcreteCircuit>(
+    params: &P,
+    circuit: &ConcreteCircuit,
+    compress_selectors: bool,
+) -> Result<VerifyingKey<C>, Error>
+where
+    C: CurveAffine,
+    P: Params<'params, C>,
+    ConcreteCircuit: Circuit<C::Scalar>,
+    C::Scalar: FromUniformBytes<64>,
+{
+    let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
     Ok(backend_keygen_vk(params, &compiled_circuit)?)
 }
 
@@ -44,6 +66,28 @@ where
     P: Params<'params, C>,
     ConcreteCircuit: Circuit<C::Scalar>,
 {
-    let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit)?;
+    keygen_pk_custom(params, vk, circuit, true)
+}
+
+/// Generate a `ProvingKey` from an instance of `Circuit`.
+///
+/// The selector compression optimization is turned on only if `compress_selectors` is `true`.
+///
+/// **NOTE**: This `keygen_pk_custom` MUST share the same `compress_selectors` with
+/// `VerifyingKey` generation process.
+/// Otherwise, the user could get unmatching pk/vk pair.  
+/// Hence, it is HIGHLY recommended to pair this util with `keygen_vk_custom`.
+pub fn keygen_pk_custom<'params, C, P, ConcreteCircuit>(
+    params: &P,
+    vk: VerifyingKey<C>,
+    circuit: &ConcreteCircuit,
+    compress_selectors: bool,
+) -> Result<ProvingKey<C>, Error>
+where
+    C: CurveAffine,
+    P: Params<'params, C>,
+    ConcreteCircuit: Circuit<C::Scalar>,
+{
+    let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
     Ok(backend_keygen_pk(params, vk, &compiled_circuit)?)
 }

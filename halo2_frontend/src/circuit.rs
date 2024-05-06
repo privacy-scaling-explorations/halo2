@@ -40,6 +40,7 @@ pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     k: u32,
     circuit: &ConcreteCircuit,
+    compress_selectors: bool,
 ) -> Result<
     (
         CompiledCircuit<F>,
@@ -49,17 +50,17 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     Error,
 > {
     let n = 2usize.pow(k);
-
     let mut cs = ConstraintSystem::default();
-
     #[cfg(feature = "circuit-params")]
     let config = ConcreteCircuit::configure_with_params(&mut cs, circuit.params());
     #[cfg(not(feature = "circuit-params"))]
     let config = ConcreteCircuit::configure(&mut cs);
+    let cs = cs;
 
     if n < cs.minimum_rows() {
         return Err(Error::not_enough_rows_available(k));
     }
+
     let mut assembly = plonk::keygen::Assembly {
         k,
         fixed: vec![vec![F::ZERO.into(); n]; cs.num_fixed_columns],
@@ -78,7 +79,14 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     )?;
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
-    let (cs, selector_polys) = cs.compress_selectors(assembly.selectors);
+    let (cs, selector_polys) = if compress_selectors {
+        cs.compress_selectors(assembly.selectors)
+    } else {
+        // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
+        let selectors = std::mem::take(&mut assembly.selectors);
+        cs.directly_convert_selectors_to_fixed(selectors)
+    };
+
     fixed.extend(selector_polys);
 
     // sort the "copies" for deterministic ordering

@@ -575,7 +575,7 @@ fn test_mycircuit_full_split() {
         .build();
     let k = K;
     let circuit: MyCircuit<Fr, WIDTH_FACTOR> = MyCircuit::new(k, 42);
-    let (compiled_circuit, config, cs) = compile_circuit(k, &circuit).unwrap();
+    let (compiled_circuit, config, cs) = compile_circuit(k, &circuit, false).unwrap();
 
     // Setup
     let mut rng = BlockRng::new(OneNg {});

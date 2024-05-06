@@ -658,6 +658,39 @@ impl<F: Field> ConstraintSystem<F> {
         (self, polys)
     }
 
+    /// Does not combine selectors and directly replaces them everywhere with fixed columns.
+    pub fn directly_convert_selectors_to_fixed(
+        mut self,
+        selectors: Vec<Vec<bool>>,
+    ) -> (Self, Vec<Vec<F>>) {
+        // The number of provided selector assignments must be the number we
+        // counted for this constraint system.
+        assert_eq!(selectors.len(), self.num_selectors);
+
+        let (polys, selector_replacements): (Vec<_>, Vec<_>) = selectors
+            .into_iter()
+            .map(|selector| {
+                let poly = selector
+                    .iter()
+                    .map(|b| if *b { F::ONE } else { F::ZERO })
+                    .collect::<Vec<_>>();
+                let column = self.fixed_column();
+                let rotation = Rotation::cur();
+                let expr = Expression::Fixed(FixedQuery {
+                    index: Some(self.query_fixed_index(column, rotation)),
+                    column_index: column.index,
+                    rotation,
+                });
+                (poly, expr)
+            })
+            .unzip();
+
+        self.replace_selectors_with_fixed(&selector_replacements);
+        self.num_selectors = 0;
+
+        (self, polys)
+    }
+
     fn replace_selectors_with_fixed(&mut self, selector_replacements: &[Expression<F>]) {
         fn replace_selectors<F: Field>(
             expr: &mut Expression<F>,
