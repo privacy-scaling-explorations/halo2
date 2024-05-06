@@ -12,6 +12,7 @@ mod verifier {
     pub use halo2_backend::plonk::verifier::verify_proof;
 }
 
+use halo2_frontend::circuit::compile_circuit;
 pub use keygen::{keygen_pk, keygen_vk};
 
 pub use prover::{create_proof, create_proof_with_engine};
@@ -28,7 +29,6 @@ pub use halo2_middleware::circuit::{Any, ConstraintSystemMid};
 
 use group::ff::FromUniformBytes;
 use halo2_backend::helpers::{SerdeCurveAffine, SerdeFormat, SerdePrimeField};
-use halo2_frontend::circuit::compile_circuit_cs;
 use std::io;
 
 /// Reads a verification key from a buffer.
@@ -44,15 +44,14 @@ use std::io;
 pub fn vk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
     reader: &mut R,
     format: SerdeFormat,
-    #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
+    k: u32,
+    circuit: &ConcreteCircuit,
 ) -> io::Result<VerifyingKey<C>>
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
-        #[cfg(feature = "circuit-params")]
-        params,
-    );
+    let (_, _, cs) = compile_circuit(k, circuit)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     let cs_mid: ConstraintSystemMid<_> = cs.into();
     VerifyingKey::read(reader, format, cs_mid.into())
 }
@@ -72,15 +71,14 @@ where
 pub fn pk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
     reader: &mut R,
     format: SerdeFormat,
-    #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
+    k: u32,
+    circuit: &ConcreteCircuit,
 ) -> io::Result<ProvingKey<C>>
 where
     C::Scalar: SerdePrimeField + FromUniformBytes<64>,
 {
-    let (_, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
-        #[cfg(feature = "circuit-params")]
-        params,
-    );
+    let (_, _, cs) = compile_circuit(k, circuit)
+        .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
     let cs_mid: ConstraintSystemMid<_> = cs.into();
     ProvingKey::read(reader, format, cs_mid.into())
 }

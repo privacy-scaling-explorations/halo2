@@ -2,7 +2,7 @@ use crate::plonk::{Error, ErrorBack};
 use crate::poly::commitment::{self, CommitmentScheme, Params};
 use crate::transcript::{EncodedChallenge, TranscriptWrite};
 use halo2_backend::plonk::{prover::Prover, ProvingKey};
-use halo2_frontend::circuit::{compile_circuit_cs, WitnessCalculator};
+use halo2_frontend::circuit::{compile_circuit, WitnessCalculator};
 use halo2_frontend::plonk::Circuit;
 use halo2_middleware::ff::{FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_middleware::zal::{
@@ -40,10 +40,8 @@ where
     if circuits.len() != instances.len() {
         return Err(Error::Backend(ErrorBack::InvalidInstances));
     }
-    let (config, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
-        #[cfg(feature = "circuit-params")]
-        circuits[0].params(),
-    );
+
+    let (_, config, cs) = compile_circuit::<_, ConcreteCircuit>(params.k(), &circuits[0])?;
     let mut witness_calcs: Vec<_> = circuits
         .iter()
         .enumerate()
@@ -167,7 +165,7 @@ fn test_create_proof() {
 fn test_create_proof_custom() {
     use crate::{
         circuit::SimpleFloorPlanner,
-        plonk::{keygen_vk, keygen_pk, ConstraintSystem, ErrorFront},
+        plonk::{keygen_pk, keygen_vk, ConstraintSystem, ErrorFront},
         poly::kzg::{
             commitment::{KZGCommitmentScheme, ParamsKZG},
             multiopen::ProverSHPLONK,
@@ -203,10 +201,8 @@ fn test_create_proof_custom() {
     }
 
     let params: ParamsKZG<Bn256> = ParamsKZG::setup(3, OsRng);
-    let vk = keygen_vk(&params, &MyCircuit)
-        .expect("keygen_vk_custom should not fail");
-    let pk = keygen_pk(&params, vk, &MyCircuit)
-        .expect("keygen_pk_custom should not fail");
+    let vk = keygen_vk(&params, &MyCircuit).expect("keygen_vk_custom should not fail");
+    let pk = keygen_pk(&params, vk, &MyCircuit).expect("keygen_pk_custom should not fail");
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
     let engine = PlonkEngineConfig::build_default();
 

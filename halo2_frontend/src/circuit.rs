@@ -31,28 +31,6 @@ pub mod layouter;
 
 pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 
-/// Compile a circuit, only generating the `Config` and the `ConstraintSystem` related information,
-/// skipping all preprocessing data.
-/// The `ConcreteCircuit::Config`, `ConstraintSystem<F>` and `SelectorsToFixed` are outputs for the
-/// frontend itself, which will be used for witness generation and fixed column assignment.
-/// The `ConstraintSystem<F>` can be converted to `ConstraintSystemMid<F>` to be used to interface
-/// with the backend.
-pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
-    #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
-) -> (
-    ConcreteCircuit::Config,
-    ConstraintSystem<F>,
-) {
-    let mut cs = ConstraintSystem::default();
-    #[cfg(feature = "circuit-params")]
-    let config = ConcreteCircuit::configure_with_params(&mut cs, params);
-    #[cfg(not(feature = "circuit-params"))]
-    let config = ConcreteCircuit::configure(&mut cs);
-    let cs = cs;
-
-    (config, cs)
-}
-
 /// Compile a circuit.  Runs configure and synthesize on the circuit in order to materialize the
 /// circuit into its columns and the column configuration; as well as doing the fixed column and
 /// copy constraints assignments.  The output of this function can then be used for the key
@@ -72,11 +50,12 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
 > {
     let n = 2usize.pow(k);
 
-    // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
-    let (config, cs) = compile_circuit_cs::<_, ConcreteCircuit>(
-        #[cfg(feature = "circuit-params")]
-        circuit.params(),
-    );
+    let mut cs = ConstraintSystem::default();
+
+    #[cfg(feature = "circuit-params")]
+    let config = ConcreteCircuit::configure_with_params(&mut cs, circuit.params());
+    #[cfg(not(feature = "circuit-params"))]
+    let config = ConcreteCircuit::configure(&mut cs);
 
     if n < cs.minimum_rows() {
         return Err(Error::not_enough_rows_available(k));
