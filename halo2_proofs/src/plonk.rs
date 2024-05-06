@@ -14,7 +14,7 @@ mod verifier {
 
 pub use keygen::{keygen_pk, keygen_pk_custom, keygen_vk, keygen_vk_custom};
 
-pub use prover::{create_proof, create_proof_custom_with_engine, create_proof_with_engine};
+pub use prover::{create_proof, create_proof_with_engine};
 pub use verifier::verify_proof;
 
 pub use error::Error;
@@ -44,7 +44,6 @@ use std::io;
 pub fn vk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
     reader: &mut R,
     format: SerdeFormat,
-    compress_selectors: bool,
     #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
 ) -> io::Result<VerifyingKey<C>>
 where
@@ -73,7 +72,6 @@ where
 pub fn pk_read<C: SerdeCurveAffine, R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
     reader: &mut R,
     format: SerdeFormat,
-    compress_selectors: bool,
     #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
 ) -> io::Result<ProvingKey<C>>
 where
