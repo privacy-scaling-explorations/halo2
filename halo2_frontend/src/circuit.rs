@@ -62,7 +62,6 @@ pub fn compile_circuit_cs<F: Field, ConcreteCircuit: Circuit<F>>(
 pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     k: u32,
     circuit: &ConcreteCircuit,
-    compress_selectors: bool,
 ) -> Result<
     (
         CompiledCircuit<F>,
@@ -101,14 +100,8 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
     println!("before: {}", fixed.len());
-    // fixed.truncate(cs.num_fixed_columns - selector_polys.len());
-    let (cs, selectors_to_fixed) = if compress_selectors {
-        cs.compress_selectors(assembly.selectors)
-    } else {
-        cs.directly_convert_selectors_to_fixed(assembly.selectors)
-    };
-    // let selector_polys = selectors_to_fixed.convert(assembly.selectors);
-    fixed.extend(selectors_to_fixed);
+    let (cs, selector_polys) = cs.compress_selectors(assembly.selectors);
+    fixed.extend(selector_polys);
     println!("after: {}", fixed.len());
 
     // sort the "copies" for deterministic ordering

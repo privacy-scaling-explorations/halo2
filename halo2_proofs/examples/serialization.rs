@@ -7,7 +7,7 @@ use ff::Field;
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof, Advice, Circuit, Column,
+        create_proof, keygen_pk, keygen_vk, pk_read, verify_proof, Advice, Circuit, Column,
         ConstraintSystem, ErrorFront, Fixed, Instance,
     },
     poly::{
@@ -141,8 +141,7 @@ fn main() {
     let k = 4;
     let circuit = StandardPlonk(Fr::random(OsRng));
     let params = ParamsKZG::<Bn256>::setup(k, OsRng);
-    let compress_selectors = true;
-    let vk = keygen_vk_custom(&params, &circuit, compress_selectors).expect("vk should not fail");
+    let vk = keygen_vk(&params, &circuit).expect("vk should not fail");
     let pk = keygen_pk(&params, vk, &circuit).expect("pk should not fail");
 
     let f = File::create("serialization-test.pk").unwrap();

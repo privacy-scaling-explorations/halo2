@@ -167,7 +167,7 @@ fn test_create_proof() {
 fn test_create_proof_custom() {
     use crate::{
         circuit::SimpleFloorPlanner,
-        plonk::{keygen_pk_custom, keygen_vk_custom, ConstraintSystem, ErrorFront},
+        plonk::{keygen_vk, keygen_pk, ConstraintSystem, ErrorFront},
         poly::kzg::{
             commitment::{KZGCommitmentScheme, ParamsKZG},
             multiopen::ProverSHPLONK,
@@ -203,10 +203,9 @@ fn test_create_proof_custom() {
     }
 
     let params: ParamsKZG<Bn256> = ParamsKZG::setup(3, OsRng);
-    let compress_selectors = true;
-    let vk = keygen_vk_custom(&params, &MyCircuit, compress_selectors)
+    let vk = keygen_vk(&params, &MyCircuit)
         .expect("keygen_vk_custom should not fail");
-    let pk = keygen_pk_custom(&params, vk, &MyCircuit, compress_selectors)
+    let pk = keygen_pk(&params, vk, &MyCircuit)
         .expect("keygen_pk_custom should not fail");
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
     let engine = PlonkEngineConfig::build_default();
