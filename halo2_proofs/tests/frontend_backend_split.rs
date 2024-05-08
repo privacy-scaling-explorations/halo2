@@ -21,15 +21,11 @@ use halo2_backend::{
     },
 };
 use halo2_frontend::{
-    circuit::{
-        compile_circuit, 
-        WitnessCalculator,
-    },
+    circuit::{compile_circuit, WitnessCalculator},
     dev::MockProver,
 };
 use halo2_proofs::poly::commitment::ParamsProver;
 use std::collections::HashMap;
-
 
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
 use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};

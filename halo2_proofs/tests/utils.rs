@@ -1,7 +1,5 @@
 use halo2_frontend::{
-    circuit::{
-        AssignedCell, Layouter, Region, SimpleFloorPlanner, Value,
-    },
+    circuit::{AssignedCell, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::{
         circuit::{Challenge, Column},
         Advice, Circuit, ConstraintSystem, Error as ErrorFront, Expression, FirstPhase, Fixed,
