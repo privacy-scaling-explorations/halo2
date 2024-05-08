@@ -409,8 +409,11 @@ fn test_mycircuit(
 }
 
 #[test]
-fn test_mycircuit_compress_selectors() {
+fn test_success() {
+    // keygen & proof generation both WITH compress
     assert!(test_mycircuit(true, true, true).is_ok());
+
+    // keygen & proof generation both WITHOUT compress
     assert!(test_mycircuit(false, false, false).is_ok());
 }
 
@@ -420,25 +423,29 @@ fn test_mycircuit_compress_selectors() {
 //  Remove ".unwrap()" & apply the error handling.
 #[should_panic]
 #[test]
-fn test_compress_selectors_3() {
+fn test_failure_1() {
+    // vk_keygen WITH compress vs pk_keygen WITHOUT compress
     assert!(test_mycircuit(false, true, true).is_err());
 }
 
 #[test]
-fn test_compress_selectors_4() {
+fn test_failure_2() {
+    // vk_keygen WITHOUT compress vs pk_keygen WITH compress
     assert!(test_mycircuit(true, false, true).is_err());
 }
 
 // ditto
 #[should_panic]
 #[test]
-fn test_compress_selectors_5() {
+fn test_failure_3() {
+    // keygen WITHOUT compress vs proof_gen WITH compress
     assert!(test_mycircuit(false, false, true).is_err());
 }
 
 // ditto
 #[should_panic]
 #[test]
-fn test_compress_selectors_6() {
+fn test_failure_4() {
+    // keygen WITH compress vs proof_gen WITHOUT compress
     assert!(test_mycircuit(true, true, false).is_err());
 }
