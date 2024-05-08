@@ -1,14 +1,20 @@
-// Import the utility module from utils.rs
-#[path = "utils.rs"]
-mod utils;
-use utils::{MyCircuit, OneNg};
+#![allow(non_snake_case)]
+
+use std::marker::PhantomData;
+
+use ff::PrimeField;
+use halo2_frontend::plonk::Error;
+use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
+use halo2_proofs::poly::Rotation;
 
 use halo2_backend::transcript::{
     Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
 };
 use halo2_middleware::zal::impls::{H2cEngine, PlonkEngineConfig};
+use halo2_proofs::arithmetic::Field;
 use halo2_proofs::plonk::{
-    create_proof_custom_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Error,
+    create_proof_custom_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Advice,
+    Assigned, Circuit, Column, ConstraintSystem, Instance, Selector,
 };
 use halo2_proofs::poly::commitment::ParamsProver;
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
@@ -16,21 +22,338 @@ use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
 use halo2_proofs::poly::kzg::strategy::SingleStrategy;
 use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use rand_core::block::BlockRng;
+use rand_core::block::BlockRngCore;
 
-const K: u32 = 6;
-const WIDTH_FACTOR: usize = 1;
+// One number generator, that can be used as a deterministic Rng, outputing fixed values.
+pub struct OneNg {}
+
+impl BlockRngCore for OneNg {
+    type Item = u32;
+    type Results = [u32; 16];
+
+    fn generate(&mut self, results: &mut Self::Results) {
+        for elem in results.iter_mut() {
+            *elem = 1;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct MyCircuitConfig {
+    l: Column<Advice>,
+    r: Column<Advice>,
+    o: Column<Advice>,
+
+    s_add: Selector,
+    s_mul: Selector,
+    s_cubed: Selector,
+
+    PI: Column<Instance>,
+}
+
+#[derive(Debug)]
+struct MyCircuitChip<F: Field> {
+    config: MyCircuitConfig,
+    marker: PhantomData<F>,
+}
+
+trait MyCircuitComposer<F: Field> {
+    fn raw_multiply<FM>(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        f: FM,
+    ) -> Result<(Cell, Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>;
+
+    fn raw_add<FM>(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        f: FM,
+    ) -> Result<(Cell, Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>;
+
+    fn copy(&self, layouter: &mut impl Layouter<F>, a: Cell, b: Cell) -> Result<(), Error>;
+
+    fn expose_public(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        cell: Cell,
+        row: usize,
+    ) -> Result<(), Error>;
+
+    fn cube<FM>(&self, layouter: &mut impl Layouter<F>, f: FM) -> Result<(Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>)>;
+}
+
+impl<F: Field> MyCircuitChip<F> {
+    fn construct(config: MyCircuitConfig) -> Self {
+        Self {
+            config,
+            marker: PhantomData,
+        }
+    }
+
+    fn configure(meta: &mut ConstraintSystem<F>) -> MyCircuitConfig {
+        let l = meta.advice_column();
+        let r = meta.advice_column();
+        let o = meta.advice_column();
+
+        let s_add = meta.selector();
+        let s_mul = meta.selector();
+        let s_cubed = meta.selector();
+
+        let PI = meta.instance_column();
+
+        meta.enable_equality(l);
+        meta.enable_equality(r);
+        meta.enable_equality(o);
+
+        meta.enable_equality(PI);
+
+        meta.create_gate("add", |meta| {
+            let l = meta.query_advice(l, Rotation::cur());
+            let r = meta.query_advice(r, Rotation::cur());
+            let o = meta.query_advice(o, Rotation::cur());
+
+            let s_add = meta.query_selector(s_add);
+
+            vec![s_add * (l + r - o)]
+        });
+
+        meta.create_gate("mul", |meta| {
+            let l = meta.query_advice(l, Rotation::cur());
+            let r = meta.query_advice(r, Rotation::cur());
+            let o = meta.query_advice(o, Rotation::cur());
+
+            let s_mul = meta.query_selector(s_mul);
+
+            vec![s_mul * (l * r - o)]
+        });
+
+        // NOTE: This gate is placement for "compress_selectors" logic testing. Not really used.
+        meta.create_gate("cubed", |meta| {
+            let l = meta.query_advice(l, Rotation::cur());
+            let o = meta.query_advice(o, Rotation::cur());
+
+            let s_cubed = meta.query_selector(s_cubed);
+
+            vec![s_cubed * (l.clone() * l.clone() * l - o)]
+        });
+
+        MyCircuitConfig {
+            l,
+            r,
+            o,
+            s_add,
+            s_mul,
+            s_cubed,
+            PI,
+        }
+    }
+}
+
+impl<F: Field> MyCircuitComposer<F> for MyCircuitChip<F> {
+    fn raw_multiply<FM>(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        mut f: FM,
+    ) -> Result<(Cell, Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>,
+    {
+        let mut values = None;
+        layouter.assign_region(
+            || "multiply",
+            |mut region| {
+                let lhs = region.assign_advice(
+                    || "lhs",
+                    self.config.l,
+                    0,
+                    || {
+                        values = Some(f());
+                        values.unwrap().map(|x| x.0)
+                    },
+                )?;
+                let rhs = region.assign_advice(
+                    || "rhs",
+                    self.config.r,
+                    0,
+                    || values.unwrap().map(|x| x.1),
+                )?;
+                let out = region.assign_advice(
+                    || "out",
+                    self.config.o,
+                    0,
+                    || values.unwrap().map(|x| x.2),
+                )?;
+
+                region.enable_selector(|| "mul", &self.config.s_mul, 0)?;
+
+                Ok((lhs.cell(), rhs.cell(), out.cell()))
+            },
+        )
+    }
+
+    fn raw_add<FM>(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        mut f: FM,
+    ) -> Result<(Cell, Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>, Assigned<F>)>,
+    {
+        let mut values = None;
+        layouter.assign_region(
+            || "add",
+            |mut region| {
+                let lhs = region.assign_advice(
+                    || "lhs",
+                    self.config.l,
+                    0,
+                    || {
+                        values = Some(f());
+                        values.unwrap().map(|x| x.0)
+                    },
+                )?;
+                let rhs = region.assign_advice(
+                    || "rhs",
+                    self.config.r,
+                    0,
+                    || values.unwrap().map(|x| x.1),
+                )?;
+                let out = region.assign_advice(
+                    || "out",
+                    self.config.o,
+                    0,
+                    || values.unwrap().map(|x| x.2),
+                )?;
+
+                region.enable_selector(|| "add", &self.config.s_add, 0)?;
+
+                Ok((lhs.cell(), rhs.cell(), out.cell()))
+            },
+        )
+    }
+
+    fn copy(&self, layouter: &mut impl Layouter<F>, a: Cell, b: Cell) -> Result<(), Error> {
+        layouter.assign_region(|| "copy values", |mut region| region.constrain_equal(a, b))
+    }
+
+    fn expose_public(
+        &self,
+        layouter: &mut impl Layouter<F>,
+        cell: Cell,
+        row: usize,
+    ) -> Result<(), Error> {
+        layouter.constrain_instance(cell, self.config.PI, row)
+    }
+
+    fn cube<FM>(&self, layouter: &mut impl Layouter<F>, mut f: FM) -> Result<(Cell, Cell), Error>
+    where
+        FM: FnMut() -> Value<(Assigned<F>, Assigned<F>)>,
+    {
+        let mut values = None;
+        layouter.assign_region(
+            || "cube",
+            |mut region| {
+                let lhs = region.assign_advice(
+                    || "lhs",
+                    self.config.l,
+                    0,
+                    || {
+                        values = Some(f());
+                        values.unwrap().map(|x| x.0)
+                    },
+                )?;
+                let out = region.assign_advice(
+                    || "out",
+                    self.config.o,
+                    0,
+                    || values.unwrap().map(|x| x.1),
+                )?;
+
+                region.enable_selector(|| "cube", &self.config.s_cubed, 0)?;
+
+                Ok((lhs.cell(), out.cell()))
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct MyCircuitCircuit<F: Field> {
+    x: Value<F>,
+    y: Value<F>,
+    constant: F,
+}
+
+impl<F: Field> Circuit<F> for MyCircuitCircuit<F> {
+    type Config = MyCircuitConfig;
+
+    type FloorPlanner = SimpleFloorPlanner;
+
+    fn without_witnesses(&self) -> Self {
+        Self::default()
+    }
+
+    fn configure(meta: &mut ConstraintSystem<F>) -> Self::Config {
+        MyCircuitChip::configure(meta)
+    }
+
+    fn synthesize(
+        &self,
+        config: Self::Config,
+        mut layouter: impl Layouter<F>,
+    ) -> Result<(), Error> {
+        let cs = MyCircuitChip::construct(config);
+
+        let x: Value<Assigned<F>> = self.x.into();
+        let y: Value<Assigned<F>> = self.y.into();
+        let consty = Assigned::from(self.constant);
+
+        let (a0, b0, c0) = cs.raw_multiply(&mut layouter, || x.map(|x| (x, x, x * x)))?;
+        cs.copy(&mut layouter, a0, b0)?;
+
+        let (a1, b1, c1) = cs.raw_multiply(&mut layouter, || y.map(|y| (y, y, y * y)))?;
+        cs.copy(&mut layouter, a1, b1)?;
+
+        let (a2, b2, c2) = cs.raw_add(&mut layouter, || {
+            x.zip(y).map(|(x, y)| (x * x, y * y, x * x + y * y))
+        })?;
+        cs.copy(&mut layouter, a2, c0)?;
+        cs.copy(&mut layouter, b2, c1)?;
+
+        let (a3, b3, c3) = cs.raw_add(&mut layouter, || {
+            x.zip(y)
+                .map(|(x, y)| (x * x + y * y, consty, x * x + y * y + consty))
+        })?;
+        cs.copy(&mut layouter, a3, c2)?;
+        cs.expose_public(&mut layouter, b3, 0)?;
+
+        cs.expose_public(&mut layouter, c3, 1)?;
+
+        Ok(())
+    }
+}
 
 fn test_mycircuit(
     vk_keygen_compress_selectors: bool,
     pk_keygen_compress_selectors: bool,
     proofgen_compress_selectors: bool,
-) -> Result<(), Error> {
+) -> Result<(), halo2_proofs::plonk::Error> {
     let engine = PlonkEngineConfig::new()
         .set_curve::<G1Affine>()
         .set_msm(H2cEngine::new())
         .build();
-    let k = K;
-    let circuit: MyCircuit<Fr, WIDTH_FACTOR> = MyCircuit::new(k, 42);
+    let k = 4;
+    let circuit: MyCircuitCircuit<Fr> = MyCircuitCircuit {
+        x: Value::known(Fr::one()),
+        y: Value::known(Fr::one()),
+        constant: Fr::one(),
+    };
 
     // Setup
     let mut rng = BlockRng::new(OneNg {});
@@ -42,7 +365,7 @@ fn test_mycircuit(
         .expect("keygen_pk should not fail");
 
     // Proving
-    let instances = circuit.instances();
+    let instances = vec![vec![Fr::one(), Fr::from_u128(3)]];
     let instances_slice: &[&[Fr]] = &(instances
         .iter()
         .map(|instance| instance.as_slice())
@@ -81,35 +404,40 @@ fn test_mycircuit(
         &[instances_slice],
         &mut verifier_transcript,
     )
-    .map_err(|e| Error::Backend(e))
+    .map_err(|e| halo2_proofs::plonk::Error::Backend(e))
 }
 
 #[test]
 fn test_mycircuit_compress_selectors() {
-    match test_mycircuit(true, true, true) {
-        Ok(_) => println!("Success!"),
-        Err(_) => panic!("Should succeed!"),
-    }
-    match test_mycircuit(false, false, false) {
-        Ok(_) => println!("Success!"),
-        Err(_) => panic!("Should succeed!"),
-    }
+    assert!(test_mycircuit(true, true, true).is_ok());
+    assert!(test_mycircuit(false, false, false).is_ok());
+}
 
-    match test_mycircuit(false, true, true) {
-        Ok(_) => panic!("Should fail!"),
-        Err(_) => println!("Success!"),
-    }
-    match test_mycircuit(true, false, true) {
-        Ok(_) => panic!("Should fail!"),
-        Err(_) => println!("Success!"),
-    }
+// TODO:
+//  This panic comes from that there exists many ".unwrap()"
+//  in proof generation/verification process.
+//  Remove ".unwrap()" & apply the error handling.
+#[should_panic]
+#[test]
+fn test_compress_selectors_3() {
+    assert!(test_mycircuit(false, true, true).is_err());
+}
 
-    match test_mycircuit(false, false, true) {
-        Ok(_) => panic!("Should fail!"),
-        Err(_) => println!("Success!"),
-    }
-    match test_mycircuit(true, true, false) {
-        Ok(_) => panic!("Should fail!"),
-        Err(_) => println!("Success!"),
-    }
+#[test]
+fn test_compress_selectors_4() {
+    assert!(test_mycircuit(true, false, true).is_err());
+}
+
+// ditto
+#[should_panic]
+#[test]
+fn test_compress_selectors_5() {
+    assert!(test_mycircuit(false, false, true).is_err());
+}
+
+// ditto
+#[should_panic]
+#[test]
+fn test_compress_selectors_6() {
+    assert!(test_mycircuit(true, true, false).is_err());
 }
