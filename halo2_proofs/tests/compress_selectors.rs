@@ -405,7 +405,7 @@ fn test_mycircuit(
         &[instances_slice],
         &mut verifier_transcript,
     )
-    .map_err(|e| halo2_proofs::plonk::Error::Backend(e))
+    .map_err(halo2_proofs::plonk::Error::Backend)
 }
 
 #[test]
