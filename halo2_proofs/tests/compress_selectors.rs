@@ -417,10 +417,6 @@ fn test_success() {
     assert!(test_mycircuit(false, false, false).is_ok());
 }
 
-// TODO:
-//  This panic comes from that there exists many ".unwrap()"
-//  in proof generation/verification process.
-//  Remove ".unwrap()" & apply the error handling.
 #[should_panic]
 #[test]
 fn test_failure_1() {
@@ -434,16 +430,12 @@ fn test_failure_2() {
     assert!(test_mycircuit(true, false, true).is_err());
 }
 
-// ditto
-#[should_panic]
 #[test]
 fn test_failure_3() {
     // keygen WITHOUT compress vs proof_gen WITH compress
     assert!(test_mycircuit(false, false, true).is_err());
 }
 
-// ditto
-#[should_panic]
 #[test]
 fn test_failure_4() {
     // keygen WITH compress vs proof_gen WITHOUT compress
