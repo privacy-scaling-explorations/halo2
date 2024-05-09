@@ -13,8 +13,8 @@ use halo2_backend::transcript::{
 use halo2_middleware::zal::impls::{H2cEngine, PlonkEngineConfig};
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::plonk::{
-    create_proof_custom_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Advice,
-    Assigned, Circuit, Column, ConstraintSystem, Instance, Selector,
+    create_proof_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Advice, Assigned,
+    Circuit, Column, ConstraintSystem, Instance, Selector,
 };
 use halo2_proofs::poly::commitment::ParamsProver;
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
@@ -343,7 +343,6 @@ impl<F: Field> Circuit<F> for MyCircuitCircuit<F> {
 fn test_mycircuit(
     vk_keygen_compress_selectors: bool,
     pk_keygen_compress_selectors: bool,
-    proofgen_compress_selectors: bool,
 ) -> Result<(), halo2_proofs::plonk::Error> {
     let engine = PlonkEngineConfig::new()
         .set_curve::<G1Affine>()
@@ -373,19 +372,10 @@ fn test_mycircuit(
         .collect::<Vec<_>>());
 
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-    create_proof_custom_with_engine::<
-        KZGCommitmentScheme<Bn256>,
-        ProverSHPLONK<'_, Bn256>,
-        _,
-        _,
-        _,
-        _,
-        _,
-    >(
+    create_proof_with_engine::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _, _>(
         engine,
         &params,
         &pk,
-        proofgen_compress_selectors,
         &[circuit],
         &[instances_slice],
         &mut rng,
@@ -410,34 +400,24 @@ fn test_mycircuit(
 
 #[test]
 fn test_success() {
-    // keygen & proof generation both WITH compress
-    assert!(test_mycircuit(true, true, true).is_ok());
+    // vk & pk keygen both WITH compress
+    assert!(test_mycircuit(true, true).is_ok());
 
-    // keygen & proof generation both WITHOUT compress
-    assert!(test_mycircuit(false, false, false).is_ok());
+    // vk & pk keygen both WITHOUT compress
+    assert!(test_mycircuit(false, false).is_ok());
 }
 
 #[should_panic]
 #[test]
 fn test_failure_1() {
-    // vk_keygen WITH compress vs pk_keygen WITHOUT compress
-    assert!(test_mycircuit(false, true, true).is_err());
+    // vk keygen WITH compress
+    // pk keygen WITHOUT compress
+    assert!(test_mycircuit(false, true).is_err());
 }
 
 #[test]
 fn test_failure_2() {
-    // vk_keygen WITHOUT compress vs pk_keygen WITH compress
-    assert!(test_mycircuit(true, false, true).is_err());
-}
-
-#[test]
-fn test_failure_3() {
-    // keygen WITHOUT compress vs proof_gen WITH compress
-    assert!(test_mycircuit(false, false, true).is_err());
-}
-
-#[test]
-fn test_failure_4() {
-    // keygen WITH compress vs proof_gen WITHOUT compress
-    assert!(test_mycircuit(true, true, false).is_err());
+    // vk keygen WITHOUT compress
+    // pk keygen WITH compress
+    assert!(test_mycircuit(true, false).is_err());
 }

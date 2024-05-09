@@ -50,6 +50,7 @@ pub fn compile_circuit<F: Field, ConcreteCircuit: Circuit<F>>(
     Error,
 > {
     let n = 2usize.pow(k);
+
     let mut cs = ConstraintSystem::default();
     #[cfg(feature = "circuit-params")]
     let config = ConcreteCircuit::configure_with_params(&mut cs, circuit.params());
