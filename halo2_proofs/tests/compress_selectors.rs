@@ -396,6 +396,43 @@ fn test_mycircuit(
     .map_err(halo2_proofs::plonk::Error::Backend)
 }
 
+/*
+
+How the `compress_selectors` works in `MyCircuit` under the hood:
+
+# compress = false
+
+    selector `s_add` -> fixed `s_add`
+    - 1 when `s_add` enabled, 0 otherwise
+
+    selector `s_mul` -> fixed `s_mul`
+    - 1 when `s_mul` enabled, 0 otherwise
+
+    selector `s_cubed` -> fixed `s_cubed`
+    - 1 when `s_cubed` enabled, 0 otherwise
+
+    Selector queries in expressions become the corresponding fixed column queries
+    at rotation 0.
+
+
+# compress = true
+
+    selector `s_add`, `s_mul` -> fixed `s_add_mul`
+    - 0 when `s_add` disabled and `s_mul` disabled
+    - 1 when only `s_add` enabled
+    - 2 when only `s_mul` enabled
+
+    selector `s_cubed` -> fixed `s_cubed`
+    - 1 when `s_cubed` enabled, 0 otherwise
+    - NOTE: `s_cubed` is not compressed to avoid growing the max degree which is 3
+
+    Selector query for `s_add` becomes (`s_add_mul`)*(2 - `s_add_mul`)
+    Selector query for `s_mul` becomes (`s_add_mul`)*(1 - `s_add_mul`)
+    Selector query for `s_cubed` becomes the corresponding fixed column query
+    at rotation 0.
+
+*/
+
 #[test]
 fn test_success() {
     // vk & pk keygen both WITH compress
