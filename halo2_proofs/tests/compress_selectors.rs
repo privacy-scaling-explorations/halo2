@@ -284,13 +284,13 @@ impl<F: Field> MyCircuitComposer<F> for MyCircuitChip<F> {
 }
 
 #[derive(Debug, Clone, Default)]
-struct MyCircuitCircuit<F: Field> {
+struct MyCircuit<F: Field> {
     x: Value<F>,
     y: Value<F>,
     constant: F,
 }
 
-impl<F: Field> Circuit<F> for MyCircuitCircuit<F> {
+impl<F: Field> Circuit<F> for MyCircuit<F> {
     type Config = MyCircuitConfig;
     type FloorPlanner = SimpleFloorPlanner;
     #[cfg(feature = "circuit-params")]
@@ -349,7 +349,7 @@ fn test_mycircuit(
         .set_msm(H2cEngine::new())
         .build();
     let k = 4;
-    let circuit: MyCircuitCircuit<Fr> = MyCircuitCircuit {
+    let circuit: MyCircuit<Fr> = MyCircuit {
         x: Value::known(Fr::one()),
         y: Value::known(Fr::one()),
         constant: Fr::one(),
@@ -359,10 +359,8 @@ fn test_mycircuit(
     let mut rng = BlockRng::new(OneNg {});
     let params = ParamsKZG::<Bn256>::setup(k, &mut rng);
     let verifier_params = params.verifier_params();
-    let vk = keygen_vk_custom(&params, &circuit, vk_keygen_compress_selectors)
-        .expect("keygen_vk should not fail");
-    let pk = keygen_pk_custom(&params, vk.clone(), &circuit, pk_keygen_compress_selectors)
-        .expect("keygen_pk should not fail");
+    let vk = keygen_vk_custom(&params, &circuit, vk_keygen_compress_selectors)?;
+    let pk = keygen_pk_custom(&params, vk.clone(), &circuit, pk_keygen_compress_selectors)?;
 
     // Proving
     let instances = vec![vec![Fr::one(), Fr::from_u128(3)]];
