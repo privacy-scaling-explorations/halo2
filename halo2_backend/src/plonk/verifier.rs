@@ -101,13 +101,11 @@ where
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        for i in 0..instances.len() {
-            let mut affines = vec![
-                <Scheme as CommitmentScheme>::Curve::identity();
-                instances_projective[i].len()
-            ];
+        for instance_projective in instances_projective {
+            let mut affines =
+                vec![<Scheme as CommitmentScheme>::Curve::identity(); instance_projective.len()];
             <<Scheme as CommitmentScheme>::Curve as CurveAffine>::CurveExt::batch_normalize(
-                &instances_projective[i],
+                &instance_projective,
                 &mut affines,
             );
             instance_commitments.push(affines);
