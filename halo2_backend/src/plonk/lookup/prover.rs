@@ -91,19 +91,22 @@ where
 {
     // Closure to get values of expressions and compress them
     let compress_expressions = |expressions: &[ExpressionBack<C::Scalar>]| {
-        let mut compressed_expression = domain.empty_lagrange();
-        for expression in expressions.iter() {
-            let expression = pk.vk.domain.lagrange_from_vec(evaluate(
-                expression,
-                params.n() as usize,
-                1,
-                fixed_values,
-                advice_values,
-                instance_values,
-                challenges,
-            ));
-            compressed_expression = compressed_expression * *theta + &expression;
-        }
+        let compressed_expression = expressions
+            .iter()
+            .map(|expression| {
+                pk.vk.domain.lagrange_from_vec(evaluate(
+                    expression,
+                    params.n() as usize,
+                    1,
+                    fixed_values,
+                    advice_values,
+                    instance_values,
+                    challenges,
+                ))
+            })
+            .fold(domain.empty_lagrange(), |acc, expression| {
+                acc * *theta + &expression
+            });
         compressed_expression
     };
 
