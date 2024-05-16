@@ -130,8 +130,7 @@ where
     let mut commit_values = |values: &Polynomial<C::Scalar, LagrangeCoeff>| {
         let poly = pk.vk.domain.lagrange_to_coeff(values.clone());
         let blind = Blind(C::Scalar::random(&mut rng));
-        let commitment = params
-            .commit_lagrange(&engine.msm_backend, values, blind);
+        let commitment = params.commit_lagrange(&engine.msm_backend, values, blind);
         (poly, blind, commitment)
     };
 
@@ -145,7 +144,13 @@ where
 
     let [permuted_input_commitment, permuted_table_commitment] = {
         let mut affines = [C::identity(); 2];
-        C::CurveExt::batch_normalize(&[permuted_input_commitment_projective, permuted_table_commitment_projective], &mut affines);
+        C::CurveExt::batch_normalize(
+            &[
+                permuted_input_commitment_projective,
+                permuted_table_commitment_projective,
+            ],
+            &mut affines,
+        );
         affines
     };
 

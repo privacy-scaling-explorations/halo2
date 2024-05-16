@@ -174,8 +174,9 @@ pub(in crate::plonk) fn permutation_commit<
 
         let blind = Blind(C::Scalar::random(&mut rng));
 
-        let permutation_product_commitment =
-            params.commit_lagrange(&engine.msm_backend, &z, blind).to_affine();
+        let permutation_product_commitment = params
+            .commit_lagrange(&engine.msm_backend, &z, blind)
+            .to_affine();
         let permutation_product_blind = blind;
         let z = domain.lagrange_to_coeff(z);
         let permutation_product_poly = z.clone();
