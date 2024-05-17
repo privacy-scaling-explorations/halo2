@@ -21,7 +21,7 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE" 
       
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v4.0.1
+        uses: codecov/codecov-action@v4.4.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
