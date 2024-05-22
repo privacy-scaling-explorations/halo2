@@ -4,9 +4,10 @@ use crate::{lookup, permutation, shuffle};
 use ff::Field;
 use std::collections::HashMap;
 use std::fmt;
+use serde::{Serialize, Deserialize};
 
 /// A challenge squeezed from transcript after advice columns at the phase have been committed.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct ChallengeMid {
     pub index: usize,
     pub phase: u8,
@@ -77,7 +78,7 @@ impl Variable for VarMid {
 pub type ExpressionMid<F> = Expression<F, VarMid>;
 
 /// A Gate contains a single polynomial identity with a name as metadata.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Gate<F: Field, V: Variable> {
     pub name: String,
     pub poly: Expression<F, V>,
@@ -152,7 +153,7 @@ pub struct CompiledCircuit<F: Field> {
 }
 
 /// An enum over the Advice, Fixed, Instance structs
-#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Any {
     /// An Advice variant
     Advice,
@@ -198,7 +199,7 @@ impl PartialOrd for Any {
 }
 
 /// A column with an index and type
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub struct ColumnMid {
     /// The type of the column.
     pub column_type: Any,

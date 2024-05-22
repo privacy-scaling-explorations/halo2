@@ -2,6 +2,7 @@ use core::cmp::max;
 use core::ops::{Add, Mul, Neg, Sub};
 use ff::Field;
 use std::iter::{Product, Sum};
+use serde::{Serialize, Deserialize};
 
 pub trait Variable: Clone + Copy + std::fmt::Debug + Eq + PartialEq {
     /// Degree that an expression would have if it was only this variable.
@@ -19,7 +20,7 @@ pub trait Variable: Clone + Copy + std::fmt::Debug + Eq + PartialEq {
 }
 
 /// Low-degree expression representing an identity that must hold over the committed columns.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Expression<F, V: Variable> {
     /// This is a constant polynomial
     Constant(F),

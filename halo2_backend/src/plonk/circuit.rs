@@ -3,9 +3,10 @@ use halo2_middleware::circuit::{Any, ChallengeMid, ColumnMid, Gate};
 use halo2_middleware::expression::{Expression, Variable};
 use halo2_middleware::poly::Rotation;
 use halo2_middleware::{lookup, permutation::ArgumentMid, shuffle};
+use serde::{Serialize, Deserialize};
 
 // TODO: Reuse ColumnMid inside this.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct QueryBack {
     /// Query index
     pub(crate) index: usize,
@@ -17,7 +18,7 @@ pub struct QueryBack {
     pub(crate) rotation: Rotation,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum VarBack {
     /// This is a generic column query
     Query(QueryBack),
@@ -53,7 +54,7 @@ pub(crate) type PermutationArgumentBack = ArgumentMid;
 
 /// This is a description of the circuit environment, such as the gate, column and permutation
 /// arrangements.  This type is internal to the backend and will appear in the verifying key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConstraintSystemBack<F: Field> {
     pub(crate) num_fixed_columns: usize,
     pub(crate) num_advice_columns: usize,

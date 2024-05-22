@@ -23,7 +23,7 @@ pub(crate) use evaluation::Evaluator;
 
 use std::io;
 
-mod circuit;
+pub mod circuit;
 mod error;
 mod evaluation;
 pub mod keygen;
@@ -47,7 +47,7 @@ pub struct VerifyingKey<C: CurveAffine> {
     /// Permutation verifying key
     permutation: permutation::VerifyingKey<C>,
     /// Constraint system
-    cs: ConstraintSystemBack<C::Scalar>,
+    pub cs: ConstraintSystemBack<C::Scalar>,
     /// Cached maximum degree of `cs` (which doesn't change after construction).
     cs_degree: usize,
     /// The representative of this `VerifyingKey` in transcripts.

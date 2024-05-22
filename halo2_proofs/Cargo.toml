@@ -44,10 +44,13 @@ harness = false
 halo2_middleware = { path = "../halo2_middleware" }
 halo2_backend = { path = "../halo2_backend" }
 halo2_frontend = { path = "../halo2_frontend" }
-halo2curves = { version = "0.6.0", default-features = false }
+halo2curves = { version = "0.6.0", default-features = false, features = ["derive_serde"] }
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 plotters = { version = "0.3.0", default-features = false, optional = true }
 group = "0.13"
+serde = { version = "1", features = ["derive"] }
+serde_derive = { version = "1", optional = true}
+bincode = "1.3"
 
 [dev-dependencies]
 ff = "0.13"
