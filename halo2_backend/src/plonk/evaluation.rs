@@ -440,7 +440,7 @@ impl<C: CurveAffine> Evaluator<C> {
                                 * l_last[idx]);
                         // Except for the first set, enforce.
                         // l_0(X) * (z_i(X) - z_{i-1}(\omega^(last) X)) = 0
-                        for (set_idx, _) in sets.iter().enumerate() {
+                        for set_idx in 0..sets.len() {
                             if set_idx != 0 {
                                 *value = *value * y
                                     + ((permutation_product_cosets[set_idx][idx]
@@ -454,13 +454,12 @@ impl<C: CurveAffine> Evaluator<C> {
                         // - z_i(X) \prod_j (p(X) + \delta^j \beta X + \gamma)
                         // )
                         let mut current_delta = delta_start * beta_term;
-                        for (((set_idx, _), columns), cosets) in sets
+                        for ((permutation_product_coset, columns), cosets) in permutation_product_cosets
                             .iter()
-                            .enumerate()
                             .zip(p.columns.chunks(chunk_len))
                             .zip(pk.permutation.cosets.chunks(chunk_len))
                         {
-                            let mut left = permutation_product_cosets[set_idx][r_next];
+                            let mut left = permutation_product_coset[r_next];
                             for (values, permutation) in columns
                                 .iter()
                                 .map(|&column| match column.column_type {
@@ -473,7 +472,7 @@ impl<C: CurveAffine> Evaluator<C> {
                                 left *= values[idx] + beta * permutation[idx] + gamma;
                             }
 
-                            let mut right = permutation_product_cosets[set_idx][idx];
+                            let mut right = permutation_product_coset[idx];
                             for values in columns.iter().map(|&column| match column.column_type {
                                 Any::Advice => &advice[column.index],
                                 Any::Fixed => &fixed[column.index],
