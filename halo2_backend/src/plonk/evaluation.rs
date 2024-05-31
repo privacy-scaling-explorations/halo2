@@ -454,10 +454,11 @@ impl<C: CurveAffine> Evaluator<C> {
                         // - z_i(X) \prod_j (p(X) + \delta^j \beta X + \gamma)
                         // )
                         let mut current_delta = delta_start * beta_term;
-                        for ((permutation_product_coset, columns), cosets) in permutation_product_cosets
-                            .iter()
-                            .zip(p.columns.chunks(chunk_len))
-                            .zip(pk.permutation.cosets.chunks(chunk_len))
+                        for ((permutation_product_coset, columns), cosets) in
+                            permutation_product_cosets
+                                .iter()
+                                .zip(p.columns.chunks(chunk_len))
+                                .zip(pk.permutation.cosets.chunks(chunk_len))
                         {
                             let mut left = permutation_product_coset[r_next];
                             for (values, permutation) in columns

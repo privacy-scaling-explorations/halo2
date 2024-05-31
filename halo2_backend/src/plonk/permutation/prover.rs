@@ -32,17 +32,8 @@ pub(crate) struct Committed<C: CurveAffine> {
     pub(crate) sets: Vec<CommittedSet<C>>,
 }
 
-pub(crate) struct ConstructedSet<C: CurveAffine> {
-    permutation_product_poly: Polynomial<C::Scalar, Coeff>,
-    permutation_product_blind: Blind<C::Scalar>,
-}
-
-pub(crate) struct Constructed<C: CurveAffine> {
-    sets: Vec<ConstructedSet<C>>,
-}
-
 pub(crate) struct Evaluated<C: CurveAffine> {
-    constructed: Constructed<C>,
+    constructed: Committed<C>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -190,21 +181,6 @@ pub(in crate::plonk) fn permutation_commit<
     Ok(Committed { sets })
 }
 
-impl<C: CurveAffine> Committed<C> {
-    pub(in crate::plonk) fn construct(self) -> Constructed<C> {
-        Constructed {
-            sets: self
-                .sets
-                .iter()
-                .map(|set| ConstructedSet {
-                    permutation_product_poly: set.permutation_product_poly.clone(),
-                    permutation_product_blind: set.permutation_product_blind,
-                })
-                .collect(),
-        }
-    }
-}
-
 impl<C: CurveAffine> super::ProvingKey<C> {
     pub(in crate::plonk) fn open(
         &self,
@@ -231,7 +207,7 @@ impl<C: CurveAffine> super::ProvingKey<C> {
     }
 }
 
-impl<C: CurveAffine> Constructed<C> {
+impl<C: CurveAffine> Committed<C> {
     pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
         self,
         pk: &plonk::ProvingKey<C>,
