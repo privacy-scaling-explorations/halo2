@@ -404,6 +404,14 @@ impl<F: Field> ConstraintSystem<F> {
                 if table.contains_simple_selector() {
                     panic!("expression containing simple selector supplied to lookup argument");
                 }
+                // this check ensures that one dedicated `Fixed` column or `Selector` is used
+                // for enabling the real table rows of the column, which is used as `TableColumn` role.
+                // otherwise, we get the soundness error, like https://github.com/privacy-scaling-explorations/halo2/issues/335
+                if table.degree() < 2 {
+                    panic!(
+                        "table expression supplied to lookup_any argument must have degree >= 2"
+                    );
+                }
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);
                 (input, table)
