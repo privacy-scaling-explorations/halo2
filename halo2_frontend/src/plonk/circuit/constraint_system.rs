@@ -389,6 +389,12 @@ impl<F: Field> ConstraintSystem<F> {
     ///
     /// `table_map` returns a map between input expressions and the table expressions
     /// they need to match.
+    /// 
+    /// NOTE:   
+    ///   The `table_expression`(right hand side) should be degree >= 2.  
+    ///   In other words, its table value rows should be explicitly enabled by use of `Fixed` column or `Selector`.  
+    ///   Otherwise, we have soundness error.(See https://github.com/privacy-scaling-explorations/halo2/issues/335)  
+    ///   Usage example: https://github.com/privacy-scaling-explorations/halo2/blob/main/halo2_proofs/tests/frontend_backend_split.rs
     pub fn lookup_any<S: AsRef<str>>(
         &mut self,
         name: S,
