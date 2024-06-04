@@ -1450,7 +1450,7 @@ mod tests {
                                 i,
                             )?;
 
-                            // Enable the table row on rows, which used for lookup table.
+                            // Enable the rows, which are used for lookup table values.
                             region.enable_selector(
                                 || format!("enabling table row {}", i),
                                 &config.s_ltable,
@@ -1492,7 +1492,8 @@ mod tests {
                                 config.advice_table,
                                 i,
                             )?;
-                            // Enable the table row on rows, which used for lookup table.
+
+                            // Enable the rows, which are used for lookup table values.
                             region.enable_selector(
                                 || format!("enabling table row {}", i),
                                 &config.s_ltable,
