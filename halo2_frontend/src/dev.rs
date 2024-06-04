@@ -1372,7 +1372,7 @@ mod tests {
                     //
                     // NOTE: When using `lookup_any` in circuit, the `Fixed` column or
                     //      `Selector` is required to be enabled for the lookup table values.
-                    // 
+                    //
                     //  The following diagram shows the example circuit.
                     //  (This is NOT a real `FaultyCircuit` instantiation we have in this test.)
                     //  The `table`(instance) column has many zeros at the end.

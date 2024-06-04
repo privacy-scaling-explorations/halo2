@@ -389,7 +389,7 @@ impl<F: Field> ConstraintSystem<F> {
     ///
     /// `table_map` returns a map between input expressions and the table expressions
     /// they need to match.
-    /// 
+    ///
     /// NOTE:   
     ///   The `table_expression`(right hand side) should be degree >= 2.  
     ///   In other words, its table value rows should be explicitly enabled by use of `Fixed` column or `Selector`.  
