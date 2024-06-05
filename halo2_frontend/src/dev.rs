@@ -1370,15 +1370,14 @@ mod tests {
 
                 meta.lookup_any("lookup", |cells| {
                     //
-                    // NOTE: When using `lookup_any` in circuit, the `Fixed` column or
-                    //      `Selector` is required to be enabled for the lookup table values.
+                    // NOTE: When using `lookup_any` in circuit, the extra `Fixed` column or
+                    //      `Selector` is required to be enabled, in order to indicate the lookup table values.
                     //
                     //  The following diagram shows the example circuit.
-                    //  (This is NOT a real `FaultyCircuit` instantiation we have in this test.)
-                    //  The `table`(instance) column has many zeros at the end.
-                    //  Those values are all copied into `advice_table` column.(Assuming we copy 5 rows)
-                    //  But, the only rows where `s_ltable` are enabled, for the lookup table values.
-                    //  Similarly, the only rows of `a` column where `q` is enabled, are used for lookup.
+                    //  (This is NOT a real `FaultyCircuit` instantiation we have in this test. Just borrow of its config.)
+                    //  Here, only the rows where `s_ltable` are enabled(row 0, 1, 2), are used as the lookup table values.
+                    //  In this way, only the values 1, 2, 3 are used as lookup table values, not unwanted 0.
+                    //  Similarly, only the rows of `a` column where `q` is enabled(row 0, 2, 4), are used for lookup.
                     //
                     //  |---------|---------|-----|----------------|------------|
                     //  |  table  |  q      |  a  |  advice_table  | s_ltable   |
