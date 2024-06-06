@@ -261,15 +261,10 @@ impl<'a, F: Field> std::fmt::Debug for PinnedConstraintSystem<'a, F> {
         debug_struct
             .field("num_fixed_columns", self.num_fixed_columns)
             .field("num_advice_columns", self.num_advice_columns)
-            .field("num_instance_columns", self.num_instance_columns);
-        // Only show multi-phase related fields if it's used.
-        if *self.num_challenges > 0 {
-            debug_struct
-                .field("num_challenges", self.num_challenges)
-                .field("advice_column_phase", self.advice_column_phase)
-                .field("challenge_phase", self.challenge_phase);
-        }
-        debug_struct
+            .field("num_instance_columns", self.num_instance_columns)
+            .field("num_challenges", self.num_challenges)
+            .field("advice_column_phase", self.advice_column_phase)
+            .field("challenge_phase", self.challenge_phase)
             .field("gates", &self.gates)
             .field("advice_queries", self.advice_queries)
             .field("instance_queries", self.instance_queries)
