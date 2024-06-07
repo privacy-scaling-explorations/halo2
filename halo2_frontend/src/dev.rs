@@ -1336,7 +1336,7 @@ mod tests {
     }
 
     #[test]
-    fn bad_lookup_any() {
+    fn bad_lookup_any_faulty_synthesis() {
         const K: u32 = 4;
 
         #[derive(Clone)]
@@ -1578,7 +1578,7 @@ mod tests {
         const K: u32 = 4;
 
         #[derive(Clone)]
-        struct FaultyCircuitConfig {
+        struct GoodLookupAnyCircuitConfig {
             a: Column<Advice>,
             table: Column<Instance>,
             advice_table: Column<Advice>,
@@ -1586,10 +1586,10 @@ mod tests {
             s_ltable: Selector,
         }
 
-        struct FaultyCircuit {}
+        struct GoodLookupAnyCircuit {}
 
-        impl Circuit<Fp> for FaultyCircuit {
-            type Config = FaultyCircuitConfig;
+        impl Circuit<Fp> for GoodLookupAnyCircuit {
+            type Config = GoodLookupAnyCircuitConfig;
             type FloorPlanner = SimpleFloorPlanner;
             #[cfg(feature = "circuit-params")]
             type Params = ();
@@ -1628,7 +1628,7 @@ mod tests {
                     ]
                 });
 
-                FaultyCircuitConfig {
+                GoodLookupAnyCircuitConfig {
                     a,
                     q,
                     table,
@@ -1701,7 +1701,7 @@ mod tests {
 
         let prover = MockProver::run(
             K,
-            &FaultyCircuit {},
+            &GoodLookupAnyCircuit {},
             // This is our "lookup table".
             vec![vec![
                 Fp::from(1u64),
