@@ -390,9 +390,9 @@ impl<F: Field> ConstraintSystem<F> {
     /// `table_map` returns a map between input expressions and the table expressions
     /// they need to match.
     ///
-    /// NOTE:   
-    ///   The `table_expression`(right hand side) should be degree >= 2.  
-    ///   In other words, its table value rows should be explicitly enabled by use of `Fixed` column or `Selector`.  
+    /// **NOTE:**   
+    ///   If we want to use `Advice` or `Instance` column as `TableColumn` in lookup argument,   
+    ///   we need to use extra `Fixed` column or `Selector` for tagging purpose.  
     ///   Otherwise, we have soundness error.(See https://github.com/privacy-scaling-explorations/halo2/issues/335)  
     ///   Usage example: https://github.com/privacy-scaling-explorations/halo2/blob/main/halo2_proofs/tests/frontend_backend_split.rs
     pub fn lookup_any<S: AsRef<str>>(
@@ -410,12 +410,9 @@ impl<F: Field> ConstraintSystem<F> {
                 if table.contains_simple_selector() {
                     panic!("expression containing simple selector supplied to lookup argument");
                 }
-                // this check ensures that one extra, dedicated `Fixed` column or `Selector` is used
-                // for enabling the real table rows of the column, which is used as `TableColumn`.
-                // otherwise, we get the soundness error, like https://github.com/privacy-scaling-explorations/halo2/issues/335
-                if table.degree() < 2 {
+                if !table.contains_fixed_col_or_selector() {
                     panic!(
-                        "table expression supplied to lookup_any argument must have degree >= 2"
+                        "table expression supplied to lookup_any argument must include fixed column or selector"
                     );
                 }
                 input.query_cells(&mut cells);

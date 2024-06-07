@@ -946,6 +946,36 @@ impl<F: Field> Expression<F> {
             &|a, _| a,
         )
     }
+
+    /// Returns whether or not this expression contains a `Selector` or `Fixed` column.
+    pub(super) fn contains_fixed_col_or_selector(&self) -> bool {
+        let is_fixed_col_exists = self.evaluate(
+            &|_| false,
+            &|_| false,
+            &|_| true,
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|a| a,
+            &|a, b| a || b,
+            &|a, b| a || b,
+            &|a, _| a,
+        );
+        let is_selector_exists = self.evaluate(
+            &|_| false,
+            &|_| true,
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|a| a,
+            &|a, b| a || b,
+            &|a, b| a || b,
+            &|a, _| a,
+        );
+
+        is_fixed_col_exists || is_selector_exists
+    }
 }
 
 impl<F: std::fmt::Debug> std::fmt::Debug for Expression<F> {
