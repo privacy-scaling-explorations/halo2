@@ -1574,6 +1574,111 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(
+        expected = "table expression containing only fixed column supplied to lookup_any argument, should use `lookup` api instead of `lookup_any`"
+    )]
+    fn bad_lookup_any_use_only_fixed_col() {
+        const K: u32 = 4;
+
+        #[derive(Clone)]
+        #[allow(dead_code)]
+        struct FaultyCircuitConfig {
+            a: Column<Advice>,
+            fixed_table: Column<Fixed>,
+            q: Selector,
+        }
+
+        struct FaultyCircuit {}
+
+        impl Circuit<Fp> for FaultyCircuit {
+            type Config = FaultyCircuitConfig;
+            type FloorPlanner = SimpleFloorPlanner;
+            #[cfg(feature = "circuit-params")]
+            type Params = ();
+
+            fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
+                let a = meta.advice_column();
+                let q = meta.complex_selector();
+                let fixed_table = meta.fixed_column();
+
+                meta.annotate_lookup_any_column(fixed_table, || "Fixed-Table");
+                meta.enable_equality(fixed_table);
+
+                meta.lookup_any("lookup", |cells| {
+                    let a = cells.query_advice(a, Rotation::cur());
+                    let q = cells.query_selector(q);
+                    let fixed_table = cells.query_fixed(fixed_table, Rotation::cur());
+
+                    // If q is enabled, a must be in the table.
+                    // When q is not enabled, lookup the default value instead.
+                    let not_q = Expression::Constant(Fp::one()) - q.clone();
+                    let default = Expression::Constant(Fp::from(2));
+                    vec![(q * a + not_q * default, fixed_table)]
+                });
+
+                FaultyCircuitConfig { a, q, fixed_table }
+            }
+
+            fn without_witnesses(&self) -> Self {
+                Self {}
+            }
+
+            fn synthesize(
+                &self,
+                config: Self::Config,
+                mut layouter: impl Layouter<Fp>,
+            ) -> Result<(), Error> {
+                // Load Fixed lookup table with the values 1, 2, 3, 4.
+                layouter.assign_region(
+                    || "Assign dynamic table",
+                    |mut region| {
+                        for i in 0..4 {
+                            region.assign_fixed(
+                                || "Fixed from instance tables",
+                                config.fixed_table,
+                                i,
+                                || Value::known(Fp::from(i as u64 + 1)),
+                            )?;
+                        }
+                        Ok(())
+                    },
+                )?;
+
+                layouter.assign_region(
+                    || "Faulty synthesis",
+                    |mut region| {
+                        // Enable the lookup on row 0, with a = 4.
+                        config.q.enable(&mut region, 0)?;
+                        region.assign_advice(
+                            || "a = 4",
+                            config.a,
+                            0,
+                            || Value::known(Fp::from(4)),
+                        )?;
+
+                        // BUG: Assign a = 0, which doesn't exist in the table(1, 2, 3, 4)!
+                        // Enable the lookup on row 1, with a = 0. (deliberately wrong)
+                        config.q.enable(&mut region, 1)?;
+                        region.assign_advice(
+                            || "a = 0",
+                            config.a,
+                            1,
+                            || Value::known(Fp::from(0)),
+                        )?;
+
+                        region.name_column(|| "Witness example", config.a);
+
+                        Ok(())
+                    },
+                )
+            }
+        }
+
+        let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
+        assert_eq!(prover.verify(), Ok(()));
+    }
+
+    #[test]
     fn good_lookup_any() {
         const K: u32 = 4;
 

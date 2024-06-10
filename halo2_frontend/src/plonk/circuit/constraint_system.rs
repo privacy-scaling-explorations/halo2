@@ -415,6 +415,9 @@ impl<F: Field> ConstraintSystem<F> {
                         "table expression supplied to lookup_any argument must include fixed column or selector"
                     );
                 }
+                if table.degree() == 1 {
+                    panic!("table expression containing only fixed column supplied to lookup_any argument, should use `lookup` api instead of `lookup_any`");
+                }
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);
                 (input, table)
