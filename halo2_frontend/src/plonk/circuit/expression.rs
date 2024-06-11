@@ -976,6 +976,22 @@ impl<F: Field> Expression<F> {
 
         is_fixed_col_exists || is_selector_exists
     }
+
+    /// Returns whether or not this expression contains a `Advice` column.
+    pub(super) fn contains_advice_col(&self) -> bool {
+        self.evaluate(
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|_| true,
+            &|_| false,
+            &|_| false,
+            &|a| a,
+            &|a, b| a || b,
+            &|a, b| a || b,
+            &|a, _| a,
+        )
+    }
 }
 
 impl<F: std::fmt::Debug> std::fmt::Debug for Expression<F> {

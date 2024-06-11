@@ -1490,7 +1490,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "table expression supplied to lookup_any argument must include fixed column or selector"
+        expected = "none of table expressions contain only fixed column, could lead to soundness error"
     )]
     fn bad_lookup_any_no_fixed_col_or_selector() {
         const K: u32 = 4;
@@ -1575,7 +1575,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "table expression containing only fixed column supplied to lookup_any argument, should use `lookup` api instead of `lookup_any`"
+        expected = "all table expressions contain only fixed column, should use `lookup` api instead of `lookup_any`"
     )]
     fn bad_lookup_any_use_only_fixed_col() {
         const K: u32 = 4;

@@ -398,9 +398,24 @@ impl<F: Field> ConstraintSystem<F> {
     pub fn lookup_any<S: AsRef<str>>(
         &mut self,
         name: S,
-        table_map: impl FnOnce(&mut VirtualCells<'_, F>) -> Vec<(Expression<F>, Expression<F>)>,
+        table_map: impl Fn(&mut VirtualCells<'_, F>) -> Vec<(Expression<F>, Expression<F>)>,
     ) -> usize {
         let mut cells = VirtualCells::new(self);
+
+        let is_all_table_expr_fixed_or_selector = table_map(&mut cells).iter().all(|(_, table)| {
+            table.contains_fixed_col_or_selector() && table.degree() == 1
+        });
+        if is_all_table_expr_fixed_or_selector {
+            panic!("all table expressions contain only fixed column, should use `lookup` api instead of `lookup_any`");
+        }
+
+        let is_any_table_expr_fixed_or_selector_not_advice = table_map(&mut cells).iter().any(|(_, table)| {
+            table.contains_fixed_col_or_selector() && !table.contains_advice_col()
+        });
+        if !is_any_table_expr_fixed_or_selector_not_advice {
+            panic!("none of table expressions contain only fixed column, could lead to soundness error");
+        }
+
         let table_map = table_map(&mut cells)
             .into_iter()
             .map(|(mut input, mut table)| {
@@ -409,14 +424,6 @@ impl<F: Field> ConstraintSystem<F> {
                 }
                 if table.contains_simple_selector() {
                     panic!("expression containing simple selector supplied to lookup argument");
-                }
-                if !table.contains_fixed_col_or_selector() {
-                    panic!(
-                        "table expression supplied to lookup_any argument must include fixed column or selector"
-                    );
-                }
-                if table.degree() == 1 {
-                    panic!("table expression containing only fixed column supplied to lookup_any argument, should use `lookup` api instead of `lookup_any`");
                 }
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);

@@ -365,6 +365,10 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
                         .expect("todo");
                     offset += 1;
                 }
+                region
+                    .assign_fixed(|| "", config.s_lookup, offset, || Value::known(F::ONE))
+                    .expect("todo");
+                offset += 1;
 
                 // Enable RLC gate 3 times
                 for abcd in [[3, 5, 3, 5], [8, 9, 8, 9], [111, 222, 111, 222]] {
