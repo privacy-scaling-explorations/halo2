@@ -398,23 +398,16 @@ impl<F: Field> ConstraintSystem<F> {
     pub fn lookup_any<S: AsRef<str>>(
         &mut self,
         name: S,
-        table_map: impl Fn(&mut VirtualCells<'_, F>) -> Vec<(Expression<F>, Expression<F>)>,
+        table_map: impl FnOnce(&mut VirtualCells<'_, F>) -> Vec<(Expression<F>, Expression<F>)>,
     ) -> usize {
         let mut cells = VirtualCells::new(self);
 
-        let is_all_table_expr_fixed_or_selector = table_map(&mut cells).iter().all(|(_, table)| {
-            table.contains_fixed_col_or_selector() && table.degree() == 1
-        });
-        if is_all_table_expr_fixed_or_selector {
-            panic!("all table expressions contain only fixed column, should use `lookup` api instead of `lookup_any`");
-        }
+        let mut is_all_table_expr_fixed_or_selector = true;
 
-        let is_any_table_expr_fixed_or_selector_not_advice = table_map(&mut cells).iter().any(|(_, table)| {
-            table.contains_fixed_col_or_selector() && !table.contains_advice_col()
-        });
-        if !is_any_table_expr_fixed_or_selector_not_advice {
-            panic!("none of table expressions contain only fixed column, could lead to soundness error");
-        }
+        let mut is_all_input_expr_contains_fixed_or_selector = true;
+        let mut is_all_table_expr_contains_fixed_or_selector = true;
+
+        let mut is_selector_pair_exists = false;
 
         let table_map = table_map(&mut cells)
             .into_iter()
@@ -425,11 +418,40 @@ impl<F: Field> ConstraintSystem<F> {
                 if table.contains_simple_selector() {
                     panic!("expression containing simple selector supplied to lookup argument");
                 }
+
+                is_all_table_expr_fixed_or_selector &=
+                    table.degree() == 1 && table.contains_fixed_col_or_selector();
+
+                is_all_input_expr_contains_fixed_or_selector &=
+                    input.contains_fixed_col_or_selector();
+                is_all_table_expr_contains_fixed_or_selector &=
+                    table.contains_fixed_col_or_selector();
+
+                is_selector_pair_exists |= (input.contains_fixed_col_or_selector()
+                    && input.degree() == 1)
+                    && (table.contains_fixed_col_or_selector() && table.degree() == 1);
+
                 input.query_cells(&mut cells);
                 table.query_cells(&mut cells);
                 (input, table)
             })
             .collect();
+
+        if is_all_table_expr_fixed_or_selector {
+            panic!("all table expressions contain only fixed query(column), should use `lookup` api instead of `lookup_any`");
+        }
+        if !is_all_input_expr_contains_fixed_or_selector
+        {
+            panic!("input expression need selector/fixed query(column) for tagging");
+        }
+        if !is_all_table_expr_contains_fixed_or_selector
+        {
+            panic!("table expression need selector/fixed query(column) for tagging");
+        }
+        if !is_selector_pair_exists {
+            panic!("pair of selector/fixed queries(columns) used for tagging should be included, otherwise we have soundness error");
+        }
+
         let index = self.lookups.len();
 
         self.lookups
