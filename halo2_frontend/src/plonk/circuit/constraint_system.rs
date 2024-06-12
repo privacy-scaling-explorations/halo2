@@ -391,10 +391,9 @@ impl<F: Field> ConstraintSystem<F> {
     /// they need to match.
     ///
     /// **NOTE:**   
-    ///   If we want to use `Advice` or `Instance` column as `TableColumn` in lookup argument,   
-    ///   we need to use extra `Fixed` column or `Selector` for tagging purpose.  
-    ///   Otherwise, we have soundness error.(See https://github.com/privacy-scaling-explorations/halo2/issues/335)  
-    ///   Usage example: https://github.com/privacy-scaling-explorations/halo2/blob/main/halo2_proofs/tests/frontend_backend_split.rs
+    ///   We should use extra `Fixed` column or `Selector` for tagging purpose, one for input and one for table.  
+    ///   Otherwise, we have soundness error.(See [here](https://github.com/privacy-scaling-explorations/halo2/issues/335))  
+    ///   For correct use, please reference this [example](https://github.com/privacy-scaling-explorations/halo2/blob/main/halo2_proofs/tests/frontend_backend_split.rs).
     pub fn lookup_any<S: AsRef<str>>(
         &mut self,
         name: S,
@@ -403,11 +402,7 @@ impl<F: Field> ConstraintSystem<F> {
         let mut cells = VirtualCells::new(self);
 
         let mut is_all_table_expr_fixed_or_selector = true;
-
-        let mut is_all_input_expr_contains_fixed_or_selector = true;
-        let mut is_all_table_expr_contains_fixed_or_selector = true;
-
-        let mut is_selector_pair_exists = false;
+        let mut is_tagging_cols_pair_exists = false;
 
         let table_map = table_map(&mut cells)
             .into_iter()
@@ -421,13 +416,7 @@ impl<F: Field> ConstraintSystem<F> {
 
                 is_all_table_expr_fixed_or_selector &=
                     table.degree() == 1 && table.contains_fixed_col_or_selector();
-
-                is_all_input_expr_contains_fixed_or_selector &=
-                    input.contains_fixed_col_or_selector();
-                is_all_table_expr_contains_fixed_or_selector &=
-                    table.contains_fixed_col_or_selector();
-
-                is_selector_pair_exists |= (input.contains_fixed_col_or_selector()
+                is_tagging_cols_pair_exists |= (input.contains_fixed_col_or_selector()
                     && input.degree() == 1)
                     && (table.contains_fixed_col_or_selector() && table.degree() == 1);
 
@@ -438,16 +427,10 @@ impl<F: Field> ConstraintSystem<F> {
             .collect();
 
         if is_all_table_expr_fixed_or_selector {
-            panic!("all table expressions contain only fixed query(column), should use `lookup` api instead of `lookup_any`");
+            panic!("all table expressions contain only fixed query, should use `lookup` api instead of `lookup_any`");
         }
-        if !is_all_input_expr_contains_fixed_or_selector {
-            panic!("input expression need selector/fixed query(column) for tagging");
-        }
-        if !is_all_table_expr_contains_fixed_or_selector {
-            panic!("table expression need selector/fixed query(column) for tagging");
-        }
-        if !is_selector_pair_exists {
-            panic!("pair of selector/fixed queries(columns) used for tagging should be included, otherwise we have soundness error");
+        if !is_tagging_cols_pair_exists {
+            panic!("pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error");
         }
 
         let index = self.lookups.len();

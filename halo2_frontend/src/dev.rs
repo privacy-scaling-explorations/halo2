@@ -1484,7 +1484,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "pair of selector/fixed queries(columns) used for tagging should be included, otherwise we have soundness error"
+        expected = "pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error"
     )]
     fn bad_lookup_any_not_add_tagging_pairs() {
         const K: u32 = 4;
@@ -1566,7 +1566,9 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "table expression need selector/fixed query(column) for tagging")]
+    #[should_panic(
+        expected = "pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error"
+    )]
     fn bad_lookup_any_no_fixed_col_or_selector() {
         const K: u32 = 4;
 
@@ -1641,7 +1643,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "all table expressions contain only fixed query(column), should use `lookup` api instead of `lookup_any`"
+        expected = "all table expressions contain only fixed query, should use `lookup` api instead of `lookup_any`"
     )]
     fn bad_lookup_any_use_only_fixed_col() {
         const K: u32 = 4;
