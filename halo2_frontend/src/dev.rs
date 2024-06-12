@@ -1378,11 +1378,8 @@ mod tests {
                     // If q is enabled, a must be in the table.
                     // If `s_ltable` is enabled, the value of `advice_table` & `table` is used as lookup table.
                     vec![
-                        (
-                            q.clone() * a.clone(),
-                            table * s_ltable.clone(),
-                        ),
-                        (q.clone() * a , advice_table * s_ltable.clone()),
+                        (q.clone() * a.clone(), table * s_ltable.clone()),
+                        (q.clone() * a, advice_table * s_ltable.clone()),
                         (q, s_ltable),
                     ]
                 });
@@ -1531,10 +1528,7 @@ mod tests {
 
                     // If q is enabled, a must be in the table.
                     vec![
-                        (
-                            q.clone() * a.clone(),
-                            s_ltable.clone() * table,
-                        ),
+                        (q.clone() * a.clone(), s_ltable.clone() * table),
                         (q * a, s_ltable * advice_table),
                     ]
                 });
@@ -1572,9 +1566,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "table expression need selector/fixed query(column) for tagging"
-    )]
+    #[should_panic(expected = "table expression need selector/fixed query(column) for tagging")]
     fn bad_lookup_any_no_fixed_col_or_selector() {
         const K: u32 = 4;
 
@@ -1613,13 +1605,7 @@ mod tests {
                     let table = cells.query_instance(table, Rotation::cur());
 
                     // If q is enabled, a must be in the table.
-                    vec![
-                        (
-                            q.clone() * a.clone(),
-                            table,
-                        ),
-                        (q * a, advice_table),
-                    ]
+                    vec![(q.clone() * a.clone(), table), (q * a, advice_table)]
                 });
 
                 FaultyCircuitConfig {
@@ -1700,11 +1686,7 @@ mod tests {
                 Self {}
             }
 
-            fn synthesize(
-                &self,
-                _: Self::Config,
-                _: impl Layouter<Fp>,
-            ) -> Result<(), Error> {
+            fn synthesize(&self, _: Self::Config, _: impl Layouter<Fp>) -> Result<(), Error> {
                 unreachable!("Should not be called because of configuration error");
             }
         }
@@ -1766,10 +1748,7 @@ mod tests {
                     // If q is enabled, a must be in the table.
                     // If `s_ltable` is enabled, the value of `advice_table` & `table` is used as lookup table.
                     vec![
-                        (
-                            q.clone() * a.clone(),
-                            table * s_ltable.clone(),
-                        ),
+                        (q.clone() * a.clone(), table * s_ltable.clone()),
                         (q.clone() * a, advice_table * s_ltable.clone()),
                         (q, s_ltable),
                     ]

@@ -440,12 +440,10 @@ impl<F: Field> ConstraintSystem<F> {
         if is_all_table_expr_fixed_or_selector {
             panic!("all table expressions contain only fixed query(column), should use `lookup` api instead of `lookup_any`");
         }
-        if !is_all_input_expr_contains_fixed_or_selector
-        {
+        if !is_all_input_expr_contains_fixed_or_selector {
             panic!("input expression need selector/fixed query(column) for tagging");
         }
-        if !is_all_table_expr_contains_fixed_or_selector
-        {
+        if !is_all_table_expr_contains_fixed_or_selector {
             panic!("table expression need selector/fixed query(column) for tagging");
         }
         if !is_selector_pair_exists {
