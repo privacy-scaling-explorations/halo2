@@ -28,7 +28,7 @@ use halo2_frontend::{
     },
 };
 use halo2_middleware::{ff::Field, poly::Rotation};
-use std::collections::HashMap;
+use std::{collections::HashMap, iter::zip};
 
 #[derive(Clone)]
 struct MyCircuitConfig {
@@ -42,7 +42,7 @@ struct MyCircuitConfig {
 
     // Copy constraints between columns (a, b) and (a, d)
 
-    // A dynamic lookup: s_lookup * [a[0], b[0]] in s_ltable * [d[0], c[0]]
+    // A dynamic lookup: s_lookup * [1, a[0], b[0]] in s_ltable * [1, d[0], c[0]]
     s_lookup: Column<Fixed>,
     s_ltable: Column<Fixed>,
 
@@ -180,9 +180,9 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
             let b = meta.query_advice(b, Rotation::cur());
             let c = meta.query_advice(c, Rotation::cur());
             let d = meta.query_fixed(d, Rotation::cur());
-            let lhs = [a, b].map(|c| c * s_lookup.clone());
-            let rhs = [d, c].map(|c| c * s_ltable.clone());
-            lhs.into_iter().zip(rhs).collect()
+            let lhs = [one.clone(), a, b].map(|c| c * s_lookup.clone());
+            let rhs = [one.clone(), d, c].map(|c| c * s_ltable.clone());
+            zip(lhs, rhs).chain([(s_lookup, s_ltable)]).collect()
         });
 
         meta.shuffle(format!("shuffle.{id}"), |meta| {
@@ -365,9 +365,6 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
                         .expect("todo");
                     offset += 1;
                 }
-                region
-                    .assign_fixed(|| "", config.s_lookup, offset, || Value::known(F::ONE))
-                    .expect("todo");
                 offset += 1;
 
                 // Enable RLC gate 3 times

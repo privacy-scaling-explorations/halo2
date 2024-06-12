@@ -947,43 +947,13 @@ impl<F: Field> Expression<F> {
         )
     }
 
-    /// Returns whether or not this expression contains a `Selector` or `Fixed` column.
-    pub(super) fn contains_fixed_col_or_selector(&self) -> bool {
-        let is_fixed_col_exists = self.evaluate(
-            &|_| false,
-            &|_| false,
-            &|_| true,
-            &|_| false,
-            &|_| false,
-            &|_| false,
-            &|a| a,
-            &|a, b| a || b,
-            &|a, b| a || b,
-            &|a, _| a,
-        );
-        let is_selector_exists = self.evaluate(
-            &|_| false,
-            &|_| true,
-            &|_| false,
-            &|_| false,
-            &|_| false,
-            &|_| false,
-            &|a| a,
-            &|a, b| a || b,
-            &|a, b| a || b,
-            &|a, _| a,
-        );
-
-        is_fixed_col_exists || is_selector_exists
-    }
-
-    /// Returns whether or not this expression contains a `Advice` column.
-    pub(super) fn contains_advice_col(&self) -> bool {
+    /// Returns whether or not this expression contains a `Fixed` column.
+    pub(super) fn contains_fixed_col(&self) -> bool {
         self.evaluate(
             &|_| false,
             &|_| false,
-            &|_| false,
             &|_| true,
+            &|_| false,
             &|_| false,
             &|_| false,
             &|a| a,
@@ -991,6 +961,27 @@ impl<F: Field> Expression<F> {
             &|a, b| a || b,
             &|a, _| a,
         )
+    }
+
+    /// Returns whether or not this expression contains a `Selector`.
+    pub(super) fn contains_selector(&self) -> bool {
+        self.evaluate(
+            &|_| false,
+            &|_| true,
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|_| false,
+            &|a| a,
+            &|a, b| a || b,
+            &|a, b| a || b,
+            &|a, _| a,
+        )
+    }
+
+    /// Returns whether or not this expression contains a `Selector` or `Fixed` column.
+    pub(super) fn contains_fixed_col_or_selector(&self) -> bool {
+        self.contains_fixed_col() || self.contains_selector()
     }
 }
 

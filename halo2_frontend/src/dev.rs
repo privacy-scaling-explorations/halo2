@@ -1376,17 +1376,14 @@ mod tests {
                     let s_ltable = cells.query_selector(s_ltable);
 
                     // If q is enabled, a must be in the table.
-                    // When q is not enabled, lookup the default value instead.
-                    // If `s_ltable` is enabled, then the value of `advice_table` & `table` is used as lookup table.
-                    // When `s_ltable` is not enabled, the value of `advice_table` & `table` is NOT used as lookup table.
-                    let not_q = Expression::Constant(Fp::one()) - q.clone();
-                    let default = Expression::Constant(Fp::from(2));
+                    // If `s_ltable` is enabled, the value of `advice_table` & `table` is used as lookup table.
                     vec![
                         (
-                            q.clone() * a.clone() + not_q.clone() * default.clone(),
+                            q.clone() * a.clone(),
                             table * s_ltable.clone(),
                         ),
-                        (q * a + not_q * default, advice_table * s_ltable),
+                        (q.clone() * a , advice_table * s_ltable.clone()),
+                        (q, s_ltable),
                     ]
                 });
 
@@ -1490,7 +1487,93 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "none of table expressions contain only fixed column, could lead to soundness error"
+        expected = "pair of selector/fixed queries(columns) used for tagging should be included, otherwise we have soundness error"
+    )]
+    fn bad_lookup_any_not_add_tagging_pairs() {
+        const K: u32 = 4;
+
+        #[derive(Clone)]
+        #[allow(dead_code)]
+        struct FaultyCircuitConfig {
+            a: Column<Advice>,
+            table: Column<Instance>,
+            advice_table: Column<Advice>,
+            q: Selector,
+            s_ltable: Selector,
+        }
+
+        struct FaultyCircuit {}
+
+        impl Circuit<Fp> for FaultyCircuit {
+            type Config = FaultyCircuitConfig;
+            type FloorPlanner = SimpleFloorPlanner;
+            #[cfg(feature = "circuit-params")]
+            type Params = ();
+
+            fn configure(meta: &mut ConstraintSystem<Fp>) -> Self::Config {
+                let a = meta.advice_column();
+                let q = meta.complex_selector();
+                let table = meta.instance_column();
+                let advice_table = meta.advice_column();
+                let s_ltable = meta.complex_selector();
+
+                meta.annotate_lookup_any_column(table, || "Inst-Table");
+                meta.enable_equality(table);
+                meta.annotate_lookup_any_column(advice_table, || "Adv-Table");
+                meta.enable_equality(advice_table);
+
+                meta.lookup_any("lookup", |cells| {
+                    let a = cells.query_advice(a, Rotation::cur());
+                    let q = cells.query_selector(q);
+                    let advice_table = cells.query_advice(advice_table, Rotation::cur());
+                    let table = cells.query_instance(table, Rotation::cur());
+                    let s_ltable = cells.query_selector(s_ltable);
+
+                    // If q is enabled, a must be in the table.
+                    vec![
+                        (
+                            q.clone() * a.clone(),
+                            s_ltable.clone() * table,
+                        ),
+                        (q * a, s_ltable * advice_table),
+                    ]
+                });
+
+                FaultyCircuitConfig {
+                    a,
+                    q,
+                    table,
+                    advice_table,
+                    s_ltable,
+                }
+            }
+
+            fn without_witnesses(&self) -> Self {
+                Self {}
+            }
+
+            fn synthesize(&self, _: Self::Config, _: impl Layouter<Fp>) -> Result<(), Error> {
+                unreachable!("Should not be called because of configuration error");
+            }
+        }
+
+        let _ = MockProver::run(
+            K,
+            &FaultyCircuit {},
+            // This is our "lookup table".
+            vec![vec![
+                Fp::from(1u64),
+                Fp::from(2u64),
+                Fp::from(4u64),
+                Fp::from(6u64),
+            ]],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "table expression need selector/fixed query(column) for tagging"
     )]
     fn bad_lookup_any_no_fixed_col_or_selector() {
         const K: u32 = 4;
@@ -1530,15 +1613,12 @@ mod tests {
                     let table = cells.query_instance(table, Rotation::cur());
 
                     // If q is enabled, a must be in the table.
-                    // When q is not enabled, lookup the default value instead.
-                    let not_q = Expression::Constant(Fp::one()) - q.clone();
-                    let default = Expression::Constant(Fp::from(2));
                     vec![
                         (
-                            q.clone() * a.clone() + not_q.clone() * default.clone(),
+                            q.clone() * a.clone(),
                             table,
                         ),
-                        (q * a + not_q * default, advice_table),
+                        (q * a, advice_table),
                     ]
                 });
 
@@ -1575,7 +1655,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "all table expressions contain only fixed column, should use `lookup` api instead of `lookup_any`"
+        expected = "all table expressions contain only fixed query(column), should use `lookup` api instead of `lookup_any`"
     )]
     fn bad_lookup_any_use_only_fixed_col() {
         const K: u32 = 4;
@@ -1610,10 +1690,7 @@ mod tests {
                     let fixed_table = cells.query_fixed(fixed_table, Rotation::cur());
 
                     // If q is enabled, a must be in the table.
-                    // When q is not enabled, lookup the default value instead.
-                    let not_q = Expression::Constant(Fp::one()) - q.clone();
-                    let default = Expression::Constant(Fp::from(2));
-                    vec![(q * a + not_q * default, fixed_table)]
+                    vec![(q * a, fixed_table)]
                 });
 
                 FaultyCircuitConfig { a, q, fixed_table }
@@ -1625,57 +1702,25 @@ mod tests {
 
             fn synthesize(
                 &self,
-                config: Self::Config,
-                mut layouter: impl Layouter<Fp>,
+                _: Self::Config,
+                _: impl Layouter<Fp>,
             ) -> Result<(), Error> {
-                // Load Fixed lookup table with the values 1, 2, 3, 4.
-                layouter.assign_region(
-                    || "Assign dynamic table",
-                    |mut region| {
-                        for i in 0..4 {
-                            region.assign_fixed(
-                                || "Fixed from instance tables",
-                                config.fixed_table,
-                                i,
-                                || Value::known(Fp::from(i as u64 + 1)),
-                            )?;
-                        }
-                        Ok(())
-                    },
-                )?;
-
-                layouter.assign_region(
-                    || "Faulty synthesis",
-                    |mut region| {
-                        // Enable the lookup on row 0, with a = 4.
-                        config.q.enable(&mut region, 0)?;
-                        region.assign_advice(
-                            || "a = 4",
-                            config.a,
-                            0,
-                            || Value::known(Fp::from(4)),
-                        )?;
-
-                        // BUG: Assign a = 0, which doesn't exist in the table(1, 2, 3, 4)!
-                        // Enable the lookup on row 1, with a = 0. (deliberately wrong)
-                        config.q.enable(&mut region, 1)?;
-                        region.assign_advice(
-                            || "a = 0",
-                            config.a,
-                            1,
-                            || Value::known(Fp::from(0)),
-                        )?;
-
-                        region.name_column(|| "Witness example", config.a);
-
-                        Ok(())
-                    },
-                )
+                unreachable!("Should not be called because of configuration error");
             }
         }
 
-        let prover = MockProver::run(K, &FaultyCircuit {}, vec![]).unwrap();
-        assert_eq!(prover.verify(), Ok(()));
+        let _ = MockProver::run(
+            K,
+            &FaultyCircuit {},
+            // This is our "lookup table".
+            vec![vec![
+                Fp::from(1u64),
+                Fp::from(2u64),
+                Fp::from(4u64),
+                Fp::from(6u64),
+            ]],
+        )
+        .unwrap();
     }
 
     #[test]
@@ -1719,17 +1764,14 @@ mod tests {
                     let s_ltable = cells.query_selector(s_ltable);
 
                     // If q is enabled, a must be in the table.
-                    // When q is not enabled, lookup the default value instead.
-                    // If `s_ltable` is enabled, then the value of `advice_table` & `table` is used as lookup table.
-                    // When `s_ltable` is not enabled, the value of `advice_table` & `table` is NOT used as lookup table.
-                    let not_q = Expression::Constant(Fp::one()) - q.clone();
-                    let default = Expression::Constant(Fp::from(2));
+                    // If `s_ltable` is enabled, the value of `advice_table` & `table` is used as lookup table.
                     vec![
                         (
-                            q.clone() * a.clone() + not_q.clone() * default.clone(),
+                            q.clone() * a.clone(),
                             table * s_ltable.clone(),
                         ),
-                        (q * a + not_q * default, advice_table * s_ltable),
+                        (q.clone() * a, advice_table * s_ltable.clone()),
+                        (q, s_ltable),
                     ]
                 });
 
