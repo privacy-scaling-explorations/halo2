@@ -1566,9 +1566,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(
-        expected = "pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error"
-    )]
+    #[should_panic(expected = "all table expressions need selector/fixed query for tagging")]
     fn bad_lookup_any_no_fixed_col_or_selector() {
         const K: u32 = 4;
 

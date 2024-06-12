@@ -402,6 +402,8 @@ impl<F: Field> ConstraintSystem<F> {
         let mut cells = VirtualCells::new(self);
 
         let mut is_all_table_expr_fixed_or_selector = true;
+        let mut is_all_input_expr_contains_fixed_or_selector = true;
+        let mut is_all_table_expr_contains_fixed_or_selector = true;
         let mut is_tagging_cols_pair_exists = false;
 
         let table_map = table_map(&mut cells)
@@ -416,6 +418,12 @@ impl<F: Field> ConstraintSystem<F> {
 
                 is_all_table_expr_fixed_or_selector &=
                     table.degree() == 1 && table.contains_fixed_col_or_selector();
+
+                is_all_input_expr_contains_fixed_or_selector &=
+                    input.contains_fixed_col_or_selector();
+                is_all_table_expr_contains_fixed_or_selector &=
+                    table.contains_fixed_col_or_selector();
+
                 is_tagging_cols_pair_exists |= (input.contains_fixed_col_or_selector()
                     && input.degree() == 1)
                     && (table.contains_fixed_col_or_selector() && table.degree() == 1);
@@ -428,6 +436,12 @@ impl<F: Field> ConstraintSystem<F> {
 
         if is_all_table_expr_fixed_or_selector {
             panic!("all table expressions contain only fixed query, should use `lookup` api instead of `lookup_any`");
+        }
+        if !is_all_input_expr_contains_fixed_or_selector {
+            panic!("all input expressions need selector/fixed query for tagging");
+        }
+        if !is_all_table_expr_contains_fixed_or_selector {
+            panic!("all table expressions need selector/fixed query for tagging");
         }
         if !is_tagging_cols_pair_exists {
             panic!("pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error");
