@@ -1484,7 +1484,7 @@ mod tests {
 
     #[test]
     #[should_panic(
-        expected = "pair of selector/fixed queries(querying the tag columns) should be included, otherwise we have soundness error"
+        expected = "pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included"
     )]
     fn bad_lookup_any_not_add_tagging_pairs() {
         const K: u32 = 4;
