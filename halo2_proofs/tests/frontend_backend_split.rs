@@ -28,7 +28,7 @@ use halo2_frontend::{
     },
 };
 use halo2_middleware::{ff::Field, poly::Rotation};
-use std::{collections::HashMap, iter::zip};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 struct MyCircuitConfig {
@@ -182,7 +182,7 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
             let d = meta.query_fixed(d, Rotation::cur());
             let lhs = [one.clone(), a, b].map(|c| c * s_lookup.clone());
             let rhs = [one.clone(), d, c].map(|c| c * s_ltable.clone());
-            zip(lhs, rhs).chain([(s_lookup, s_ltable)]).collect()
+            lhs.into_iter().zip(rhs).collect()
         });
 
         meta.shuffle(format!("shuffle.{id}"), |meta| {
@@ -365,7 +365,6 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
                         .expect("todo");
                     offset += 1;
                 }
-                offset += 1;
 
                 // Enable RLC gate 3 times
                 for abcd in [[3, 5, 3, 5], [8, 9, 8, 9], [111, 222, 111, 222]] {
