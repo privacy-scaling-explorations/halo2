@@ -402,37 +402,42 @@ impl<F: Field> ConstraintSystem<F> {
         name: S,
         table_map: impl FnOnce(&mut VirtualCells<'_, F>) -> Vec<(Expression<F>, Expression<F>)>,
     ) -> usize {
+        let mut cells = VirtualCells::new(self);
+
+        let mut is_all_table_expr_single_fixed = true;
+        let mut is_all_table_expr_contain_fixed_or_selector = true;
+        let mut is_tagging_exprs_pair_exists = false;
+
+        let table_map = table_map(&mut cells)
+            .into_iter()
+            .map(|(mut input, mut table)| {
+                if input.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
+                if table.contains_simple_selector() {
+                    panic!("expression containing simple selector supplied to lookup argument");
+                }
+
+                is_all_table_expr_single_fixed &= table.degree() == 1 && table.contains_fixed_col();
+                is_all_table_expr_contain_fixed_or_selector &=
+                    table.contains_fixed_col_or_selector();
+                is_tagging_exprs_pair_exists |=
+                    table.contains_fixed_col_or_selector() && table.degree() == 1;
+
+                input.query_cells(&mut cells);
+                table.query_cells(&mut cells);
+                (input, table)
+            })
+            .collect();
+
         #[cfg(feature = "lookup-any-sanity-checks")]
         {
-            let mut cells = VirtualCells::new(self);
-
-            let mut is_all_table_expr_single_fixed = true;
-            let mut is_all_table_expr_contain_fixed_or_selector = true;
-            let mut is_tagging_exprs_pair_exists = false;
-
-            let table_map = table_map(&mut cells)
-                .into_iter()
-                .map(|(mut input, mut table)| {
-                    if input.contains_simple_selector() {
-                        panic!("expression containing simple selector supplied to lookup argument");
-                    }
-                    if table.contains_simple_selector() {
-                        panic!("expression containing simple selector supplied to lookup argument");
-                    }
-
-                    is_all_table_expr_single_fixed &=
-                        table.degree() == 1 && table.contains_fixed_col();
-                    is_all_table_expr_contain_fixed_or_selector &=
-                        table.contains_fixed_col_or_selector();
-                    is_tagging_exprs_pair_exists |=
-                        table.contains_fixed_col_or_selector() && table.degree() == 1;
-
-                    input.query_cells(&mut cells);
-                    table.query_cells(&mut cells);
-                    (input, table)
-                })
-                .collect();
-
+            // NOTE: These checks try to detect unsound cases of lookups and are only active
+            // with the `lookup-any-sanity-checks`.  False positives may exist: in some
+            // particular scenarios the lookup can be sound but these checks will not pass,
+            // leading to panics.  For those cases you can disable the
+            // `lookup-any-sanity-checks` feature.  We will appreciate it if you report false
+            // positives by opening issues on the repository.
             if is_all_table_expr_single_fixed {
                 panic!("all table expressions contain only fixed query, should use `lookup` api instead of `lookup_any`");
             }
@@ -442,41 +447,14 @@ impl<F: Field> ConstraintSystem<F> {
             if !is_tagging_exprs_pair_exists {
                 panic!("pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included");
             }
-
-            let index = self.lookups.len();
-
-            self.lookups
-                .push(lookup::Argument::new(name.as_ref(), table_map));
-
-            index
         }
-        #[cfg(not(feature = "lookup-any-sanity-checks"))]
-        {
-            let mut cells = VirtualCells::new(self);
 
-            let table_map = table_map(&mut cells)
-                .into_iter()
-                .map(|(mut input, mut table)| {
-                    if input.contains_simple_selector() {
-                        panic!("expression containing simple selector supplied to lookup argument");
-                    }
-                    if table.contains_simple_selector() {
-                        panic!("expression containing simple selector supplied to lookup argument");
-                    }
+        let index = self.lookups.len();
 
-                    input.query_cells(&mut cells);
-                    table.query_cells(&mut cells);
-                    (input, table)
-                })
-                .collect();
+        self.lookups
+            .push(lookup::Argument::new(name.as_ref(), table_map));
 
-            let index = self.lookups.len();
-
-            self.lookups
-                .push(lookup::Argument::new(name.as_ref(), table_map));
-
-            index
-        }
+        index
     }
 
     /// Add a shuffle argument for some input expressions and table expressions.
