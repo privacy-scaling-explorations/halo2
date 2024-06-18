@@ -1,9 +1,8 @@
 use crate::plonk::{
-    Advice, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
-    FloorPlanner, Instance, Selector,
+    Advice, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, FieldFront,
+    Fixed, FloorPlanner, Instance, Selector,
 };
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::Field;
 use tabbycat::{AttrList, Edge, GraphBuilder, GraphType, Identity, StmtList};
 
 use crate::circuit::Value;
@@ -16,7 +15,7 @@ pub mod layout;
 /// inside the gadgets and chips that it uses.
 ///
 /// [`Layouter::namespace`]: crate::circuit::Layouter#method.namespace
-pub fn circuit_dot_graph<F: Field, ConcreteCircuit: Circuit<F>>(
+pub fn circuit_dot_graph<F: FieldFront, ConcreteCircuit: Circuit<F>>(
     circuit: &ConcreteCircuit,
 ) -> String {
     // Collect the graph details.
@@ -79,7 +78,7 @@ struct Graph {
     current_namespace: Vec<usize>,
 }
 
-impl<F: Field> Assignment<F> for Graph {
+impl<F: FieldFront> Assignment<F> for Graph {
     fn enter_region<NR, N>(&mut self, _: N)
     where
         NR: Into<String>,

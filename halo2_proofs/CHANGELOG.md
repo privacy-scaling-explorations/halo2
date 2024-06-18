@@ -11,7 +11,7 @@ and this project adheres to Rust's notion of
 ### Added
 - `halo2_proofs::circuit::Value`, a more usable and type-safe replacement for
   `Option<V>` in circuit synthesis.
-- `impl Mul<F: Field> for &Assigned<F>`
+- `impl Mul<F: FieldFront> for &Assigned<F>`
 
 ### Changed
 All APIs that represented witnessed values as `Option<V>` now represent them as

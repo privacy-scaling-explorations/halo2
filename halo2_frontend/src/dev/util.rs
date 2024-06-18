@@ -1,7 +1,7 @@
-use group::ff::Field;
 use std::collections::BTreeMap;
 
 use super::{metadata, CellValue, InstanceValue, Value};
+use crate::plonk::FieldFront;
 use crate::plonk::{
     AdviceQuery, Column, ColumnType, Expression, FixedQuery, Gate, InstanceQuery, VirtualCell,
 };
@@ -52,7 +52,7 @@ impl From<InstanceQuery> for AnyQuery {
     }
 }
 
-pub(super) fn format_value<F: Field>(v: F) -> String {
+pub(super) fn format_value<F: FieldFront>(v: F) -> String {
     if v.is_zero_vartime() {
         "0".into()
     } else if v == F::ONE {
@@ -69,7 +69,7 @@ pub(super) fn format_value<F: Field>(v: F) -> String {
     }
 }
 
-pub(super) fn load<'a, F: Field, T: ColumnType, Q: Into<AnyQuery> + Copy>(
+pub(super) fn load<'a, F: FieldFront, T: ColumnType, Q: Into<AnyQuery> + Copy>(
     n: i32,
     row: i32,
     queries: &'a [(Column<T>, Rotation)],
@@ -82,7 +82,7 @@ pub(super) fn load<'a, F: Field, T: ColumnType, Q: Into<AnyQuery> + Copy>(
     }
 }
 
-pub(super) fn load_instance<'a, F: Field, T: ColumnType, Q: Into<AnyQuery> + Copy>(
+pub(super) fn load_instance<'a, F: FieldFront, T: ColumnType, Q: Into<AnyQuery> + Copy>(
     n: i32,
     row: i32,
     queries: &'a [(Column<T>, Rotation)],
@@ -96,7 +96,7 @@ pub(super) fn load_instance<'a, F: Field, T: ColumnType, Q: Into<AnyQuery> + Cop
     }
 }
 
-fn cell_value<'a, F: Field, Q: Into<AnyQuery> + Copy>(
+fn cell_value<'a, F: FieldFront, Q: Into<AnyQuery> + Copy>(
     virtual_cells: &'a [VirtualCell],
     load: impl Fn(Q) -> Value<F> + 'a,
 ) -> impl Fn(Q) -> BTreeMap<metadata::VirtualCell, String> + 'a {
@@ -129,7 +129,7 @@ fn cell_value<'a, F: Field, Q: Into<AnyQuery> + Copy>(
     }
 }
 
-pub(super) fn cell_values<'a, F: Field>(
+pub(super) fn cell_values<'a, F: FieldFront>(
     gate: &Gate<F>,
     poly: &Expression<F>,
     load_fixed: impl Fn(FixedQuery) -> Value<F> + 'a,

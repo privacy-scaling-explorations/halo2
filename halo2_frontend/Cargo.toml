@@ -9,7 +9,7 @@ authors = [
     "Privacy Scaling Explorations team",
 ]
 edition = "2021"
-rust-version = "1.66.0"
+rust-version = "1.70.0"
 description = """
 Halo2 frontend implementation.  This package implements an API to write circuits, handles witness generation and contains the MockProver.
 """

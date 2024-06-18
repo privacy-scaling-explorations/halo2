@@ -8,9 +8,10 @@ use std::{
     ops::{Add, Mul},
 };
 
+use crate::plonk::FieldFront;
 use group::prime::PrimeGroup;
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::{Field, PrimeField};
+use halo2_middleware::ff::PrimeField;
 use halo2_middleware::poly::Rotation;
 
 use crate::{
@@ -24,7 +25,8 @@ use crate::{
 /// Measures a circuit to determine its costs, and explain what contributes to them.
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct CircuitCost<G: PrimeGroup, ConcreteCircuit: Circuit<G::Scalar>> {
+pub struct CircuitCost<G: PrimeGroup, F: FieldFront<Field = G::Scalar>, ConcreteCircuit: Circuit<F>>
+{
     /// Power-of-2 bound on the number of rows in the circuit.
     k: u32,
     /// Maximum degree of the circuit.
@@ -52,7 +54,7 @@ pub struct CircuitCost<G: PrimeGroup, ConcreteCircuit: Circuit<G::Scalar>> {
     num_instance_columns: usize,
     num_total_columns: usize,
 
-    _marker: PhantomData<(G, ConcreteCircuit)>,
+    _marker: PhantomData<(G, F, ConcreteCircuit)>,
 }
 
 /// Region implementation used by Layout
@@ -147,7 +149,7 @@ impl Layout {
     }
 }
 
-impl<F: Field> Assignment<F> for Layout {
+impl<F: FieldFront> Assignment<F> for Layout {
     fn enter_region<NR, N>(&mut self, name_fn: N)
     where
         NR: Into<String>,
@@ -266,7 +268,9 @@ impl<F: Field> Assignment<F> for Layout {
     }
 }
 
-impl<G: PrimeGroup, ConcreteCircuit: Circuit<G::Scalar>> CircuitCost<G, ConcreteCircuit> {
+impl<G: PrimeGroup, FE: FieldFront<Field = G::Scalar>, ConcreteCircuit: Circuit<FE>>
+    CircuitCost<G, FE, ConcreteCircuit>
+{
     /// Measures a circuit with parameter constant `k`.
     ///
     /// Panics if `k` is not large enough for the circuit.
@@ -555,6 +559,6 @@ mod tests {
                 Ok(())
             }
         }
-        CircuitCost::<Eq, MyCircuit>::measure(K, &MyCircuit).proof_size(1);
+        CircuitCost::<Eq, _, MyCircuit>::measure(K, &MyCircuit).proof_size(1);
     }
 }

@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
 use std::ops::{Add, Mul, Neg, Sub};
 
-use group::ff::Field;
+use crate::plonk::FieldFront;
 
 use crate::plonk::{Assigned, Error};
 
@@ -523,7 +523,7 @@ where
 // Assigned<Field>
 //
 
-impl<F: Field> From<Value<F>> for Value<Assigned<F>> {
+impl<F: FieldFront> From<Value<F>> for Value<Assigned<F>> {
     #[must_use]
     fn from(value: Value<F>) -> Self {
         Self {
@@ -532,7 +532,7 @@ impl<F: Field> From<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<Value<F>> for Value<Assigned<F>> {
+impl<F: FieldFront> Add<Value<F>> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -543,7 +543,7 @@ impl<F: Field> Add<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<F> for Value<Assigned<F>> {
+impl<F: FieldFront> Add<F> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -552,7 +552,7 @@ impl<F: Field> Add<F> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<Value<F>> for Value<&Assigned<F>> {
+impl<F: FieldFront> Add<Value<F>> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -563,7 +563,7 @@ impl<F: Field> Add<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<F> for Value<&Assigned<F>> {
+impl<F: FieldFront> Add<F> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -572,7 +572,7 @@ impl<F: Field> Add<F> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<Value<F>> for Value<Assigned<F>> {
+impl<F: FieldFront> Sub<Value<F>> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -583,7 +583,7 @@ impl<F: Field> Sub<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<F> for Value<Assigned<F>> {
+impl<F: FieldFront> Sub<F> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -592,7 +592,7 @@ impl<F: Field> Sub<F> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<Value<F>> for Value<&Assigned<F>> {
+impl<F: FieldFront> Sub<Value<F>> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -603,7 +603,7 @@ impl<F: Field> Sub<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<F> for Value<&Assigned<F>> {
+impl<F: FieldFront> Sub<F> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -612,7 +612,7 @@ impl<F: Field> Sub<F> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<Value<F>> for Value<Assigned<F>> {
+impl<F: FieldFront> Mul<Value<F>> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -623,7 +623,7 @@ impl<F: Field> Mul<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<F> for Value<Assigned<F>> {
+impl<F: FieldFront> Mul<F> for Value<Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -632,7 +632,7 @@ impl<F: Field> Mul<F> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<Value<F>> for Value<&Assigned<F>> {
+impl<F: FieldFront> Mul<Value<F>> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -643,7 +643,7 @@ impl<F: Field> Mul<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<F> for Value<&Assigned<F>> {
+impl<F: FieldFront> Mul<F> for Value<&Assigned<F>> {
     type Output = Value<Assigned<F>>;
 
     #[must_use]
@@ -655,7 +655,7 @@ impl<F: Field> Mul<F> for Value<&Assigned<F>> {
 impl<V> Value<V> {
     /// Returns the field element corresponding to this value.
     #[must_use]
-    pub fn to_field<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn to_field<F: FieldFront>(&self) -> Value<Assigned<F>>
     where
         for<'v> Assigned<F>: From<&'v V>,
     {
@@ -666,7 +666,7 @@ impl<V> Value<V> {
 
     /// Returns the field element corresponding to this value.
     #[must_use]
-    pub fn into_field<F: Field>(self) -> Value<Assigned<F>>
+    pub fn into_field<F: FieldFront>(self) -> Value<Assigned<F>>
     where
         V: Into<Assigned<F>>,
     {
@@ -679,7 +679,7 @@ impl<V> Value<V> {
     ///
     /// # Examples
     ///
-    /// If you have a `Value<F: Field>`, convert it to `Value<Assigned<F>>` first:
+    /// If you have a `Value<F: FieldFront>`, convert it to `Value<Assigned<F>>` first:
     /// ```
     /// # use halo2curves::pasta::pallas::Base as F;
     /// use halo2_frontend::circuit::Value;
@@ -690,7 +690,7 @@ impl<V> Value<V> {
     /// let _ = v.double();
     /// ```
     #[must_use]
-    pub fn double<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn double<F: FieldFront>(&self) -> Value<Assigned<F>>
     where
         V: Borrow<Assigned<F>>,
     {
@@ -701,7 +701,7 @@ impl<V> Value<V> {
 
     /// Squares this field element.
     #[must_use]
-    pub fn square<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn square<F: FieldFront>(&self) -> Value<Assigned<F>>
     where
         V: Borrow<Assigned<F>>,
     {
@@ -712,7 +712,7 @@ impl<V> Value<V> {
 
     /// Cubes this field element.
     #[must_use]
-    pub fn cube<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn cube<F: FieldFront>(&self) -> Value<Assigned<F>>
     where
         V: Borrow<Assigned<F>>,
     {
@@ -723,7 +723,7 @@ impl<V> Value<V> {
 
     /// Inverts this assigned value (taking the inverse of zero to be zero).
     #[must_use]
-    pub fn invert<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn invert<F: FieldFront>(&self) -> Value<Assigned<F>>
     where
         V: Borrow<Assigned<F>>,
     {
@@ -733,7 +733,7 @@ impl<V> Value<V> {
     }
 }
 
-impl<F: Field> Value<Assigned<F>> {
+impl<F: FieldFront> Value<Assigned<F>> {
     /// Evaluates this value directly, performing an unbatched inversion if necessary.
     ///
     /// If the denominator is zero, the returned value is zero.

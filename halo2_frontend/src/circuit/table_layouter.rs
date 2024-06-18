@@ -6,15 +6,15 @@ use std::{
 };
 
 use super::Value;
+use crate::plonk::FieldFront;
 use crate::plonk::{Assigned, Assignment, Error, TableColumn, TableError};
-use halo2_middleware::ff::Field;
 
 /// Helper trait for implementing a custom [`Layouter`].
 ///
 /// This trait is used for implementing table assignments.
 ///
 /// [`Layouter`]: super::Layouter
-pub trait TableLayouter<F: Field>: std::fmt::Debug {
+pub trait TableLayouter<F: FieldFront>: std::fmt::Debug {
     /// Assigns a fixed value to a table cell.
     ///
     /// Returns an error if the table cell has already been assigned to.
@@ -37,14 +37,16 @@ pub trait TableLayouter<F: Field>: std::fmt::Debug {
 type DefaultTableValue<F> = Option<Value<Assigned<F>>>;
 
 /// A table layouter that can be used to assign values to a table.
-pub struct SimpleTableLayouter<'r, 'a, F: Field, CS: Assignment<F> + 'a> {
+pub struct SimpleTableLayouter<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> {
     cs: &'a mut CS,
     used_columns: &'r [TableColumn],
     /// maps from a fixed column to a pair (default value, vector saying which rows are assigned)
     pub default_and_assigned: HashMap<TableColumn, (DefaultTableValue<F>, Vec<bool>)>,
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> fmt::Debug for SimpleTableLayouter<'r, 'a, F, CS> {
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> fmt::Debug
+    for SimpleTableLayouter<'r, 'a, F, CS>
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("SimpleTableLayouter")
             .field("used_columns", &self.used_columns)
@@ -53,7 +55,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> fmt::Debug for SimpleTableLayoute
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> SimpleTableLayouter<'r, 'a, F, CS> {
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> SimpleTableLayouter<'r, 'a, F, CS> {
     /// Returns a new SimpleTableLayouter
     pub fn new(cs: &'a mut CS, used_columns: &'r [TableColumn]) -> Self {
         SimpleTableLayouter {
@@ -64,7 +66,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> SimpleTableLayouter<'r, 'a, F, CS
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> TableLayouter<F>
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> TableLayouter<F>
     for SimpleTableLayouter<'r, 'a, F, CS>
 {
     fn assign_cell<'v>(
@@ -378,7 +380,7 @@ mod tests {
                 meta.lookup("", |cells| {
                     let a = cells.query_advice(a, Rotation::cur());
 
-                    vec![(a.clone(), table.0), (a, table.1)]
+                    vec![(a, table.0), (a, table.1)]
                 });
 
                 Self::Config { table }

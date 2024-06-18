@@ -3,10 +3,8 @@ use std::{
     fmt::{self, Write},
 };
 
-use halo2_middleware::ff::PrimeField;
-
-use crate::dev::util;
 use crate::plonk::{sealed::SealedPhase, Circuit, ConstraintSystem, FirstPhase};
+use crate::{dev::util, plonk::FieldFront};
 
 #[derive(Debug)]
 struct Constraint {
@@ -31,7 +29,7 @@ struct Gate {
 /// use halo2_frontend::{
 ///     circuit::{Layouter, SimpleFloorPlanner},
 ///     dev::CircuitGates,
-///     plonk::{Circuit, ConstraintSystem, Error},
+///     plonk::{Circuit, ConstraintSystem, Error, FieldFront},
 /// };
 /// use halo2curves::pasta::pallas;
 ///
@@ -41,7 +39,7 @@ struct Gate {
 /// #[derive(Clone, Default)]
 /// struct MyCircuit {}
 ///
-/// impl<F: Field> Circuit<F> for MyCircuit {
+/// impl<F: FieldFront> Circuit<F> for MyCircuit {
 ///     type Config = MyConfig;
 ///     type FloorPlanner = SimpleFloorPlanner;
 ///     #[cfg(feature = "circuit-params")]
@@ -103,7 +101,7 @@ pub struct CircuitGates {
 
 impl CircuitGates {
     /// Collects the gates from within the circuit.
-    pub fn collect<F: PrimeField, C: Circuit<F>>(
+    pub fn collect<F: FieldFront, C: Circuit<F>>(
         #[cfg(feature = "circuit-params")] params: C::Params,
     ) -> Self {
         // Collect the graph details.

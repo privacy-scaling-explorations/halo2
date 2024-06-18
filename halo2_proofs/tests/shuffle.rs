@@ -1,6 +1,7 @@
 use ff::{BatchInvert, FromUniformBytes};
+use halo2_frontend::plonk::FieldFront;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::CurveAffine,
     circuit::{floor_planner::V1, Layouter, Value},
     dev::{metadata, FailureLocation, MockProver, VerifyFailure},
     halo2curves::pasta::EqAffine,
@@ -21,11 +22,13 @@ use halo2_proofs::{
 use rand_core::{OsRng, RngCore};
 use std::iter;
 
-fn rand_2d_array<F: Field, R: RngCore, const W: usize, const H: usize>(rng: &mut R) -> [[F; H]; W] {
+fn rand_2d_array<F: FieldFront, R: RngCore, const W: usize, const H: usize>(
+    rng: &mut R,
+) -> [[F; H]; W] {
     [(); W].map(|_| [(); H].map(|_| F::random(&mut *rng)))
 }
 
-fn shuffled<F: Field, R: RngCore, const W: usize, const H: usize>(
+fn shuffled<F: FieldFront, R: RngCore, const W: usize, const H: usize>(
     original: [[F; H]; W],
     rng: &mut R,
 ) -> [[F; H]; W] {
@@ -54,7 +57,7 @@ struct MyConfig<const W: usize> {
 }
 
 impl<const W: usize> MyConfig<W> {
-    fn configure<F: Field>(meta: &mut ConstraintSystem<F>) -> Self {
+    fn configure<F: FieldFront>(meta: &mut ConstraintSystem<F>) -> Self {
         let [q_shuffle, q_first, q_last] = [(); 3].map(|_| meta.selector());
         // First phase
         let original = [(); W].map(|_| meta.advice_column_in(FirstPhase));
@@ -85,15 +88,15 @@ impl<const W: usize> MyConfig<W> {
             let original = original
                 .iter()
                 .cloned()
-                .reduce(|acc, a| acc * theta.clone() + a)
+                .reduce(|acc, a| acc * theta + a)
                 .unwrap();
             let shuffled = shuffled
                 .iter()
                 .cloned()
-                .reduce(|acc, a| acc * theta.clone() + a)
+                .reduce(|acc, a| acc * theta + a)
                 .unwrap();
 
-            vec![q_shuffle * (z.cur() * (original + gamma.clone()) - z.next() * (shuffled + gamma))]
+            vec![q_shuffle * (z.cur() * (original + gamma) - z.next() * (shuffled + gamma))]
         });
 
         Self {
@@ -110,12 +113,12 @@ impl<const W: usize> MyConfig<W> {
 }
 
 #[derive(Clone, Default)]
-struct MyCircuit<F: Field, const W: usize, const H: usize> {
+struct MyCircuit<F: FieldFront, const W: usize, const H: usize> {
     original: Value<[[F; H]; W]>,
     shuffled: Value<[[F; H]; W]>,
 }
 
-impl<F: Field, const W: usize, const H: usize> MyCircuit<F, W, H> {
+impl<F: FieldFront, const W: usize, const H: usize> MyCircuit<F, W, H> {
     fn rand<R: RngCore>(rng: &mut R) -> Self {
         let original = rand_2d_array::<F, _, W, H>(rng);
         let shuffled = shuffled(original, rng);
@@ -127,7 +130,7 @@ impl<F: Field, const W: usize, const H: usize> MyCircuit<F, W, H> {
     }
 }
 
-impl<F: Field, const W: usize, const H: usize> Circuit<F> for MyCircuit<F, W, H> {
+impl<F: FieldFront, const W: usize, const H: usize> Circuit<F> for MyCircuit<F, W, H> {
     type Config = MyConfig<W>;
     type FloorPlanner = V1;
     #[cfg(feature = "circuit-params")]
@@ -242,7 +245,7 @@ impl<F: Field, const W: usize, const H: usize> Circuit<F> for MyCircuit<F, W, H>
     }
 }
 
-fn test_mock_prover<F: Ord + FromUniformBytes<64>, const W: usize, const H: usize>(
+fn test_mock_prover<F: FieldFront + Ord + FromUniformBytes<64>, const W: usize, const H: usize>(
     k: u32,
     circuit: MyCircuit<F, W, H>,
     expected: Result<(), Vec<(metadata::Constraint, FailureLocation)>>,
@@ -269,9 +272,9 @@ fn test_mock_prover<F: Ord + FromUniformBytes<64>, const W: usize, const H: usiz
     };
 }
 
-fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
+fn test_prover<C: CurveAffine, F: FieldFront<Field = C::Scalar>, const W: usize, const H: usize>(
     k: u32,
-    circuit: MyCircuit<C::Scalar, W, H>,
+    circuit: MyCircuit<F, W, H>,
     expected: bool,
 ) where
     C::Scalar: FromUniformBytes<64>,
@@ -283,7 +286,7 @@ fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
+        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _, F>(
             &params,
             &pk,
             &[circuit],
@@ -300,7 +303,7 @@ fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
         let strategy = AccumulatorStrategy::new(&params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _>(
+        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _, F>(
             &params,
             pk.get_vk(),
             strategy,
@@ -324,7 +327,7 @@ fn test_shuffle() {
 
     {
         test_mock_prover(K, circuit.clone(), Ok(()));
-        test_prover::<EqAffine, W, H>(K, circuit.clone(), true);
+        test_prover::<EqAffine, halo2curves::pasta::Fp, W, H>(K, circuit.clone(), true);
     }
 
     #[cfg(not(feature = "sanity-checks"))]
@@ -348,6 +351,6 @@ fn test_shuffle() {
                 },
             )]),
         );
-        test_prover::<EqAffine, W, H>(K, circuit, false);
+        test_prover::<EqAffine, halo2curves::pasta::Fp, W, H>(K, circuit, false);
     }
 }

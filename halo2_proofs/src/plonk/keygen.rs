@@ -4,8 +4,8 @@ use halo2_backend::plonk::{
     ProvingKey, VerifyingKey,
 };
 use halo2_backend::{arithmetic::CurveAffine, poly::commitment::Params};
-use halo2_frontend::circuit::compile_circuit;
 use halo2_frontend::plonk::Circuit;
+use halo2_frontend::{circuit::compile_circuit, plonk::FieldFront};
 use halo2_middleware::ff::FromUniformBytes;
 
 /// Generate a `VerifyingKey` from an instance of `Circuit`.
@@ -14,14 +14,15 @@ use halo2_middleware::ff::FromUniformBytes;
 /// **NOTE**: This `keygen_vk` is legacy one, assuming that `compress_selector: true`.
 /// Hence, it is HIGHLY recommended to pair this util with `keygen_pk`.
 /// In addition, when using this for key generation, user MUST use `compress_selectors: true`.
-pub fn keygen_vk<C, P, ConcreteCircuit>(
+pub fn keygen_vk<C, P, ConcreteCircuit, F>(
     params: &P,
     circuit: &ConcreteCircuit,
 ) -> Result<VerifyingKey<C>, Error>
 where
     C: CurveAffine,
     P: Params<C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: FieldFront<Field = C::Scalar>,
+    ConcreteCircuit: Circuit<F>,
     C::Scalar: FromUniformBytes<64>,
 {
     keygen_vk_custom(params, circuit, true)
@@ -35,7 +36,7 @@ where
 /// `ProvingKey` generation process.
 /// Otherwise, the user could get unmatching pk/vk pair.
 /// Hence, it is HIGHLY recommended to pair this util with `keygen_pk_custom`.
-pub fn keygen_vk_custom<C, P, ConcreteCircuit>(
+pub fn keygen_vk_custom<C, P, ConcreteCircuit, F>(
     params: &P,
     circuit: &ConcreteCircuit,
     compress_selectors: bool,
@@ -43,7 +44,8 @@ pub fn keygen_vk_custom<C, P, ConcreteCircuit>(
 where
     C: CurveAffine,
     P: Params<C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: FieldFront<Field = C::Scalar>,
+    ConcreteCircuit: Circuit<F>,
     C::Scalar: FromUniformBytes<64>,
 {
     let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
@@ -56,7 +58,7 @@ where
 /// **NOTE**: This `keygen_pk` is legacy one, assuming that `compress_selector: true`.
 /// Hence, it is HIGHLY recommended to pair this util with `keygen_vk`.
 /// In addition, when using this for key generation, user MUST use `compress_selectors: true`.
-pub fn keygen_pk<C, P, ConcreteCircuit>(
+pub fn keygen_pk<C, P, ConcreteCircuit, F>(
     params: &P,
     vk: VerifyingKey<C>,
     circuit: &ConcreteCircuit,
@@ -64,7 +66,8 @@ pub fn keygen_pk<C, P, ConcreteCircuit>(
 where
     C: CurveAffine,
     P: Params<C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: FieldFront<Field = C::Scalar>,
+    ConcreteCircuit: Circuit<F>,
 {
     keygen_pk_custom(params, vk, circuit, true)
 }
@@ -77,7 +80,7 @@ where
 /// `VerifyingKey` generation process.
 /// Otherwise, the user could get unmatching pk/vk pair.
 /// Hence, it is HIGHLY recommended to pair this util with `keygen_vk_custom`.
-pub fn keygen_pk_custom<C, P, ConcreteCircuit>(
+pub fn keygen_pk_custom<C, P, ConcreteCircuit, F>(
     params: &P,
     vk: VerifyingKey<C>,
     circuit: &ConcreteCircuit,
@@ -86,7 +89,8 @@ pub fn keygen_pk_custom<C, P, ConcreteCircuit>(
 where
     C: CurveAffine,
     P: Params<C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: FieldFront<Field = C::Scalar>,
+    ConcreteCircuit: Circuit<F>,
 {
     let (compiled_circuit, _, _) = compile_circuit(params.k(), circuit, compress_selectors)?;
     Ok(backend_keygen_pk(params, vk, &compiled_circuit)?)

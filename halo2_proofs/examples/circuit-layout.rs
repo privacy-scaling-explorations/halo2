@@ -1,7 +1,10 @@
 use ff::Field;
 use halo2_proofs::{
     circuit::{Cell, Layouter, Region, SimpleFloorPlanner, Value},
-    plonk::{Advice, Assigned, Circuit, Column, ConstraintSystem, ErrorFront, Fixed, TableColumn},
+    plonk::{
+        Advice, Assigned, Circuit, Column, ConstraintSystem, ErrorFront, FieldFront, Fixed,
+        TableColumn,
+    },
     poly::Rotation,
 };
 use halo2curves::pasta::Fp;
@@ -28,7 +31,7 @@ struct PlonkConfig {
     sl: TableColumn,
 }
 
-trait StandardCs<FF: Field> {
+trait StandardCs<FF: FieldFront> {
     fn raw_multiply<F>(
         &self,
         region: &mut Region<FF>,
@@ -47,17 +50,17 @@ trait StandardCs<FF: Field> {
     ) -> Result<(), ErrorFront>;
 }
 
-struct MyCircuit<F: Field> {
+struct MyCircuit<F: FieldFront> {
     a: Value<F>,
     lookup_table: Vec<F>,
 }
 
-struct StandardPlonk<F: Field> {
+struct StandardPlonk<F: FieldFront> {
     config: PlonkConfig,
     _marker: PhantomData<F>,
 }
 
-impl<FF: Field> StandardPlonk<FF> {
+impl<FF: FieldFront> StandardPlonk<FF> {
     fn new(config: PlonkConfig) -> Self {
         StandardPlonk {
             config,
@@ -66,7 +69,7 @@ impl<FF: Field> StandardPlonk<FF> {
     }
 }
 
-impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
+impl<FF: FieldFront> StandardCs<FF> for StandardPlonk<FF> {
     fn raw_multiply<F>(
         &self,
         region: &mut Region<FF>,
@@ -175,7 +178,7 @@ impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
     }
 }
 
-impl<F: Field> Circuit<F> for MyCircuit<F> {
+impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
     type Config = PlonkConfig;
     type FloorPlanner = SimpleFloorPlanner;
     #[cfg(feature = "circuit-params")]
@@ -240,7 +243,7 @@ impl<F: Field> Circuit<F> for MyCircuit<F> {
             let sc = meta.query_fixed(sc, Rotation::cur());
             let sm = meta.query_fixed(sm, Rotation::cur());
 
-            vec![a.clone() * sa + b.clone() * sb + a * b * sm - (c * sc) + sf * (d * e)]
+            vec![a * sa + b * sb + a * b * sm - (c * sc) + sf * (d * e)]
         });
 
         PlonkConfig {

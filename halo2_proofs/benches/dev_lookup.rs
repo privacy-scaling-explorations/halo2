@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate criterion;
 
-use ff::{Field, PrimeField};
+use halo2_frontend::plonk::FieldFront;
 use halo2_proofs::circuit::{Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::dev::MockProver;
 use halo2_proofs::plonk::*;
@@ -14,7 +14,7 @@ use criterion::{BenchmarkId, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
     #[derive(Clone, Default)]
-    struct MyCircuit<F: Field> {
+    struct MyCircuit<F: FieldFront> {
         _marker: PhantomData<F>,
     }
 
@@ -25,7 +25,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         advice: Column<Advice>,
     }
 
-    impl<F: PrimeField> Circuit<F> for MyCircuit<F> {
+    impl<F: FieldFront + From<u64>> Circuit<F> for MyCircuit<F> {
         type Config = MyConfig;
         type FloorPlanner = SimpleFloorPlanner;
         #[cfg(feature = "circuit-params")]
@@ -44,7 +44,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
             meta.lookup("lookup", |meta| {
                 let selector = meta.query_selector(config.selector);
-                let not_selector = Expression::Constant(F::ONE) - selector.clone();
+                let not_selector = Expression::Constant(F::ONE) - selector;
                 let advice = meta.query_advice(config.advice, Rotation::cur());
                 vec![(selector * advice + not_selector, config.table)]
             });

@@ -4,8 +4,8 @@ use std::cmp;
 use std::collections::HashSet;
 use std::fmt;
 
+use crate::plonk::FieldFront;
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::Field;
 
 pub use super::table_layouter::TableLayouter;
 use super::{Cell, RegionIndex, Value};
@@ -31,7 +31,7 @@ impl<T> SyncDeps for T {}
 /// This trait is used for implementing region assignments:
 ///
 /// ```ignore
-/// impl<'a, F: Field, C: Chip<F>, CS: Assignment<F> + 'a> Layouter<C> for MyLayouter<'a, C, CS> {
+/// impl<'a, F: FieldFront, C: Chip<F>, CS: Assignment<F> + 'a> Layouter<C> for MyLayouter<'a, C, CS> {
 ///     fn assign_region(
 ///         &mut self,
 ///         assignment: impl FnOnce(Region<'_, F, C>) -> Result<(), Error>,
@@ -56,7 +56,7 @@ impl<T> SyncDeps for T {}
 /// `Chip::Config`).
 ///
 /// [`Layouter`]: super::Layouter
-pub trait RegionLayouter<F: Field>: fmt::Debug + SyncDeps {
+pub trait RegionLayouter<F: FieldFront>: fmt::Debug + SyncDeps {
     /// Enables a selector at the given offset.
     fn enable_selector<'v>(
         &'v mut self,
@@ -210,7 +210,7 @@ impl RegionShape {
     }
 }
 
-impl<F: Field> RegionLayouter<F> for RegionShape {
+impl<F: FieldFront> RegionLayouter<F> for RegionShape {
     fn enable_selector<'v>(
         &'v mut self,
         _: &'v (dyn Fn() -> String + 'v),

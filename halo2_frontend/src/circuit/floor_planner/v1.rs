@@ -1,9 +1,8 @@
 use std::fmt;
 
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::Field;
 
-use crate::plonk::Assigned;
+use crate::plonk::{Assigned, FieldFront};
 use crate::{
     circuit::{
         layouter::{RegionColumn, RegionLayouter, RegionShape, SyncDeps, TableLayouter},
@@ -29,7 +28,7 @@ pub mod strategy;
 #[derive(Debug)]
 pub struct V1;
 
-struct V1Plan<'a, F: Field, CS: Assignment<F> + 'a> {
+struct V1Plan<'a, F: FieldFront, CS: Assignment<F> + 'a> {
     cs: &'a mut CS,
     /// Stores the starting row for each region.
     regions: Vec<RegionStart>,
@@ -39,13 +38,13 @@ struct V1Plan<'a, F: Field, CS: Assignment<F> + 'a> {
     table_columns: Vec<TableColumn>,
 }
 
-impl<'a, F: Field, CS: Assignment<F> + 'a> fmt::Debug for V1Plan<'a, F, CS> {
+impl<'a, F: FieldFront, CS: Assignment<F> + 'a> fmt::Debug for V1Plan<'a, F, CS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("floor_planner::V1Plan").finish()
     }
 }
 
-impl<'a, F: Field, CS: Assignment<F> + SyncDeps> V1Plan<'a, F, CS> {
+impl<'a, F: FieldFront, CS: Assignment<F> + SyncDeps> V1Plan<'a, F, CS> {
     /// Creates a new v1 layouter.
     pub fn new(cs: &'a mut CS) -> Result<Self, Error> {
         let ret = V1Plan {
@@ -59,7 +58,7 @@ impl<'a, F: Field, CS: Assignment<F> + SyncDeps> V1Plan<'a, F, CS> {
 }
 
 impl FloorPlanner for V1 {
-    fn synthesize<F: Field, CS: Assignment<F> + SyncDeps, C: Circuit<F>>(
+    fn synthesize<F: FieldFront, CS: Assignment<F> + SyncDeps, C: Circuit<F>>(
         cs: &mut CS,
         circuit: &C,
         config: C::Config,
@@ -143,16 +142,16 @@ impl FloorPlanner for V1 {
 }
 
 #[derive(Debug)]
-enum Pass<'p, 'a, F: Field, CS: Assignment<F> + 'a> {
+enum Pass<'p, 'a, F: FieldFront, CS: Assignment<F> + 'a> {
     Measurement(&'p mut MeasurementPass),
     Assignment(&'p mut AssignmentPass<'p, 'a, F, CS>),
 }
 
 /// A single pass of the [`V1`] layouter.
 #[derive(Debug)]
-pub struct V1Pass<'p, 'a, F: Field, CS: Assignment<F> + 'a>(Pass<'p, 'a, F, CS>);
+pub struct V1Pass<'p, 'a, F: FieldFront, CS: Assignment<F> + 'a>(Pass<'p, 'a, F, CS>);
 
-impl<'p, 'a, F: Field, CS: Assignment<F> + 'a> V1Pass<'p, 'a, F, CS> {
+impl<'p, 'a, F: FieldFront, CS: Assignment<F> + 'a> V1Pass<'p, 'a, F, CS> {
     fn measure(pass: &'p mut MeasurementPass) -> Self {
         V1Pass(Pass::Measurement(pass))
     }
@@ -162,7 +161,7 @@ impl<'p, 'a, F: Field, CS: Assignment<F> + 'a> V1Pass<'p, 'a, F, CS> {
     }
 }
 
-impl<'p, 'a, F: Field, CS: Assignment<F> + SyncDeps> Layouter<F> for V1Pass<'p, 'a, F, CS> {
+impl<'p, 'a, F: FieldFront, CS: Assignment<F> + SyncDeps> Layouter<F> for V1Pass<'p, 'a, F, CS> {
     type Root = Self;
 
     fn assign_region<A, AR, N, NR>(&mut self, name: N, assignment: A) -> Result<AR, Error>
@@ -240,7 +239,7 @@ impl MeasurementPass {
         MeasurementPass { regions: vec![] }
     }
 
-    fn assign_region<F: Field, A, AR>(&mut self, mut assignment: A) -> Result<AR, Error>
+    fn assign_region<F: FieldFront, A, AR>(&mut self, mut assignment: A) -> Result<AR, Error>
     where
         A: FnMut(Region<'_, F>) -> Result<AR, Error>,
     {
@@ -260,13 +259,13 @@ impl MeasurementPass {
 
 /// Assigns the circuit.
 #[derive(Debug)]
-pub struct AssignmentPass<'p, 'a, F: Field, CS: Assignment<F> + 'a> {
+pub struct AssignmentPass<'p, 'a, F: FieldFront, CS: Assignment<F> + 'a> {
     plan: &'p mut V1Plan<'a, F, CS>,
     /// Counter tracking which region we need to assign next.
     region_index: usize,
 }
 
-impl<'p, 'a, F: Field, CS: Assignment<F> + SyncDeps> AssignmentPass<'p, 'a, F, CS> {
+impl<'p, 'a, F: FieldFront, CS: Assignment<F> + SyncDeps> AssignmentPass<'p, 'a, F, CS> {
     fn new(plan: &'p mut V1Plan<'a, F, CS>) -> Self {
         AssignmentPass {
             plan,
@@ -349,12 +348,12 @@ impl<'p, 'a, F: Field, CS: Assignment<F> + SyncDeps> AssignmentPass<'p, 'a, F, C
     }
 }
 
-struct V1Region<'r, 'a, F: Field, CS: Assignment<F> + 'a> {
+struct V1Region<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> {
     plan: &'r mut V1Plan<'a, F, CS>,
     region_index: RegionIndex,
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> fmt::Debug for V1Region<'r, 'a, F, CS> {
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> fmt::Debug for V1Region<'r, 'a, F, CS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("V1Region")
             .field("plan", &self.plan)
@@ -363,13 +362,15 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> fmt::Debug for V1Region<'r, 'a, F
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> V1Region<'r, 'a, F, CS> {
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + 'a> V1Region<'r, 'a, F, CS> {
     fn new(plan: &'r mut V1Plan<'a, F, CS>, region_index: RegionIndex) -> Self {
         V1Region { plan, region_index }
     }
 }
 
-impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Region<'r, 'a, F, CS> {
+impl<'r, 'a, F: FieldFront, CS: Assignment<F> + SyncDeps> RegionLayouter<F>
+    for V1Region<'r, 'a, F, CS>
+{
     fn enable_selector<'v>(
         &'v mut self,
         annotation: &'v (dyn Fn() -> String + 'v),

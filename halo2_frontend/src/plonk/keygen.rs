@@ -1,7 +1,7 @@
 use std::ops::Range;
 
+use crate::plonk::FieldFront;
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::Field;
 
 use crate::circuit::Value;
 use crate::plonk::{
@@ -10,7 +10,7 @@ use crate::plonk::{
 
 /// Assembly to be used in circuit synthesis.
 #[derive(Debug)]
-pub(crate) struct Assembly<F: Field> {
+pub(crate) struct Assembly<F: FieldFront> {
     pub(crate) k: u32,
     pub(crate) fixed: Vec<Vec<Assigned<F>>>,
     pub(crate) permutation: permutation::Assembly,
@@ -20,7 +20,7 @@ pub(crate) struct Assembly<F: Field> {
     pub(crate) _marker: std::marker::PhantomData<F>,
 }
 
-impl<F: Field> Assignment<F> for Assembly<F> {
+impl<F: FieldFront> Assignment<F> for Assembly<F> {
     fn enter_region<NR, N>(&mut self, _: N)
     where
         NR: Into<String>,

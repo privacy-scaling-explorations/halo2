@@ -7,7 +7,6 @@ use halo2_middleware::zal::{
     impls::{PlonkEngine, PlonkEngineConfig},
     traits::MsmAccel,
 };
-use halo2_proofs::arithmetic::Field;
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::dev::MockProver;
 use halo2_proofs::plonk::{
@@ -22,8 +21,21 @@ use halo2_proofs::transcript::{
     Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge, TranscriptReadBuffer,
     TranscriptWriterBuffer,
 };
+use halo2_proofs::{arithmetic::Field, plonk::FieldFront};
 use rand_core::{OsRng, RngCore};
 use std::marker::PhantomData;
+
+macro_rules! common {
+    ($scheme:ident) => {{
+        let a = <$scheme as CommitmentScheme>::Scalar::from(2834758237)
+            * <$scheme as CommitmentScheme>::Scalar::ZETA;
+        let instance =
+            <$scheme as CommitmentScheme>::Scalar::ONE + <$scheme as CommitmentScheme>::Scalar::ONE;
+        let lookup_table = vec![instance, a, a, <$scheme as CommitmentScheme>::Scalar::ZERO];
+
+        (a, instance, lookup_table)
+    }};
+}
 
 #[test]
 fn plonk_api() {
@@ -51,7 +63,7 @@ fn plonk_api() {
     }
 
     #[allow(clippy::type_complexity)]
-    trait StandardCs<FF: Field> {
+    trait StandardCs<FF: FieldFront> {
         fn raw_multiply<F>(
             &self,
             layouter: &mut impl Layouter<FF>,
@@ -87,17 +99,17 @@ fn plonk_api() {
     }
 
     #[derive(Clone)]
-    struct MyCircuit<F: Field> {
+    struct MyCircuit<F: FieldFront> {
         a: Value<F>,
         lookup_table: Vec<F>,
     }
 
-    struct StandardPlonk<F: Field> {
+    struct StandardPlonk<F: FieldFront> {
         config: PlonkConfig,
         _marker: PhantomData<F>,
     }
 
-    impl<FF: Field> StandardPlonk<FF> {
+    impl<FF: FieldFront> StandardPlonk<FF> {
         fn new(config: PlonkConfig) -> Self {
             StandardPlonk {
                 config,
@@ -106,7 +118,7 @@ fn plonk_api() {
         }
     }
 
-    impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
+    impl<FF: FieldFront> StandardCs<FF> for StandardPlonk<FF> {
         fn raw_multiply<F>(
             &self,
             layouter: &mut impl Layouter<FF>,
@@ -280,7 +292,7 @@ fn plonk_api() {
         }
     }
 
-    impl<F: Field> Circuit<F> for MyCircuit<F> {
+    impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
         type Config = PlonkConfig;
         type FloorPlanner = SimpleFloorPlanner;
         #[cfg(feature = "circuit-params")]
@@ -347,7 +359,7 @@ fn plonk_api() {
                 let sc = meta.query_fixed(sc, Rotation::cur());
                 let sm = meta.query_fixed(sm, Rotation::cur());
 
-                vec![a.clone() * sa + b.clone() * sb + a * b * sm - (c * sc) + sf * (d * e)]
+                vec![a * sa + b * sb + a * b * sm - (c * sc) + sf * (d * e)]
             });
 
             meta.create_gate("Public input", |meta| {
@@ -415,17 +427,6 @@ fn plonk_api() {
         }
     }
 
-    macro_rules! common {
-        ($scheme:ident) => {{
-            let a = <$scheme as CommitmentScheme>::Scalar::from(2834758237)
-                * <$scheme as CommitmentScheme>::Scalar::ZETA;
-            let instance = <$scheme as CommitmentScheme>::Scalar::ONE
-                + <$scheme as CommitmentScheme>::Scalar::ONE;
-            let lookup_table = vec![instance, a, a, <$scheme as CommitmentScheme>::Scalar::ZERO];
-            (a, instance, lookup_table)
-        }};
-    }
-
     macro_rules! bad_keys {
         ($scheme:ident) => {{
             let (_, _, lookup_table) = common!($scheme);
@@ -433,7 +434,6 @@ fn plonk_api() {
                 a: Value::unknown(),
                 lookup_table: lookup_table.clone(),
             };
-
             // Check that we get an error if we try to initialize the proving key with a value of
             // k that is too small for the minimum required number of rows.
             let much_too_small_params= <$scheme as CommitmentScheme>::ParamsProver::new(1);
@@ -456,12 +456,16 @@ fn plonk_api() {
         }};
     }
 
-    fn keygen<Scheme: CommitmentScheme>(params: &Scheme::ParamsProver) -> ProvingKey<Scheme::Curve>
+    fn keygen<Scheme: CommitmentScheme, F: FieldFront<Field = Scheme::Scalar>>(
+        params: &Scheme::ParamsProver,
+    ) -> ProvingKey<Scheme::Curve>
     where
         Scheme::Scalar: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
     {
         let (_, _, lookup_table) = common!(Scheme);
-        let empty_circuit: MyCircuit<Scheme::Scalar> = MyCircuit {
+        let lookup_table: Vec<_> = lookup_table.into_iter().map(F::into_fieldfront).collect();
+
+        let empty_circuit: MyCircuit<F> = MyCircuit {
             a: Value::unknown(),
             lookup_table,
         };
@@ -480,6 +484,7 @@ fn plonk_api() {
         R: RngCore,
         T: TranscriptWriterBuffer<Vec<u8>, Scheme::Curve, E>,
         M: MsmAccel<Scheme::Curve>,
+        F: FieldFront<Field = Scheme::Scalar> + FromUniformBytes<64> + Ord,
     >(
         engine: PlonkEngine<Scheme::Curve, M>,
         rng: R,
@@ -490,8 +495,10 @@ fn plonk_api() {
         Scheme::Scalar: Ord + WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
         let (a, instance_val, lookup_table) = common!(Scheme);
-
-        let circuit: MyCircuit<Scheme::Scalar> = MyCircuit {
+        let a = F::into_fieldfront(a);
+        let instance_val = F::into_fieldfront(instance_val);
+        let lookup_table: Vec<_> = lookup_table.into_iter().map(F::into_fieldfront).collect();
+        let circuit: MyCircuit<F> = MyCircuit {
             a: Value::known(a),
             lookup_table,
         };
@@ -499,7 +506,7 @@ fn plonk_api() {
         let mut transcript = T::init(vec![]);
 
         let instance = [vec![vec![instance_val]], vec![vec![instance_val]]];
-        create_plonk_proof_with_engine::<Scheme, P, _, _, _, _, _>(
+        create_plonk_proof_with_engine::<Scheme, P, _, _, _, _, _, F>(
             engine,
             params,
             pk,
@@ -527,6 +534,7 @@ fn plonk_api() {
         E: EncodedChallenge<Scheme::Curve>,
         R: RngCore,
         T: TranscriptWriterBuffer<Vec<u8>, Scheme::Curve, E>,
+        F: FieldFront<Field = Scheme::Scalar> + FromUniformBytes<64> + Ord,
     >(
         rng: R,
         params: &'params Scheme::ParamsProver,
@@ -536,7 +544,7 @@ fn plonk_api() {
         Scheme::Scalar: Ord + WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
         let engine = PlonkEngineConfig::build_default();
-        create_proof_with_engine::<Scheme, P, _, _, T, _>(engine, rng, params, pk)
+        create_proof_with_engine::<Scheme, P, _, _, T, _, F>(engine, rng, params, pk)
     }
 
     fn verify_proof<
@@ -547,6 +555,7 @@ fn plonk_api() {
         E: EncodedChallenge<Scheme::Curve>,
         T: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
         Strategy: VerificationStrategy<'params, Scheme, V, Output = Strategy>,
+        F: FieldFront<Field = Scheme::Scalar> + FromUniformBytes<64> + Ord,
     >(
         params_verifier: &'params Scheme::ParamsVerifier,
         vk: &VerifyingKey<Scheme::Curve>,
@@ -555,6 +564,7 @@ fn plonk_api() {
         Scheme::Scalar: Ord + WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
         let (_, instance_val, _) = common!(Scheme);
+        let instance_val = F::into_fieldfront(instance_val);
 
         let mut transcript = T::init(proof);
         let instance = [vec![vec![instance_val]], vec![vec![instance_val]]];
@@ -573,16 +583,22 @@ fn plonk_api() {
         use halo2curves::bn256::Bn256;
 
         type Scheme = KZGCommitmentScheme<Bn256>;
+
         bad_keys!(Scheme);
 
         let params = ParamsKZG::<Bn256>::new(K);
         let rng = OsRng;
 
-        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
+        let pk = keygen::<KZGCommitmentScheme<_>, <Scheme as CommitmentScheme>::Scalar>(&params);
 
-        let proof = create_proof::<_, ProverGWC<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng, &params, &pk,
-        );
+        let proof = create_proof::<
+            _,
+            ProverGWC<_>,
+            _,
+            _,
+            Blake2bWrite<_, _, Challenge255<_>>,
+            <Scheme as CommitmentScheme>::Scalar,
+        >(rng, &params, &pk);
 
         let verifier_params = params.verifier_params();
 
@@ -592,6 +608,7 @@ fn plonk_api() {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
+            <Scheme as CommitmentScheme>::Scalar,
         >(&verifier_params, pk.get_vk(), &proof[..]);
     }
 
@@ -607,11 +624,16 @@ fn plonk_api() {
         let params = ParamsKZG::<Bn256>::new(K);
         let rng = OsRng;
 
-        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
+        let pk = keygen::<KZGCommitmentScheme<_>, <Scheme as CommitmentScheme>::Scalar>(&params);
 
-        let proof = create_proof::<_, ProverSHPLONK<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng, &params, &pk,
-        );
+        let proof = create_proof::<
+            _,
+            ProverSHPLONK<_>,
+            _,
+            _,
+            Blake2bWrite<_, _, Challenge255<_>>,
+            <Scheme as CommitmentScheme>::Scalar,
+        >(rng, &params, &pk);
 
         let verifier_params = params.verifier_params();
 
@@ -621,6 +643,7 @@ fn plonk_api() {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
+            <Scheme as CommitmentScheme>::Scalar,
         >(&verifier_params, pk.get_vk(), &proof[..]);
     }
 
@@ -636,11 +659,17 @@ fn plonk_api() {
         let params = ParamsIPA::<EqAffine>::new(K);
         let rng = OsRng;
 
-        let pk = keygen::<IPACommitmentScheme<EqAffine>>(&params);
+        let pk =
+            keygen::<IPACommitmentScheme<EqAffine>, <Scheme as CommitmentScheme>::Scalar>(&params);
 
-        let proof = create_proof::<_, ProverIPA<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng, &params, &pk,
-        );
+        let proof = create_proof::<
+            _,
+            ProverIPA<_>,
+            _,
+            _,
+            Blake2bWrite<_, _, Challenge255<_>>,
+            <Scheme as CommitmentScheme>::Scalar,
+        >(rng, &params, &pk);
 
         let verifier_params = params;
 
@@ -650,6 +679,7 @@ fn plonk_api() {
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,
+            <Scheme as CommitmentScheme>::Scalar,
         >(&verifier_params, pk.get_vk(), &proof[..]);
 
         // Check that the verification key has not changed unexpectedly

@@ -1,4 +1,3 @@
-use halo2_middleware::ff::Field;
 use plotters::{
     coord::Shift,
     prelude::{DrawingArea, DrawingAreaErrorKind, DrawingBackend},
@@ -6,7 +5,7 @@ use plotters::{
 use std::collections::HashSet;
 use std::ops::Range;
 
-use crate::plonk::{Circuit, Column, ConstraintSystem, FloorPlanner};
+use crate::plonk::{Circuit, Column, ConstraintSystem, FieldFront, FloorPlanner};
 use crate::{circuit::layouter::RegionColumn, dev::cost::Layout};
 use halo2_middleware::circuit::Any;
 
@@ -80,7 +79,7 @@ impl CircuitLayout {
     }
 
     /// Renders the given circuit on the given drawing area.
-    pub fn render<F: Field, ConcreteCircuit: Circuit<F>, DB: DrawingBackend>(
+    pub fn render<F: FieldFront, ConcreteCircuit: Circuit<F>, DB: DrawingBackend>(
         self,
         k: u32,
         circuit: &ConcreteCircuit,

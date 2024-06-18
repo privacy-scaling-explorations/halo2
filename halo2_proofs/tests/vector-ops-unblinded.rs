@@ -4,8 +4,9 @@
 use std::marker::PhantomData;
 
 use ff::FromUniformBytes;
+use halo2_frontend::plonk::FieldFront;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::CurveAffine,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::*,
     poly::{
@@ -24,7 +25,7 @@ use halo2_proofs::{
 use rand_core::OsRng;
 
 // ANCHOR: instructions
-trait NumericInstructions<F: Field>: Chip<F> {
+trait NumericInstructions<F: FieldFront>: Chip<F> {
     /// Variable representing a number.
     type Num;
 
@@ -64,7 +65,7 @@ trait NumericInstructions<F: Field>: Chip<F> {
 // ANCHOR: chip
 /// The chip that will implement our instructions! Chips store their own
 /// config, as well as type markers if necessary.
-struct MultChip<F: Field> {
+struct MultChip<F: FieldFront> {
     config: FieldConfig,
     _marker: PhantomData<F>,
 }
@@ -72,7 +73,7 @@ struct MultChip<F: Field> {
 // ANCHOR: chip
 /// The chip that will implement our instructions! Chips store their own
 /// config, as well as type markers if necessary.
-struct AddChip<F: Field> {
+struct AddChip<F: FieldFront> {
     config: FieldConfig,
     _marker: PhantomData<F>,
 }
@@ -88,7 +89,7 @@ struct FieldConfig {
     s: Selector,
 }
 
-impl<F: Field> MultChip<F> {
+impl<F: FieldFront> MultChip<F> {
     fn construct(config: <Self as Chip<F>>::Config) -> Self {
         Self {
             config,
@@ -125,7 +126,7 @@ impl<F: Field> MultChip<F> {
     }
 }
 
-impl<F: Field> AddChip<F> {
+impl<F: FieldFront> AddChip<F> {
     fn construct(config: <Self as Chip<F>>::Config) -> Self {
         Self {
             config,
@@ -164,7 +165,7 @@ impl<F: Field> AddChip<F> {
 // ANCHOR_END: chip-config
 
 // ANCHOR: chip-impl
-impl<F: Field> Chip<F> for MultChip<F> {
+impl<F: FieldFront> Chip<F> for MultChip<F> {
     type Config = FieldConfig;
     type Loaded = ();
 
@@ -179,7 +180,7 @@ impl<F: Field> Chip<F> for MultChip<F> {
 // ANCHOR_END: chip-impl
 
 // ANCHOR: chip-impl
-impl<F: Field> Chip<F> for AddChip<F> {
+impl<F: FieldFront> Chip<F> for AddChip<F> {
     type Config = FieldConfig;
     type Loaded = ();
 
@@ -195,9 +196,9 @@ impl<F: Field> Chip<F> for AddChip<F> {
 // ANCHOR: instructions-impl
 /// A variable representing a number.
 #[derive(Clone, Debug)]
-struct Number<F: Field>(AssignedCell<F, F>);
+struct Number<F: FieldFront>(AssignedCell<F, F>);
 
-impl<F: Field> NumericInstructions<F> for MultChip<F> {
+impl<F: FieldFront> NumericInstructions<F> for MultChip<F> {
     type Num = Number<F>;
 
     fn load_unblinded(
@@ -279,7 +280,7 @@ impl<F: Field> NumericInstructions<F> for MultChip<F> {
 }
 // ANCHOR_END: instructions-impl
 
-impl<F: Field> NumericInstructions<F> for AddChip<F> {
+impl<F: FieldFront> NumericInstructions<F> for AddChip<F> {
     type Num = Number<F>;
 
     fn load_unblinded(
@@ -361,12 +362,12 @@ impl<F: Field> NumericInstructions<F> for AddChip<F> {
 }
 
 #[derive(Default)]
-struct MulCircuit<F: Field> {
+struct MulCircuit<F: FieldFront> {
     a: Vec<Value<F>>,
     b: Vec<Value<F>>,
 }
 
-impl<F: Field> Circuit<F> for MulCircuit<F> {
+impl<F: FieldFront> Circuit<F> for MulCircuit<F> {
     // Since we are using a single chip for everything, we can just reuse its config.
     type Config = FieldConfig;
     type FloorPlanner = SimpleFloorPlanner;
@@ -414,12 +415,12 @@ impl<F: Field> Circuit<F> for MulCircuit<F> {
 // ANCHOR_END: circuit
 
 #[derive(Default)]
-struct AddCircuit<F: Field> {
+struct AddCircuit<F: FieldFront> {
     a: Vec<Value<F>>,
     b: Vec<Value<F>>,
 }
 
-impl<F: Field> Circuit<F> for AddCircuit<F> {
+impl<F: FieldFront> Circuit<F> for AddCircuit<F> {
     // Since we are using a single chip for everything, we can just reuse its config.
     type Config = FieldConfig;
     type FloorPlanner = SimpleFloorPlanner;
@@ -466,11 +467,11 @@ impl<F: Field> Circuit<F> for AddCircuit<F> {
 }
 // ANCHOR_END: circuit
 
-fn test_prover<C: CurveAffine>(
+fn test_prover<C: CurveAffine, F: FieldFront<Field = C::Scalar>>(
     k: u32,
-    circuit: impl Circuit<C::Scalar>,
+    circuit: impl Circuit<F>,
     expected: bool,
-    instances: Vec<C::Scalar>,
+    instances: Vec<F>,
 ) -> Vec<u8>
 where
     C::Scalar: FromUniformBytes<64>,
@@ -483,7 +484,7 @@ where
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
+        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _, F>(
             &params,
             &pk,
             &[circuit],
@@ -500,7 +501,7 @@ where
         let strategy = AccumulatorStrategy::new(&params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _>(
+        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _, F>(
             &params,
             pk.get_vk(),
             strategy,
@@ -545,9 +546,9 @@ fn test_vector_ops_unbinded() {
     };
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
-    let proof_1 = test_prover::<halo2curves::pasta::EqAffine>(k, mul_circuit, true, c_mul);
+    let proof_1 = test_prover::<halo2curves::pasta::EqAffine, _>(k, mul_circuit, true, c_mul);
     // the commitments will be the first columns of the proof transcript so we can compare them easily
-    let proof_2 = test_prover::<halo2curves::pasta::EqAffine>(k, add_circuit, true, c_add);
+    let proof_2 = test_prover::<halo2curves::pasta::EqAffine, _>(k, add_circuit, true, c_add);
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     // here we compare the first 10 bytes of the commitments

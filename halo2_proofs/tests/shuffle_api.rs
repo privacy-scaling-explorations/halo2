@@ -2,13 +2,11 @@ use std::{marker::PhantomData, vec};
 
 use ff::FromUniformBytes;
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
         create_proof, keygen_pk, keygen_vk, verify_proof, Advice, Circuit, Column,
-        ConstraintSystem, ErrorFront, Fixed, Selector,
+        ConstraintSystem, ErrorFront, FieldFront, Fixed, Selector,
     },
-    poly::Rotation,
     poly::{
         commitment::ParamsProver,
         ipa::{
@@ -16,7 +14,7 @@ use halo2_proofs::{
             multiopen::{ProverIPA, VerifierIPA},
             strategy::AccumulatorStrategy,
         },
-        VerificationStrategy,
+        Rotation, VerificationStrategy,
     },
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
@@ -25,7 +23,7 @@ use halo2_proofs::{
 use halo2curves::{pasta::EqAffine, CurveAffine};
 use rand_core::OsRng;
 
-struct ShuffleChip<F: Field> {
+struct ShuffleChip<F: FieldFront> {
     config: ShuffleConfig,
     _marker: PhantomData<F>,
 }
@@ -40,7 +38,7 @@ struct ShuffleConfig {
     s_shuffle: Selector,
 }
 
-impl<F: Field> ShuffleChip<F> {
+impl<F: FieldFront> ShuffleChip<F> {
     fn construct(config: ShuffleConfig) -> Self {
         Self {
             config,
@@ -65,7 +63,7 @@ impl<F: Field> ShuffleChip<F> {
             let shuffle_0 = meta.query_advice(shuffle_0, Rotation::cur());
             let shuffle_1 = meta.query_advice(shuffle_1, Rotation::cur());
             vec![
-                (s_input.clone() * input_0, s_shuffle.clone() * shuffle_0),
+                (s_input * input_0, s_shuffle * shuffle_0),
                 (s_input * input_1, s_shuffle * shuffle_1),
             ]
         });
@@ -81,14 +79,14 @@ impl<F: Field> ShuffleChip<F> {
 }
 
 #[derive(Default)]
-struct MyCircuit<F: Field> {
+struct MyCircuit<F: FieldFront> {
     input_0: Vec<Value<F>>,
     input_1: Vec<F>,
     shuffle_0: Vec<Value<F>>,
     shuffle_1: Vec<Value<F>>,
 }
 
-impl<F: Field> Circuit<F> for MyCircuit<F> {
+impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
     // Since we are using a single chip for everything, we can just reuse its config.
     type Config = ShuffleConfig;
     type FloorPlanner = SimpleFloorPlanner;
@@ -148,8 +146,11 @@ impl<F: Field> Circuit<F> for MyCircuit<F> {
     }
 }
 
-fn test_prover<C: CurveAffine>(k: u32, circuit: MyCircuit<C::Scalar>, expected: bool)
-where
+fn test_prover<C: CurveAffine, F: FieldFront<Field = C::Scalar>>(
+    k: u32,
+    circuit: MyCircuit<F>,
+    expected: bool,
+) where
     C::Scalar: FromUniformBytes<64>,
 {
     let params = ParamsIPA::<C>::new(k);
@@ -159,7 +160,7 @@ where
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
+        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _, F>(
             &params,
             &pk,
             &[circuit],
@@ -176,7 +177,7 @@ where
         let strategy = AccumulatorStrategy::new(&params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _>(
+        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _, F>(
             &params,
             pk.get_vk(),
             strategy,
@@ -213,5 +214,5 @@ fn test_shuffle_api() {
     };
     let prover = MockProver::run(K, &circuit, vec![]).unwrap();
     prover.assert_satisfied();
-    test_prover::<EqAffine>(K, circuit, true);
+    test_prover::<EqAffine, halo2curves::pasta::Fp>(K, circuit, true);
 }

@@ -2,6 +2,7 @@
 extern crate criterion;
 
 use group::ff::Field;
+use halo2_frontend::plonk::FieldFront;
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::plonk::*;
 use halo2_proofs::poly::{commitment::ParamsProver, Rotation};
@@ -43,7 +44,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         sm: Column<Fixed>,
     }
 
-    trait StandardCs<FF: Field> {
+    trait StandardCs<FF: FieldFront> {
         fn raw_multiply<F>(
             &self,
             layouter: &mut impl Layouter<FF>,
@@ -67,17 +68,17 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     #[derive(Clone)]
-    struct MyCircuit<F: Field> {
+    struct MyCircuit<F: FieldFront> {
         a: Value<F>,
         k: u32,
     }
 
-    struct StandardPlonk<F: Field> {
+    struct StandardPlonk<F: FieldFront> {
         config: PlonkConfig,
         _marker: PhantomData<F>,
     }
 
-    impl<FF: Field> StandardPlonk<FF> {
+    impl<FF: FieldFront> StandardPlonk<FF> {
         fn new(config: PlonkConfig) -> Self {
             StandardPlonk {
                 config,
@@ -86,7 +87,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
+    impl<FF: FieldFront> StandardCs<FF> for StandardPlonk<FF> {
         fn raw_multiply<F>(
             &self,
             layouter: &mut impl Layouter<FF>,
@@ -186,7 +187,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    impl<F: Field> Circuit<F> for MyCircuit<F> {
+    impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
         type Config = PlonkConfig;
         type FloorPlanner = SimpleFloorPlanner;
         #[cfg(feature = "circuit-params")]
@@ -225,7 +226,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 let sc = meta.query_fixed(sc, Rotation::cur());
                 let sm = meta.query_fixed(sm, Rotation::cur());
 
-                vec![a.clone() * sa + b.clone() * sb + a * b * sm - (c * sc)]
+                vec![a * sa + b * sb + a * b * sm - (c * sc)]
             });
 
             PlonkConfig {
@@ -287,7 +288,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         };
 
         let mut transcript = Blake2bWrite::<_, _, Challenge255<EqAffine>>::init(vec![]);
-        create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
+        create_proof::<
+            IPACommitmentScheme<EqAffine>,
+            ProverIPA<EqAffine>,
+            _,
+            _,
+            _,
+            _,
+            halo2curves::pasta::Fp,
+        >(
             params,
             pk,
             &[circuit],
@@ -302,7 +311,14 @@ fn criterion_benchmark(c: &mut Criterion) {
     fn verifier(params: &ParamsIPA<EqAffine>, vk: &VerifyingKey<EqAffine>, proof: &[u8]) {
         let strategy = SingleStrategy::new(params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(proof);
-        assert!(verify_proof(params, vk, strategy, &[vec![vec![]]], &mut transcript).is_ok());
+        assert!(verify_proof::<_, _, _, _, _, halo2curves::pasta::Fp>(
+            params,
+            vk,
+            strategy,
+            &[vec![vec![]]],
+            &mut transcript
+        )
+        .is_ok());
     }
 
     let k_range = 8..=16;

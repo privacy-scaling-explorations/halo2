@@ -1,17 +1,19 @@
 use std::{fmt, marker::PhantomData};
 
 use halo2_middleware::circuit::Any;
-use halo2_middleware::ff::Field;
 use tracing::{debug, debug_span, span::EnteredSpan};
 
-use crate::circuit::{
-    layouter::{RegionLayouter, SyncDeps},
-    AssignedCell, Cell, Layouter, Region, Table, Value,
-};
 use crate::plonk::{
     circuit::expression::{Challenge, Column},
     Advice, Assigned, Assignment, Circuit, ConstraintSystem, Error, Fixed, FloorPlanner, Instance,
     Selector,
+};
+use crate::{
+    circuit::{
+        layouter::{RegionLayouter, SyncDeps},
+        AssignedCell, Cell, Layouter, Region, Table, Value,
+    },
+    plonk::FieldFront,
 };
 
 /// A helper type that augments a [`FloorPlanner`] with [`tracing`] spans and events.
@@ -33,15 +35,15 @@ use crate::plonk::{
 /// use halo2_frontend::{
 ///     circuit::{floor_planner, Layouter, Value},
 ///     dev::TracingFloorPlanner,
-///     plonk::{Circuit, ConstraintSystem, Error},
+///     plonk::{Circuit, ConstraintSystem, Error, FieldFront},
 /// };
 ///
-/// # struct MyCircuit<F: Field> {
+/// # struct MyCircuit<F: FieldFront> {
 /// #     some_witness: Value<F>,
 /// # };
 /// # #[derive(Clone)]
 /// # struct MyConfig;
-/// impl<F: Field> Circuit<F> for MyCircuit<F> {
+/// impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
 ///     // Wrap `TracingFloorPlanner` around your existing floor planner of choice.
 ///     //type FloorPlanner = floor_planner::V1;
 ///     type FloorPlanner = TracingFloorPlanner<floor_planner::V1>;
@@ -86,7 +88,7 @@ pub struct TracingFloorPlanner<P: FloorPlanner> {
 }
 
 impl<P: FloorPlanner> FloorPlanner for TracingFloorPlanner<P> {
-    fn synthesize<F: Field, CS: Assignment<F> + SyncDeps, C: Circuit<F>>(
+    fn synthesize<F: FieldFront, CS: Assignment<F> + SyncDeps, C: Circuit<F>>(
         cs: &mut CS,
         circuit: &C,
         config: C::Config,
@@ -102,12 +104,12 @@ impl<P: FloorPlanner> FloorPlanner for TracingFloorPlanner<P> {
 }
 
 /// A helper type that augments a [`Circuit`] with [`tracing`] spans and events.
-enum TracingCircuit<'c, F: Field, C: Circuit<F>> {
+enum TracingCircuit<'c, F: FieldFront, C: Circuit<F>> {
     Borrowed(&'c C, PhantomData<F>),
     Owned(C, PhantomData<F>),
 }
 
-impl<'c, F: Field, C: Circuit<F>> TracingCircuit<'c, F, C> {
+impl<'c, F: FieldFront, C: Circuit<F>> TracingCircuit<'c, F, C> {
     fn borrowed(circuit: &'c C) -> Self {
         Self::Borrowed(circuit, PhantomData)
     }
@@ -124,7 +126,7 @@ impl<'c, F: Field, C: Circuit<F>> TracingCircuit<'c, F, C> {
     }
 }
 
-impl<'c, F: Field, C: Circuit<F>> Circuit<F> for TracingCircuit<'c, F, C> {
+impl<'c, F: FieldFront, C: Circuit<F>> Circuit<F> for TracingCircuit<'c, F, C> {
     type Config = C::Config;
     type FloorPlanner = C::FloorPlanner;
     #[cfg(feature = "circuit-params")]
@@ -147,13 +149,13 @@ impl<'c, F: Field, C: Circuit<F>> Circuit<F> for TracingCircuit<'c, F, C> {
 }
 
 /// A helper type that augments a [`Layouter`] with [`tracing`] spans and events.
-struct TracingLayouter<F: Field, L: Layouter<F>> {
+struct TracingLayouter<F: FieldFront, L: Layouter<F>> {
     layouter: L,
     namespace_spans: Vec<EnteredSpan>,
     _phantom: PhantomData<F>,
 }
 
-impl<F: Field, L: Layouter<F>> TracingLayouter<F, L> {
+impl<F: FieldFront, L: Layouter<F>> TracingLayouter<F, L> {
     fn new(layouter: L) -> Self {
         Self {
             layouter,
@@ -163,7 +165,7 @@ impl<F: Field, L: Layouter<F>> TracingLayouter<F, L> {
     }
 }
 
-impl<F: Field, L: Layouter<F>> Layouter<F> for TracingLayouter<F, L> {
+impl<F: FieldFront, L: Layouter<F>> Layouter<F> for TracingLayouter<F, L> {
     type Root = Self;
 
     fn assign_region<A, AR, N, NR>(&mut self, name: N, mut assignment: A) -> Result<AR, Error>
@@ -223,23 +225,23 @@ impl<F: Field, L: Layouter<F>> Layouter<F> for TracingLayouter<F, L> {
     }
 }
 
-fn debug_value<F: Field, V: fmt::Debug>(value: &AssignedCell<V, F>) {
+fn debug_value<F: FieldFront, V: fmt::Debug>(value: &AssignedCell<V, F>) {
     value.value().assert_if_known(|v| {
         debug!(target: "assigned", value = ?v);
         true
     });
 }
 
-fn debug_value_and_return_cell<F: Field, V: fmt::Debug>(value: AssignedCell<V, F>) -> Cell {
+fn debug_value_and_return_cell<F: FieldFront, V: fmt::Debug>(value: AssignedCell<V, F>) -> Cell {
     debug_value(&value);
     value.cell()
 }
 
 /// A helper type that augments a [`Region`] with [`tracing`] spans and events.
 #[derive(Debug)]
-struct TracingRegion<'r, F: Field>(Region<'r, F>);
+struct TracingRegion<'r, F: FieldFront>(Region<'r, F>);
 
-impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
+impl<'r, F: FieldFront> RegionLayouter<F> for TracingRegion<'r, F> {
     fn enable_selector<'v>(
         &'v mut self,
         annotation: &'v (dyn Fn() -> String + 'v),
@@ -355,13 +357,13 @@ impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
 }
 
 /// A helper type that augments an [`Assignment`] with [`tracing`] spans and events.
-struct TracingAssignment<'cs, F: Field, CS: Assignment<F>> {
+struct TracingAssignment<'cs, F: FieldFront, CS: Assignment<F>> {
     cs: &'cs mut CS,
     in_region: bool,
     _phantom: PhantomData<F>,
 }
 
-impl<'cs, F: Field, CS: Assignment<F>> TracingAssignment<'cs, F, CS> {
+impl<'cs, F: FieldFront, CS: Assignment<F>> TracingAssignment<'cs, F, CS> {
     fn new(cs: &'cs mut CS) -> Self {
         Self {
             cs,
@@ -371,7 +373,7 @@ impl<'cs, F: Field, CS: Assignment<F>> TracingAssignment<'cs, F, CS> {
     }
 }
 
-impl<'cs, F: Field, CS: Assignment<F>> Assignment<F> for TracingAssignment<'cs, F, CS> {
+impl<'cs, F: FieldFront, CS: Assignment<F>> Assignment<F> for TracingAssignment<'cs, F, CS> {
     fn enter_region<NR, N>(&mut self, name_fn: N)
     where
         NR: Into<String>,

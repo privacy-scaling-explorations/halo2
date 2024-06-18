@@ -1,14 +1,14 @@
 use std::marker::PhantomData;
 
+use halo2_frontend::plonk::FieldFront;
 use halo2_proofs::{
-    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::{Advice, Circuit, Column, ConstraintSystem, ErrorFront, Instance, Selector},
     poly::Rotation,
 };
 
 // ANCHOR: instructions
-trait NumericInstructions<F: Field>: Chip<F> {
+trait NumericInstructions<F: FieldFront>: Chip<F> {
     /// Variable representing a number.
     type Num;
 
@@ -40,7 +40,7 @@ trait NumericInstructions<F: Field>: Chip<F> {
 // ANCHOR: chip
 /// The chip that will implement our instructions! Chips store their own
 /// config, as well as type markers if necessary.
-struct FieldChip<F: Field> {
+struct FieldChip<F: FieldFront> {
     config: FieldConfig,
     _marker: PhantomData<F>,
 }
@@ -66,7 +66,7 @@ struct FieldConfig {
     s_mul: Selector,
 }
 
-impl<F: Field> FieldChip<F> {
+impl<F: FieldFront> FieldChip<F> {
     fn construct(config: <Self as Chip<F>>::Config) -> Self {
         Self {
             config,
@@ -124,7 +124,7 @@ impl<F: Field> FieldChip<F> {
 // ANCHOR_END: chip-config
 
 // ANCHOR: chip-impl
-impl<F: Field> Chip<F> for FieldChip<F> {
+impl<F: FieldFront> Chip<F> for FieldChip<F> {
     type Config = FieldConfig;
     type Loaded = ();
 
@@ -141,9 +141,9 @@ impl<F: Field> Chip<F> for FieldChip<F> {
 // ANCHOR: instructions-impl
 /// A variable representing a number.
 #[derive(Clone, Debug)]
-struct Number<F: Field>(AssignedCell<F, F>);
+struct Number<F: FieldFront>(AssignedCell<F, F>);
 
-impl<F: Field> NumericInstructions<F> for FieldChip<F> {
+impl<F: FieldFront> NumericInstructions<F> for FieldChip<F> {
     type Num = Number<F>;
 
     fn load_private(
@@ -223,12 +223,12 @@ impl<F: Field> NumericInstructions<F> for FieldChip<F> {
 /// they won't have any value during key generation. During proving, if any of these
 /// were `None` we would get an error.
 #[derive(Default)]
-struct MyCircuit<F: Field> {
+struct MyCircuit<F: FieldFront> {
     a: Vec<Value<F>>,
     b: Vec<Value<F>>,
 }
 
-impl<F: Field> Circuit<F> for MyCircuit<F> {
+impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
     // Since we are using a single chip for everything, we can just reuse its config.
     type Config = FieldConfig;
     type FloorPlanner = SimpleFloorPlanner;

@@ -1,7 +1,6 @@
+use crate::plonk::FieldFront;
 use std::collections::BTreeMap;
 use std::iter;
-
-use group::ff::Field;
 
 use super::FailureLocation;
 use crate::dev::{metadata, util};
@@ -137,7 +136,7 @@ pub(super) fn render_cell_layout(
     }
 }
 
-pub(super) fn expression_to_string<F: Field>(
+pub(super) fn expression_to_string<F: FieldFront>(
     expr: &Expression<F>,
     layout: &BTreeMap<i32, BTreeMap<metadata::Column, String>>,
 ) -> String {

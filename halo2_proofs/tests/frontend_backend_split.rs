@@ -64,7 +64,7 @@ struct MyCircuitConfig {
 
 impl MyCircuitConfig {
     #[allow(clippy::type_complexity)]
-    fn assign_gate<F: Field + From<u64>>(
+    fn assign_gate<F: FieldFront + From<u64>>(
         &self,
         region: &mut Region<'_, F>,
         offset: &mut usize,
@@ -103,7 +103,7 @@ struct MyCircuit<F: Field, const WIDTH_FACTOR: usize> {
     _marker: std::marker::PhantomData<F>,
 }
 
-impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR> {
+impl<F: FieldFront + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR> {
     fn new(k: u32, input: u64) -> Self {
         Self {
             k,
@@ -180,8 +180,8 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
             let b = meta.query_advice(b, Rotation::cur());
             let c = meta.query_advice(c, Rotation::cur());
             let d = meta.query_fixed(d, Rotation::cur());
-            let lhs = [one.clone(), a, b].map(|c| c * s_lookup.clone());
-            let rhs = [one.clone(), d, c].map(|c| c * s_ltable.clone());
+            let lhs = [one, a, b].map(|c| c * s_lookup);
+            let rhs = [one, d, c].map(|c| c * s_ltable);
             lhs.into_iter().zip(rhs).collect()
         });
 
@@ -190,8 +190,8 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
             let s_stable = meta.query_fixed(s_stable, Rotation::cur());
             let a = meta.query_advice(a, Rotation::cur());
             let b = meta.query_advice(b, Rotation::cur());
-            let lhs = [one.clone(), a].map(|c| c * s_shuffle.clone());
-            let rhs = [one.clone(), b].map(|c| c * s_stable.clone());
+            let lhs = [one, a].map(|c| c * s_shuffle);
+            let rhs = [one, b].map(|c| c * s_stable);
             lhs.into_iter().zip(rhs).collect()
         });
 
@@ -205,7 +205,7 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
             let challenge = meta.query_challenge(challenge);
 
             vec![
-                s_rlc.clone() * (a + challenge.clone() * b - e.clone()),
+                s_rlc * (a + challenge * b - e),
                 s_rlc * (c + challenge * d - e),
             ]
         });
@@ -413,7 +413,9 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> MyCircuit<F, WIDTH_FACTOR>
     }
 }
 
-impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> Circuit<F> for MyCircuit<F, WIDTH_FACTOR> {
+impl<F: FieldFront + From<u64>, const WIDTH_FACTOR: usize> Circuit<F>
+    for MyCircuit<F, WIDTH_FACTOR>
+{
     type Config = Vec<MyCircuitConfig>;
     type FloorPlanner = SimpleFloorPlanner;
     #[cfg(feature = "circuit-params")]
@@ -466,9 +468,12 @@ impl<F: Field + From<u64>, const WIDTH_FACTOR: usize> Circuit<F> for MyCircuit<F
     }
 }
 
-use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
 use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
 use halo2_proofs::poly::kzg::strategy::SingleStrategy;
+use halo2_proofs::{
+    plonk::FieldFront,
+    poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG},
+};
 use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use rand_core::block::BlockRng;
 use rand_core::block::BlockRngCore;
@@ -504,9 +509,6 @@ const WIDTH_FACTOR: usize = 1;
 
 #[test]
 fn test_mycircuit_full_legacy() {
-    #[cfg(all(feature = "heap-profiling", not(coverage)))]
-    let _profiler = dhat::Profiler::new_heap();
-
     use halo2_proofs::plonk::{
         create_proof, keygen_pk as keygen_pk_legacy, keygen_vk as keygen_vk_legacy,
     };
@@ -527,7 +529,15 @@ fn test_mycircuit_full_legacy() {
 
     let start = Instant::now();
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-    create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
+    create_proof::<
+        KZGCommitmentScheme<Bn256>,
+        ProverSHPLONK<'_, Bn256>,
+        _,
+        _,
+        _,
+        _,
+        halo2curves::bn256::Fr,
+    >(
         &params,
         &pk,
         &[circuit],

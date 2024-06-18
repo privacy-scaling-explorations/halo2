@@ -5,7 +5,7 @@ authors = [
     "Privacy Scaling Explorations team",
 ]
 edition = "2021"
-rust-version = "1.66.0"
+rust-version = "1.70.0"
 description = """
 Halo2 Debug.  This package contains utilities for debugging and testing within
 the halo2 ecosystem.

@@ -23,7 +23,7 @@ use halo2_proofs::{
     },
     SerdeFormat,
 };
-use halo2curves::bn256::{Bn256, Fr, G1Affine};
+use halo2curves::bn256::{self, Bn256, Fr, G1Affine};
 use rand_core::OsRng;
 
 #[derive(Clone, Copy)]
@@ -55,14 +55,7 @@ impl StandardPlonkConfig {
                 let [q_a, q_b, q_c, q_ab, constant] = [q_a, q_b, q_c, q_ab, constant]
                     .map(|column| meta.query_fixed(column, Rotation::cur()));
                 let instance = meta.query_instance(instance, Rotation::cur());
-                Some(
-                    q_a * a.clone()
-                        + q_b * b.clone()
-                        + q_c * c
-                        + q_ab * a * b
-                        + constant
-                        + instance,
-                )
+                Some(q_a * a + q_b * b + q_c * c + q_ab * a * b + constant + instance)
             },
         );
 
@@ -145,7 +138,7 @@ fn test_serialization() {
     let f = File::open("serialization-test.pk").unwrap();
     let mut reader = BufReader::new(f);
     #[allow(clippy::unit_arg)]
-    let pk = pk_read::<G1Affine, _, StandardPlonk>(
+    let pk = pk_read::<G1Affine, _, _, StandardPlonk>(
         &mut reader,
         SerdeFormat::RawBytes,
         k,
@@ -165,6 +158,7 @@ fn test_serialization() {
         _,
         Blake2bWrite<Vec<u8>, G1Affine, Challenge255<_>>,
         _,
+        bn256::Fr,
     >(
         &params,
         &pk,
@@ -185,6 +179,7 @@ fn test_serialization() {
         Challenge255<G1Affine>,
         Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
         SingleStrategy<Bn256>,
+        _,
     >(
         &verifier_params,
         pk.get_vk(),

@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use ff::PrimeField;
 use halo2_debug::display::expr_disp_names;
 use halo2_frontend::circuit::compile_circuit;
-use halo2_frontend::plonk::Error;
+use halo2_frontend::plonk::{Error, FieldFront};
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::poly::Rotation;
 
@@ -14,7 +14,6 @@ use halo2_backend::transcript::{
 };
 use halo2_middleware::circuit::{Any, ColumnMid};
 use halo2_middleware::zal::impls::{H2cEngine, PlonkEngineConfig};
-use halo2_proofs::arithmetic::Field;
 use halo2_proofs::plonk::{
     create_proof_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Advice, Assigned,
     Circuit, Column, ConstraintSystem, Instance, Selector,
@@ -55,12 +54,12 @@ struct MyCircuitConfig {
 }
 
 #[derive(Debug)]
-struct MyCircuitChip<F: Field> {
+struct MyCircuitChip<F: FieldFront> {
     config: MyCircuitConfig,
     marker: PhantomData<F>,
 }
 
-trait MyCircuitComposer<F: Field> {
+trait MyCircuitComposer<F: FieldFront> {
     fn raw_multiply<FM>(
         &self,
         layouter: &mut impl Layouter<F>,
@@ -92,7 +91,7 @@ trait MyCircuitComposer<F: Field> {
         FM: FnMut() -> Value<(Assigned<F>, Assigned<F>)>;
 }
 
-impl<F: Field> MyCircuitChip<F> {
+impl<F: FieldFront> MyCircuitChip<F> {
     fn construct(config: MyCircuitConfig) -> Self {
         Self {
             config,
@@ -148,7 +147,7 @@ impl<F: Field> MyCircuitChip<F> {
 
             let s_cubed = meta.query_selector(s_cubed);
 
-            vec![s_cubed * (l.clone() * l.clone() * l - o)]
+            vec![s_cubed * (l * l * l - o)]
         });
 
         MyCircuitConfig {
@@ -163,7 +162,7 @@ impl<F: Field> MyCircuitChip<F> {
     }
 }
 
-impl<F: Field> MyCircuitComposer<F> for MyCircuitChip<F> {
+impl<F: FieldFront> MyCircuitComposer<F> for MyCircuitChip<F> {
     fn raw_multiply<FM>(
         &self,
         layouter: &mut impl Layouter<F>,
@@ -292,13 +291,13 @@ impl<F: Field> MyCircuitComposer<F> for MyCircuitChip<F> {
 }
 
 #[derive(Debug, Clone, Default)]
-struct MyCircuit<F: Field> {
+struct MyCircuit<F: FieldFront> {
     x: Value<F>,
     y: Value<F>,
     constant: F,
 }
 
-impl<F: Field> Circuit<F> for MyCircuit<F> {
+impl<F: FieldFront> Circuit<F> for MyCircuit<F> {
     type Config = MyCircuitConfig;
     type FloorPlanner = SimpleFloorPlanner;
     #[cfg(feature = "circuit-params")]
@@ -375,7 +374,16 @@ fn test_mycircuit(
     let instances = vec![vec![vec![Fr::one(), Fr::from_u128(3)]]];
 
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-    create_proof_with_engine::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _, _>(
+    create_proof_with_engine::<
+        KZGCommitmentScheme<Bn256>,
+        ProverSHPLONK<'_, Bn256>,
+        _,
+        _,
+        _,
+        _,
+        _,
+        halo2curves::bn256::Fr,
+    >(
         engine,
         &params,
         &pk,
@@ -391,14 +399,13 @@ fn test_mycircuit(
         Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
     let strategy = SingleStrategy::new(&verifier_params);
 
-    verify_proof::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, _>(
+    verify_proof::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, _, _>(
         &verifier_params,
         &vk,
         strategy,
         instances.as_slice(),
         &mut verifier_transcript,
     )
-    .map_err(halo2_proofs::plonk::Error::Backend)
 }
 
 /*
