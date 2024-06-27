@@ -1,3 +1,8 @@
+mod check_witness;
+pub mod display;
+
+pub use check_witness::check_witness;
+
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 use tiny_keccak::Hasher;
@@ -34,5 +39,3 @@ pub fn test_result<F: FnOnce() -> Vec<u8> + Send>(test: F, _expected: &str) -> V
 
     result
 }
-
-pub mod display;
