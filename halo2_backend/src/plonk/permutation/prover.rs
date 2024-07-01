@@ -20,18 +20,34 @@ use crate::{
 use halo2_middleware::circuit::Any;
 use halo2_middleware::poly::Rotation;
 
-// TODO: Document a bit these types
-// https://github.com/privacy-scaling-explorations/halo2/issues/264
-
+/// Single permutation product polynomial, which has been **committed**.
+///
+/// This struct contains two fields:
+/// - `permutation_product_poly`: A (coefficient-form) polynomial representing the permutation grand product.
+/// - `permutation_product_blind`: A scalar value used for blinding, in the commitment of the `permutation_product_poly`.
+///
+/// It stores a single `Z_P` in [permutation argument specification](https://zcash.github.io/halo2/design/proving-system/permutation.html#argument-specification).  
 pub(crate) struct CommittedSet<C: CurveAffine> {
     pub(crate) permutation_product_poly: Polynomial<C::Scalar, Coeff>,
     permutation_product_blind: Blind<C::Scalar>,
 }
 
+/// Set of permutation product polynomials, which have been **committed**.
+///
+/// This struct is to contain all of the permutation product polynomials([`CommittedSet`]), from a single circuit.
+///
+/// It stores multiple `Z_P` in [permutation argument specification](https://zcash.github.io/halo2/design/proving-system/permutation.html#spanning-a-large-number-of-columns).
 pub(crate) struct Committed<C: CurveAffine> {
     pub(crate) sets: Vec<CommittedSet<C>>,
 }
 
+/// Set of permutation product polynomials, which have been **evaluated**.
+///
+/// This struct is, in essence, the same as [`Committed`].  
+///
+/// It indicates that the permutation product polynomials([`Committed`]) have been evaluated in the evaluation domain, and converted to [`Evaluated`](see [`Committed::evaluate`]).  
+///
+/// It also indicates that the permuted product polynomials([`Evaluated`]) can be **opened** (see [`Evaluated::open`]).  
 pub(crate) struct Evaluated<C: CurveAffine> {
     constructed: Committed<C>,
 }
