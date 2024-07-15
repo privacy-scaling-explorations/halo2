@@ -4,8 +4,8 @@ use halo2_backend::poly::kzg::strategy::SingleStrategy;
 use halo2_backend::{
     plonk::{
         keygen::{keygen_pk, keygen_vk},
-        prover::ProverSingle,
-        verifier::verify_proof_single,
+        prover::Prover,
+        verifier::verify_proof,
     },
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
@@ -73,7 +73,7 @@ pub(crate) fn setup_prove_verify(
     println!("Proving...");
     let start = Instant::now();
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-    let mut prover = ProverSingle::<
+    let mut prover = Prover::<
         KZGCommitmentScheme<Bn256>,
         ProverSHPLONK<'_, Bn256>,
         _,
@@ -93,15 +93,15 @@ pub(crate) fn setup_prove_verify(
     println!("Verifying...");
     let mut verifier_transcript =
         Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
-    let strategy = SingleStrategy::new(&verifier_params);
 
-    verify_proof_single::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, _>(
-        &verifier_params,
-        &vk,
-        strategy,
-        pis.to_vec(),
-        &mut verifier_transcript,
-    )
-    .expect("verify succeeds");
+    assert!(
+        verify_proof::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, SingleStrategy<_>>(
+            &verifier_params,
+            &vk,
+            pis.to_vec(),
+            &mut verifier_transcript,
+        ),
+        "failed to verify proof"
+    );
     println!("Verify: {:?}", start.elapsed());
 }

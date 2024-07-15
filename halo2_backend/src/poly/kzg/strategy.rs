@@ -120,8 +120,6 @@ where
     E::G1: CurveExt<AffineExt = E::G1Affine>,
     E::G2Affine: SerdeCurveAffine,
 {
-    type Output = Self;
-
     fn new(params: &'params ParamsVerifierKZG<E>) -> Self {
         AccumulatorStrategy::new(params)
     }
@@ -129,7 +127,7 @@ where
     fn process(
         mut self,
         f: impl FnOnce(V::MSMAccumulator) -> Result<V::Guard, Error>,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self, Error> {
         self.msm_accumulator.scale(E::Fr::random(OsRng));
 
         // Guard is updated with new msm contributions
@@ -155,8 +153,6 @@ where
     E::G1: CurveExt<AffineExt = E::G1Affine>,
     E::G2Affine: SerdeCurveAffine,
 {
-    type Output = ();
-
     fn new(params: &'params ParamsVerifierKZG<E>) -> Self {
         Self::new(params)
     }
@@ -164,20 +160,19 @@ where
     fn process(
         self,
         f: impl FnOnce(V::MSMAccumulator) -> Result<V::Guard, Error>,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self, Error> {
         // Guard is updated with new msm contributions
         let guard = f(self.msm)?;
         let msm = guard.msm_accumulator;
-        // Verification is (supposedly) cheap, hence we don't use an accelerator engine
-        let default_engine = H2cEngine::new();
-        if msm.check(&default_engine, &self.params) {
-            Ok(())
-        } else {
-            Err(Error::ConstraintSystemFailure)
-        }
+        Ok(Self {
+            msm,
+            params: self.params,
+        })
     }
 
     fn finalize(self) -> bool {
-        unreachable!();
+        // Verification is (supposedly) cheap, hence we don't use an accelerator engine
+        let default_engine = H2cEngine::new();
+        self.msm.check(&default_engine, &self.params)
     }
 }

@@ -1,7 +1,7 @@
 use crate::plonk::{Error, ErrorBack};
 use crate::poly::commitment::{self, CommitmentScheme, Params};
 use crate::transcript::{EncodedChallenge, TranscriptWrite};
-use halo2_backend::plonk::{prover::Prover, ProvingKey};
+use halo2_backend::plonk::{prover::ProverMulti, ProvingKey};
 use halo2_frontend::circuit::WitnessCalculator;
 use halo2_frontend::plonk::{Circuit, ConstraintSystem};
 use halo2_middleware::ff::{FromUniformBytes, WithSmallOrderMulGroup};
@@ -55,7 +55,7 @@ where
             WitnessCalculator::new(params.k(), circuit, &config, &cs, instances[i].as_slice())
         })
         .collect();
-    let mut prover = Prover::<Scheme, P, _, _, _, _>::new_with_engine(
+    let mut prover = ProverMulti::<Scheme, P, _, _, _, _>::new_with_engine(
         engine, params, pk, instances, rng, transcript,
     )?;
     let mut challenges = HashMap::new();

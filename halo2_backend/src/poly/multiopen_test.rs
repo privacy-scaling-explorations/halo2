@@ -173,7 +173,7 @@ mod test {
         V: Verifier<'params, Scheme>,
         E: EncodedChallenge<Scheme::Curve>,
         T: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
-        Strategy: VerificationStrategy<'params, Scheme, V, Output = Strategy>,
+        Strategy: VerificationStrategy<'params, Scheme, V>,
     >(
         params: &'params Scheme::ParamsVerifier,
         proof: &'a [u8],

@@ -5,7 +5,7 @@ use halo2_middleware::zal::impls::H2cEngine;
 use halo2curves::CurveAffine;
 use rand_core::OsRng;
 
-use super::{verify_proof, VerificationStrategy};
+use super::{verify_proof_with_strategy, VerificationStrategy};
 use crate::{
     multicore::{
         IndexedParallelIterator, IntoParallelIterator, ParallelIterator, TryFoldAndReduce,
@@ -34,8 +34,6 @@ struct BatchStrategy<'params, C: CurveAffine> {
 impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<C>, VerifierIPA<C>>
     for BatchStrategy<'params, C>
 {
-    type Output = MSMIPA<'params, C>;
-
     fn new(params: &'params ParamsVerifierIPA<C>) -> Self {
         BatchStrategy {
             msm: MSMIPA::new(params),
@@ -45,9 +43,11 @@ impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<
     fn process(
         self,
         f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self, Error> {
         let guard = f(self.msm)?;
-        Ok(guard.use_challenges())
+        Ok(Self {
+            msm: guard.use_challenges(),
+        })
     }
 
     fn finalize(self) -> bool {
@@ -110,10 +110,12 @@ where
             .map(|(i, item)| {
                 let strategy = BatchStrategy::new(params);
                 let mut transcript = Blake2bRead::init(&item.proof[..]);
-                verify_proof(params, vk, strategy, &item.instances, &mut transcript).map_err(|e| {
-                    tracing::debug!("Batch item {} failed verification: {}", i, e);
-                    e
-                })
+                verify_proof_with_strategy(params, vk, strategy, &item.instances, &mut transcript)
+                    .map_err(|e| {
+                        tracing::debug!("Batch item {} failed verification: {}", i, e);
+                        e
+                    })
+                    .map(|st| st.msm)
             })
             .try_fold_and_reduce(
                 || ParamsVerifier::<'_, C>::empty_msm(params),
