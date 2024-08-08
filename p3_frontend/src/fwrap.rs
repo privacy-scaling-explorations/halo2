@@ -239,7 +239,7 @@ impl<F: PrimeField + Hash + Ord> p3PrimeField for FWrap<F> {
 }
 
 // HACK: In general an `FWrap` will need more than 64 bits.  This trait is only implemented in
-// order to use `FWrap` with witness generation from plonky3 that requries this trait but doesn't
+// order to use `FWrap` with witness generation from plonky3 that requires this trait but doesn't
 // use the order.  Do not use an `ff::PrimeField` on a circuit that requires a 64 bit prime field
 // (i.e. relies on the `ORDER_U64` value), only use it on circuits that always assign less than 64
 // bit values on the field elements.

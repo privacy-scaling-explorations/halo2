@@ -174,11 +174,11 @@ impl Calculation {
 /// Evaluator
 #[derive(Clone, Default, Debug)]
 pub(crate) struct Evaluator<C: CurveAffine> {
-    ///  Custom gates evalution
+    ///  Custom gates evaluation
     custom_gates: GraphEvaluator<C>,
-    ///  Lookups evalution
+    ///  Lookups evaluation
     lookups: Vec<GraphEvaluator<C>>,
-    ///  Shuffle evalution
+    ///  Shuffle evaluation
     shuffles: Vec<GraphEvaluator<C>>,
 }
 

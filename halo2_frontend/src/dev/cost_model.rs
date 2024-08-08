@@ -16,9 +16,9 @@ use super::MockProver;
 pub enum CommitmentScheme {
     /// Inner Product Argument commitment scheme
     IPA,
-    /// KZG with GWC19 mutli-open strategy
+    /// KZG with GWC19 multi-open strategy
     KZGGWC,
-    /// KZG with BDFG20 mutli-open strategy
+    /// KZG with BDFG20 multi-open strategy
     KZGSHPLONK,
 }
 

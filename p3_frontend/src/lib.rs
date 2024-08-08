@@ -144,7 +144,7 @@ where
 }
 
 // Check if the constraint is an equality against a public input and extract the copy constraint as
-// `(advice_column_index, Location)` and `public_index`.  If there's no copy constriant, return
+// `(advice_column_index, Location)` and `public_index`.  If there's no copy constraint, return
 // None.
 fn extract_copy_public<F: PrimeField + Hash>(
     e: &SymbolicExpression<FWrap<F>>,

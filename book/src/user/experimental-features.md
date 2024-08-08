@@ -24,11 +24,11 @@ When using `create_proof` and `verify_proof`, we need to specify the commitment 
 create_proof<IPACommitmentScheme<_>, ProverIPA<_>, _, _, _, _>
 verify_proof<IPACommitmentScheme<_>, ProverIPA<_>, _, _, _>
 
-// Using KZG with GWC19 mutli-open strategy
+// Using KZG with GWC19 multi-open strategy
 create_proof<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _, _>
 verify_proof<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _>
 
-// Using KZG with BDFG20 mutli-open strategy
+// Using KZG with BDFG20 multi-open strategy
 create_proof<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>
 verify_proof<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _>
 ```

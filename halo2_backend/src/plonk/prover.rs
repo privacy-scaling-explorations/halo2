@@ -489,10 +489,10 @@ impl<
 
     /// Finalizes the proof creation.
     /// The following steps are performed:
-    /// - 1. Generate commited lookup polys
-    /// - 2. Generate commited permutation polys
-    /// - 3. Generate commited lookup polys
-    /// - 4. Generate commited shuffle polys
+    /// - 1. Generate committed lookup polys
+    /// - 2. Generate committed permutation polys
+    /// - 3. Generate committed lookup polys
+    /// - 4. Generate committed shuffle polys
     /// - 5. Commit to the vanishing argument's random polynomial
     /// - 6. Generate the advice polys
     /// - 7. Evaluate the h(X) polynomial
@@ -523,7 +523,7 @@ impl<
             .map(|index| challenges.remove(&index).unwrap())
             .collect::<Vec<_>>();
 
-        // 1. Generate commited ( added to transcript ) lookup polys  ---------------------------------------
+        // 1. Generate committed ( added to transcript ) lookup polys  ---------------------------------------
 
         // Sample theta challenge for keeping lookup columns linearly independent
         // [TRANSCRIPT-5]
@@ -574,9 +574,9 @@ impl<
         // [TRANSCRIPT-8]
         let gamma: ChallengeGamma<_> = self.transcript.squeeze_challenge_scalar();
 
-        // 2. Generate commited permutation polys  -----------------------------------------
+        // 2. Generate committed permutation polys  -----------------------------------------
         // [TRANSCRIPT-9]
-        let permutations_commited: Vec<permutation::prover::Committed<Scheme::Curve>> = instances
+        let permutations_committed: Vec<permutation::prover::Committed<Scheme::Curve>> = instances
             .iter()
             .zip(advices.iter())
             .map(|(instance, advice)| {
@@ -597,34 +597,35 @@ impl<
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        // 3. Generate commited lookup polys ----------------------------------------------------------
+        // 3. Generate committed lookup polys ----------------------------------------------------------
 
         // [TRANSCRIPT-10]
-        let lookups_commited: Vec<Vec<lookup::prover::Committed<Scheme::Curve>>> = permuted_lookups
-            .into_iter()
-            .map(|lookups| -> Result<Vec<_>, _> {
-                // Construct and commit to products for each lookup
-                lookups
-                    .into_iter()
-                    .map(|lookup| {
-                        lookup.commit_product(
-                            &self.engine,
-                            pk,
-                            params,
-                            beta,
-                            gamma,
-                            &mut rng,
-                            self.transcript,
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let lookups_committed: Vec<Vec<lookup::prover::Committed<Scheme::Curve>>> =
+            permuted_lookups
+                .into_iter()
+                .map(|lookups| -> Result<Vec<_>, _> {
+                    // Construct and commit to products for each lookup
+                    lookups
+                        .into_iter()
+                        .map(|lookup| {
+                            lookup.commit_product(
+                                &self.engine,
+                                pk,
+                                params,
+                                beta,
+                                gamma,
+                                &mut rng,
+                                self.transcript,
+                            )
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .collect::<Result<Vec<_>, _>>()?;
 
-        // 4. Generate commited shuffle polys  -------------------------------------------------------
+        // 4. Generate committed shuffle polys  -------------------------------------------------------
 
         // [TRANSCRIPT-11]
-        let shuffles_commited: Vec<Vec<shuffle::prover::Committed<Scheme::Curve>>> = instances
+        let shuffles_committed: Vec<Vec<shuffle::prover::Committed<Scheme::Curve>>> = instances
             .iter()
             .zip(advices.iter())
             .map(|(instance, advice)| -> Result<Vec<_>, _> {
@@ -703,9 +704,9 @@ impl<
             *beta,
             *gamma,
             *theta,
-            &lookups_commited,
-            &shuffles_commited,
-            &permutations_commited,
+            &lookups_committed,
+            &shuffles_committed,
+            &permutations_committed,
         );
 
         // 8. Construct the vanishing argument's h(X) commitments --------------------------------------
@@ -796,7 +797,7 @@ impl<
         // Evaluate the permutations, if any, at omega^i x.
         // [TRANSCRIPT-21]
         let permutations_evaluated: Vec<permutation::prover::Evaluated<Scheme::Curve>> =
-            permutations_commited
+            permutations_committed
                 .into_iter()
                 .map(|permutation| -> Result<_, _> { permutation.evaluate(pk, x, self.transcript) })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -804,7 +805,7 @@ impl<
         // Evaluate the lookups, if any, at omega^i x.
         // [TRANSCRIPT-22]
         let lookups_evaluated: Vec<Vec<lookup::prover::Evaluated<Scheme::Curve>>> =
-            lookups_commited
+            lookups_committed
                 .into_iter()
                 .map(|lookups| -> Result<Vec<_>, _> {
                     lookups
@@ -817,7 +818,7 @@ impl<
         // Evaluate the shuffles, if any, at omega^i x.
         // [TRANSCRIPT-23]
         let shuffles_evaluated: Vec<Vec<shuffle::prover::Evaluated<Scheme::Curve>>> =
-            shuffles_commited
+            shuffles_committed
                 .into_iter()
                 .map(|shuffles| -> Result<Vec<_>, _> {
                     shuffles

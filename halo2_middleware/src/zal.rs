@@ -71,7 +71,7 @@ pub mod traits {
         // Descriptors are opaque pointers that hold the input in a format suitable for the accelerator engine.
         // They may be:
         // - Input moved on accelerator device (only once for repeated calls)
-        // - Endianess conversion
+        // - Endianness conversion
         // - Converting from Montgomery to Canonical form
         // - Input changed from Projective to Jacobian coordinates or even to a Twisted Edwards curve.
         // - other form of expensive preprocessing

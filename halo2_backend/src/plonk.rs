@@ -117,7 +117,7 @@ where
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "circuit size value (k): {} exceeds maxium: {}",
+                    "circuit size value (k): {} exceeds maximum: {}",
                     k,
                     C::Scalar::S
                 ),
