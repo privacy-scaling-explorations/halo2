@@ -5,7 +5,7 @@ use halo2_middleware::ff::Field;
 
 use crate::circuit::Value;
 use crate::plonk::{
-    permutation, Advice, Assigned, Assignment, AssignmentError, Challenge, Column, Error, Fixed,
+    permutation, Advice, AssignError, Assigned, Assignment, Challenge, Column, Error, Fixed,
     Instance, Selector,
 };
 
@@ -94,7 +94,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
         let value = match to().into_field().assign() {
             Ok(v) => v,
             Err(_) => {
-                return Err(Error::AssignmentError(AssignmentError::WitnessMissing {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
                     func: "assign_fixed".to_string(),
                     desc: desc().into(),
                 }))
@@ -143,7 +143,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
         let filler = match to.assign() {
             Ok(v) => v,
             Err(_) => {
-                return Err(Error::AssignmentError(AssignmentError::WitnessMissing {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
                     func: "fill_from_row".to_string(),
                     desc: "".to_string(),
                 }))
