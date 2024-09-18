@@ -504,11 +504,14 @@ impl<F: Field> Assignment<F> for MockProver<F> {
                     .expect("bounds failure");
                 *value = CellValue::Assigned(to);
             }
-            Err(err) => {
+            Err(_) => {
                 // Propagate `assign` error if the column is in current phase.
                 let phase = self.cs.advice_column_phase[column.index];
                 if self.in_phase(phase) {
-                    return Err(err);
+                    return Err(Error::AssignmentError(AssignmentError::WitnessMissing {
+                        func: "assign_advice".to_string(),
+                        desc: desc().into(),
+                    }));
                 }
             }
         }
@@ -552,11 +555,21 @@ impl<F: Field> Assignment<F> for MockProver<F> {
                 .or_default();
         }
 
+        let value = match to().into_field().evaluate().assign() {
+            Ok(v) => CellValue::Assigned(v),
+            Err(_) => {
+                return Err(Error::AssignmentError(AssignmentError::WitnessMissing {
+                    func: "assign_fixed".to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         *self
             .fixed
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .expect("bounds failure") = CellValue::Assigned(to().into_field().evaluate().assign()?);
+            .expect("bounds failure") = value;
 
         Ok(())
     }

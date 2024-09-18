@@ -154,6 +154,10 @@ pub enum AssignmentError {
         usable_rows: (usize, usize),
         k: u32,
     },
+    WitnessMissing {
+        func: String,
+        desc: String,
+    },
 }
 
 impl fmt::Display for AssignmentError {
@@ -219,6 +223,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
+            AssignmentError::WitnessMissing { func, desc } => write!(f, "witness missing/unknown when {} `{}`", func, desc),
         }
     }
 }

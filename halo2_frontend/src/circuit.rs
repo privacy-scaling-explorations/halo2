@@ -198,11 +198,21 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
             }));
         }
 
+        let value = match to().into_field().assign() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::AssignmentError(AssignmentError::WitnessMissing {
+                    func: "assign_advice".to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         *self
             .advice
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .ok_or(Error::BoundsFailure)? = to().into_field().assign()?;
+            .ok_or(Error::BoundsFailure)? = value;
 
         Ok(())
     }
