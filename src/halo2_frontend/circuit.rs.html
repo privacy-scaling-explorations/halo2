@@ -993,9 +993,20 @@
 <a href="#977" id="977">977</a>
 <a href="#978" id="978">978</a>
 <a href="#979" id="979">979</a>
+<a href="#980" id="980">980</a>
+<a href="#981" id="981">981</a>
+<a href="#982" id="982">982</a>
+<a href="#983" id="983">983</a>
+<a href="#984" id="984">984</a>
+<a href="#985" id="985">985</a>
+<a href="#986" id="986">986</a>
+<a href="#987" id="987">987</a>
+<a href="#988" id="988">988</a>
+<a href="#989" id="989">989</a>
+<a href="#990" id="990">990</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Traits and structs for implementing circuit components.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::plonk;
+</span><span class="kw">use </span><span class="kw">crate</span>::plonk::{<span class="self">self</span>, AssignmentError};
 <span class="kw">use </span><span class="kw">crate</span>::plonk::{
     permutation,
     sealed::{<span class="self">self</span>, SealedPhase},
@@ -1149,7 +1160,12 @@
 
     <span class="kw">fn </span>query_instance(<span class="kw-2">&amp;</span><span class="self">self</span>, column: Column&lt;Instance&gt;, row: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Value&lt;F&gt;, Error&gt; {
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::not_enough_rows_available(<span class="self">self</span>.k));
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::QueryInstance {
+                col: column.into(),
+                row,
+                usable_rows: (<span class="number">0</span>, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
         }
 
         <span class="self">self</span>.instances
@@ -1161,7 +1177,7 @@
 
     <span class="kw">fn </span>assign_advice&lt;V, VR, A, AR&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        <span class="kw">_</span>: A,
+        desc: A,
         column: Column&lt;Advice&gt;,
         row: usize,
         to: V,
@@ -1179,7 +1195,13 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::not_enough_rows_available(<span class="self">self</span>.k));
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignAdvice {
+                desc: desc().into(),
+                col: column.into(),
+                row,
+                usable_rows: (<span class="number">0</span>, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
         }
 
         <span class="kw-2">*</span><span class="self">self

@@ -2273,6 +2273,22 @@
 <a href="#2257" id="2257">2257</a>
 <a href="#2258" id="2258">2258</a>
 <a href="#2259" id="2259">2259</a>
+<a href="#2260" id="2260">2260</a>
+<a href="#2261" id="2261">2261</a>
+<a href="#2262" id="2262">2262</a>
+<a href="#2263" id="2263">2263</a>
+<a href="#2264" id="2264">2264</a>
+<a href="#2265" id="2265">2265</a>
+<a href="#2266" id="2266">2266</a>
+<a href="#2267" id="2267">2267</a>
+<a href="#2268" id="2268">2268</a>
+<a href="#2269" id="2269">2269</a>
+<a href="#2270" id="2270">2270</a>
+<a href="#2271" id="2271">2271</a>
+<a href="#2272" id="2272">2272</a>
+<a href="#2273" id="2273">2273</a>
+<a href="#2274" id="2274">2274</a>
+<a href="#2275" id="2275">2275</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Tools for developing circuits.
 
 </span><span class="kw">use </span>std::collections::HashMap;
@@ -2282,6 +2298,7 @@
 
 <span class="kw">use </span>blake2b_simd::blake2b;
 
+<span class="kw">use </span><span class="kw">crate</span>::plonk::AssignmentError;
 <span class="kw">use crate</span>::{
     circuit,
     plonk::{
@@ -2674,7 +2691,12 @@
         }
     }
 
-    <span class="kw">fn </span>enable_selector&lt;A, AR&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: A, selector: <span class="kw-2">&amp;</span>Selector, row: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), Error&gt;
+    <span class="kw">fn </span>enable_selector&lt;A, AR&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        desc: A,
+        selector: <span class="kw-2">&amp;</span>Selector,
+        row: usize,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Error&gt;
     <span class="kw">where
         </span>A: FnOnce() -&gt; AR,
         AR: Into&lt;String&gt;,
@@ -2683,13 +2705,15 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row),
-            <span class="string">"row={} not in usable_rows={:?}, k={}"</span>,
-            row,
-            <span class="self">self</span>.usable_rows,
-            <span class="self">self</span>.k,
-        );
+        <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::EnableSelector {
+                desc: desc().into(),
+                selector: <span class="kw-2">*</span>selector,
+                row,
+                usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
+        }
 
         <span class="comment">// Track that this selector was enabled. We require that all selectors are enabled
         // inside some region (i.e. no floating selectors).
@@ -2711,13 +2735,14 @@
         column: Column&lt;Instance&gt;,
         row: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;circuit::Value&lt;F&gt;, Error&gt; {
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row),
-            <span class="string">"row={}, usable_rows={:?}, k={}"</span>,
-            row,
-            <span class="self">self</span>.usable_rows,
-            <span class="self">self</span>.k,
-        );
+        <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::QueryInstance {
+                col: column.into(),
+                row,
+                usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
+        }
 
         <span class="prelude-val">Ok</span>(<span class="self">self
             </span>.instance
@@ -2729,7 +2754,7 @@
 
     <span class="kw">fn </span>assign_advice&lt;V, VR, A, AR&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        <span class="kw">_</span>: A,
+        desc: A,
         column: Column&lt;Advice&gt;,
         row: usize,
         to: V,
@@ -2741,13 +2766,15 @@
         AR: Into&lt;String&gt;,
     {
         <span class="kw">if </span><span class="self">self</span>.in_phase(FirstPhase) {
-            <span class="macro">assert!</span>(
-                <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row),
-                <span class="string">"row={}, usable_rows={:?}, k={}"</span>,
-                row,
-                <span class="self">self</span>.usable_rows,
-                <span class="self">self</span>.k,
-            );
+            <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignAdvice {
+                    desc: desc().into(),
+                    col: column.into(),
+                    row,
+                    usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                    k: <span class="self">self</span>.k,
+                }));
+            }
 
             <span class="kw">if let </span><span class="prelude-val">Some</span>(region) = <span class="self">self</span>.current_region.as_mut() {
                 region.update_extent(column.into(), row);
@@ -2782,7 +2809,7 @@
 
     <span class="kw">fn </span>assign_fixed&lt;V, VR, A, AR&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        <span class="kw">_</span>: A,
+        desc: A,
         column: Column&lt;Fixed&gt;,
         row: usize,
         to: V,
@@ -2797,13 +2824,15 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row),
-            <span class="string">"row={}, usable_rows={:?}, k={}"</span>,
-            row,
-            <span class="self">self</span>.usable_rows,
-            <span class="self">self</span>.k,
-        );
+        <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignFixed {
+                desc: desc().into(),
+                col: column.into(),
+                row,
+                usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
+        }
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(region) = <span class="self">self</span>.current_region.as_mut() {
             region.update_extent(column.into(), row);
@@ -2834,14 +2863,16 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>left_row) &amp;&amp; <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>right_row),
-            <span class="string">"left_row={}, right_row={}, usable_rows={:?}, k={}"</span>,
-            left_row,
-            right_row,
-            <span class="self">self</span>.usable_rows,
-            <span class="self">self</span>.k,
-        );
+        <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>left_row) || !<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>right_row) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::Copy {
+                left_col: left_column,
+                left_row,
+                right_col: right_column,
+                right_row,
+                usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
+        }
 
         <span class="self">self</span>.permutation
             .copy(left_column, left_row, right_column, right_row)
@@ -2857,13 +2888,14 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="macro">assert!</span>(
-            <span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>from_row),
-            <span class="string">"row={}, usable_rows={:?}, k={}"</span>,
-            from_row,
-            <span class="self">self</span>.usable_rows,
-            <span class="self">self</span>.k,
-        );
+        <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>from_row) {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::FillFromRow {
+                col: col.into(),
+                from_row,
+                usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
+                k: <span class="self">self</span>.k,
+            }));
+        }
 
         <span class="kw">for </span>row <span class="kw">in </span><span class="self">self</span>.usable_rows.clone().skip(from_row) {
             <span class="self">self</span>.assign_fixed(|| <span class="string">""</span>, col, row, || to)<span class="question-mark">?</span>;
