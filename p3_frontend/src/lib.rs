@@ -5,8 +5,8 @@
 extern crate alloc;
 
 use halo2_middleware::circuit::{
-    Any, Cell, ColumnMid, CompiledCircuit, ConstraintSystemMid, ExpressionMid, GateMid,
-    Preprocessing, QueryMid, VarMid,
+    Any, Cell, ColumnMid, ConstraintSystemMid, ExpressionMid, GateMid, Preprocessing, QueryMid,
+    VarMid,
 };
 use halo2_middleware::ff::{Field, PrimeField};
 use halo2_middleware::permutation;
@@ -144,7 +144,7 @@ where
 }
 
 // Check if the constraint is an equality against a public input and extract the copy constraint as
-// `(advice_column_index, Location)` and `public_index`.  If there's no copy constriant, return
+// `(advice_column_index, Location)` and `public_index`.  If there's no copy constraint, return
 // None.
 fn extract_copy_public<F: PrimeField + Hash>(
     e: &SymbolicExpression<FWrap<F>>,
@@ -184,7 +184,7 @@ fn extract_copy_public<F: PrimeField + Hash>(
 pub fn get_public_inputs<F: Field>(
     preprocessing_info: &PreprocessingInfo,
     size: usize,
-    witness: &[Option<Vec<F>>],
+    witness: &[Vec<F>],
 ) -> Vec<Vec<F>> {
     if preprocessing_info.num_public_values == 0 {
         return Vec::new();
@@ -196,7 +196,7 @@ pub fn get_public_inputs<F: Field>(
             Location::LastRow => size - 1,
             Location::Transition => unreachable!(),
         };
-        public_inputs[*public_index] = witness[cell.0].as_ref().unwrap()[offset]
+        public_inputs[*public_index] = witness[cell.0][offset]
     }
     vec![public_inputs]
 }
@@ -293,7 +293,7 @@ where
     (cs, preprocessing_info)
 }
 
-pub fn trace_to_wit<F: Field>(k: u32, trace: RowMajorMatrix<FWrap<F>>) -> Vec<Option<Vec<F>>> {
+pub fn trace_to_wit<F: Field>(k: u32, trace: RowMajorMatrix<FWrap<F>>) -> Vec<Vec<F>> {
     let n = 2usize.pow(k);
     let num_columns = trace.width;
     let mut witness = vec![vec![F::ZERO; n]; num_columns];
@@ -302,56 +302,5 @@ pub fn trace_to_wit<F: Field>(k: u32, trace: RowMajorMatrix<FWrap<F>>) -> Vec<Op
             witness[column_index][row_offset] = row[column_index].0;
         }
     }
-    witness.into_iter().map(Some).collect()
-}
-
-// TODO: Move to middleware
-pub fn check_witness<F: Field>(
-    circuit: &CompiledCircuit<F>,
-    k: u32,
-    witness: &[Option<Vec<F>>],
-    public: &[Vec<F>],
-) {
-    let n = 2usize.pow(k);
-    let cs = &circuit.cs;
-    let preprocessing = &circuit.preprocessing;
-    // TODO: Simulate blinding rows
-    // Verify all gates
-    for (i, gate) in cs.gates.iter().enumerate() {
-        for offset in 0..n {
-            let res = gate.poly.evaluate(
-                &|s| s,
-                &|v| match v {
-                    VarMid::Query(q) => {
-                        let offset = offset as i32 + q.rotation.0;
-                        // TODO: Try to do mod n with a rust function
-                        let offset = if offset < 0 {
-                            (offset + n as i32) as usize
-                        } else if offset >= n as i32 {
-                            (offset - n as i32) as usize
-                        } else {
-                            offset as usize
-                        };
-                        match q.column_type {
-                            Any::Instance => public[q.column_index][offset],
-                            Any::Advice => witness[q.column_index].as_ref().unwrap()[offset],
-                            Any::Fixed => preprocessing.fixed[q.column_index][offset],
-                        }
-                    }
-                    VarMid::Challenge(_c) => unimplemented!(),
-                },
-                &|ne| -ne,
-                &|a, b| a + b,
-                &|a, b| a * b,
-            );
-            if !res.is_zero_vartime() {
-                println!(
-                    "Unsatisfied gate {} \"{}\" at offset {}",
-                    i, gate.name, offset
-                );
-                panic!("KO");
-            }
-        }
-    }
-    println!("Check witness: OK");
+    witness
 }

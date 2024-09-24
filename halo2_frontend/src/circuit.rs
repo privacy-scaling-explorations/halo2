@@ -1,6 +1,6 @@
 //! Traits and structs for implementing circuit components.
 
-use crate::plonk;
+use crate::plonk::{self, AssignmentError};
 use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
@@ -154,7 +154,12 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
 
     fn query_instance(&self, column: Column<Instance>, row: usize) -> Result<Value<F>, Error> {
         if !self.usable_rows.contains(&row) {
-            return Err(Error::not_enough_rows_available(self.k));
+            return Err(Error::AssignmentError(AssignmentError::QueryInstance {
+                col: column.into(),
+                row,
+                usable_rows: (0, self.usable_rows.end),
+                k: self.k,
+            }));
         }
 
         self.instances
@@ -166,7 +171,7 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
 
     fn assign_advice<V, VR, A, AR>(
         &mut self,
-        _: A,
+        desc: A,
         column: Column<Advice>,
         row: usize,
         to: V,
@@ -184,7 +189,13 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
         }
 
         if !self.usable_rows.contains(&row) {
-            return Err(Error::not_enough_rows_available(self.k));
+            return Err(Error::AssignmentError(AssignmentError::AssignAdvice {
+                desc: desc().into(),
+                col: column.into(),
+                row,
+                usable_rows: (0, self.usable_rows.end),
+                k: self.k,
+            }));
         }
 
         *self

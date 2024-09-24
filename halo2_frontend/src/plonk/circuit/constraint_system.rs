@@ -445,7 +445,7 @@ impl<F: Field> ConstraintSystem<F> {
                 panic!("all table expressions need selector/fixed query for tagging");
             }
             if !is_tagging_exprs_pair_exists {
-                panic!("pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included");
+                panic!("pair of tagging expressions(query of the tag columns or multiple query combinations) should be included");
             }
         }
 
@@ -953,7 +953,7 @@ impl<F: Field> ConstraintSystem<F> {
         tmp
     }
 
-    /// Helper funciotn to assert phase exists, to make sure phase-aware resources
+    /// Helper function to assert phase exists, to make sure phase-aware resources
     /// are allocated in order, and to avoid any phase to be skipped accidentally
     /// to cause unexpected issue in the future.
     fn assert_phase_exists(&self, phase: sealed::Phase, resource: &str) {

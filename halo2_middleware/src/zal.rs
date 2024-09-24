@@ -71,7 +71,7 @@ pub mod traits {
         // Descriptors are opaque pointers that hold the input in a format suitable for the accelerator engine.
         // They may be:
         // - Input moved on accelerator device (only once for repeated calls)
-        // - Endianess conversion
+        // - Endianness conversion
         // - Converting from Montgomery to Canonical form
         // - Input changed from Projective to Jacobian coordinates or even to a Twisted Edwards curve.
         // - other form of expensive preprocessing
@@ -110,7 +110,7 @@ pub mod impls {
     use std::marker::PhantomData;
 
     use crate::zal::traits::MsmAccel;
-    use halo2curves::msm::best_multiexp;
+    use halo2curves::msm::msm_best;
     use halo2curves::CurveAffine;
 
     // Halo2curve Backend
@@ -134,7 +134,7 @@ pub mod impls {
 
     impl<C: CurveAffine> MsmAccel<C> for H2cEngine {
         fn msm(&self, coeffs: &[C::Scalar], bases: &[C]) -> C::Curve {
-            best_multiexp(coeffs, bases)
+            msm_best(coeffs, bases)
         }
 
         // Caching API
@@ -156,7 +156,7 @@ pub mod impls {
             coeffs: &Self::CoeffsDescriptor<'_>,
             base: &[C],
         ) -> C::Curve {
-            best_multiexp(coeffs.raw, base)
+            msm_best(coeffs.raw, base)
         }
 
         fn msm_with_cached_base(
@@ -164,7 +164,7 @@ pub mod impls {
             coeffs: &[C::Scalar],
             base: &Self::BaseDescriptor<'_>,
         ) -> C::Curve {
-            best_multiexp(coeffs, base.raw)
+            msm_best(coeffs, base.raw)
         }
 
         fn msm_with_cached_inputs(
@@ -172,7 +172,7 @@ pub mod impls {
             coeffs: &Self::CoeffsDescriptor<'_>,
             base: &Self::BaseDescriptor<'_>,
         ) -> C::Curve {
-            best_multiexp(coeffs.raw, base.raw)
+            msm_best(coeffs.raw, base.raw)
         }
     }
 
@@ -251,7 +251,7 @@ mod test {
     use crate::zal::impls::{H2cEngine, PlonkEngineConfig};
     use crate::zal::traits::MsmAccel;
     use halo2curves::bn256::G1Affine;
-    use halo2curves::msm::best_multiexp;
+    use halo2curves::msm::msm_best;
     use halo2curves::CurveAffine;
 
     use ark_std::{end_timer, start_timer};
@@ -282,7 +282,7 @@ mod test {
         let scalars = &scalars[..1 << k];
 
         let t0 = start_timer!(|| format!("freestanding msm k={}", k));
-        let e0 = best_multiexp(scalars, points);
+        let e0 = msm_best(scalars, points);
         end_timer!(t0);
 
         let engine = PlonkEngineConfig::build_default::<C>();
@@ -323,7 +323,7 @@ mod test {
         let scalars = &scalars[..1 << k];
 
         let t0 = start_timer!(|| format!("freestanding msm k={}", k));
-        let e0 = best_multiexp(scalars, points);
+        let e0 = msm_best(scalars, points);
         end_timer!(t0);
 
         let engine = PlonkEngineConfig::new()
