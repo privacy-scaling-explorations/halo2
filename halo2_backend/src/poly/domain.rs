@@ -243,6 +243,67 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         }
     }
 
+    // Compute L_i(X) in the extended co-domain, where
+    // L_i(X)is the ith Lagrange polynomial in the original domain,
+    // H = {1, g, g^2, ..., g^(n-1)}.
+    // We compute its represenation in the extended co-domain
+    // zH = {z, z*w, z*w^2, ... , z*w^(n*k - 1)}, where k is the extension factor
+    // of the domain, and z is the extended root such that w^k = g.
+    // We assume z = F::ZETA, a cubic root the field. This simplifies the computation.
+    //
+    // The computation uses the fomula:
+    // L_i(X) = g^i/n * (X^n -1)/(X-g^i)
+    pub fn lagrange_extended(&self, idx: usize) -> Polynomial<F, ExtendedLagrangeCoeff> {
+        let one = F::ONE;
+        let zeta = <F as WithSmallOrderMulGroup<3>>::ZETA;
+
+        let n: u64 = 1 << self.k();
+        let g_i = self.omega.pow_vartime([idx as u64]);
+        let mut lag_poly = vec![F::ZERO; self.extended_len()];
+
+        let w = self.get_extended_omega();
+        let wn = w.pow_vartime([n]);
+        let zeta_n = match n % 3 {
+            1 => zeta,
+            2 => zeta * zeta,
+            _ => one,
+        };
+
+        // Compute denominators. ( n * (w^j - g_i))
+        let n = F::from(n);
+        let n_g_i = n * g_i;
+        parallelize(&mut lag_poly, |e, mut index| {
+            let mut acc = n * zeta * w.pow_vartime([index as u64]);
+            for e in e {
+                *e = acc - n_g_i;
+                acc *= w;
+                index += 1;
+            }
+        });
+        lag_poly.batch_invert();
+
+        // Compute numerators.
+        //  g_i * (zeta * w^i)^n = (g_i * zeta^n) * w^(i*n)
+        // We use w^k = g and g^n = 1 to save multiplications.
+        let k = 1 << (self.extended_k() - self.k());
+        let mut wn_powers = vec![zeta_n * g_i; k];
+        for i in 1..k {
+            wn_powers[i] = wn_powers[i - 1] * wn
+        }
+
+        parallelize(&mut lag_poly, |e, mut index| {
+            for e in e {
+                *e *= wn_powers[index % k] - g_i;
+                index += 1;
+            }
+        });
+
+        Polynomial {
+            values: lag_poly,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
     /// Rotate the extended domain polynomial over the original domain.
     pub fn rotate_extended(
         &self,

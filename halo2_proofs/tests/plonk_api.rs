@@ -601,7 +601,7 @@ fn plonk_api() {
 
                 proof
             },
-            "b749dfa90ac3bc3d45f994cc8bf527928a274c2225e4e87668eece79938e6d12",
+            "f87ba1010dede5a2148ed94403ca12a566d3154ebb12ccb6c20a330e9b280af8",
         );
     }
 
@@ -638,7 +638,7 @@ fn plonk_api() {
 
                 proof
             },
-            "284001f93f86a5d18ad9ebff6da81031e5ad9f799ea1dc2606271a6ff240fbd3",
+            "0fc67d890faef0ef8ea7ef680cc566b2ab7dabef12fcceb74d3655a0fb08c708",
         );
     }
 

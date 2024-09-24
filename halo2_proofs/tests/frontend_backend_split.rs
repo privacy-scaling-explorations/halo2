@@ -43,7 +43,7 @@ struct MyCircuitConfig {
     s_lookup: Column<Fixed>,
     s_ltable: Column<Fixed>,
 
-    // A shuffle: s_shufle * [1, a[0]] shuffle_of s_stable * [1, b[0]]
+    // A shuffle: s_shuffle * [1, a[0]] shuffle_of s_stable * [1, b[0]]
     s_shuffle: Column<Fixed>,
     s_stable: Column<Fixed>,
 
@@ -539,7 +539,7 @@ fn test_mycircuit_full_legacy() {
 
             proof
         },
-        "427e55eafeaafd9f4dfc7ec6f782ec7464251c749bb08e23efb663790c0419ed",
+        "78aadfd46b5cc58b90d832ee47e4df57af3dfc28d1457c4ceeb5d0323a72f130",
     );
 }
 
@@ -619,6 +619,6 @@ fn test_mycircuit_full_split() {
 
             proof
         },
-        "427e55eafeaafd9f4dfc7ec6f782ec7464251c749bb08e23efb663790c0419ed",
+        "78aadfd46b5cc58b90d832ee47e4df57af3dfc28d1457c4ceeb5d0323a72f130",
     );
 }

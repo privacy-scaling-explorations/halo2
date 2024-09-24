@@ -7,6 +7,7 @@ use std::ops::{Add, Mul, Neg, Range};
 
 use blake2b_simd::blake2b;
 
+use crate::plonk::AssignmentError;
 use crate::{
     circuit,
     plonk::{
@@ -399,7 +400,12 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         }
     }
 
-    fn enable_selector<A, AR>(&mut self, _: A, selector: &Selector, row: usize) -> Result<(), Error>
+    fn enable_selector<A, AR>(
+        &mut self,
+        desc: A,
+        selector: &Selector,
+        row: usize,
+    ) -> Result<(), Error>
     where
         A: FnOnce() -> AR,
         AR: Into<String>,
@@ -408,13 +414,15 @@ impl<F: Field> Assignment<F> for MockProver<F> {
             return Ok(());
         }
 
-        assert!(
-            self.usable_rows.contains(&row),
-            "row={} not in usable_rows={:?}, k={}",
-            row,
-            self.usable_rows,
-            self.k,
-        );
+        if !self.usable_rows.contains(&row) {
+            return Err(Error::AssignmentError(AssignmentError::EnableSelector {
+                desc: desc().into(),
+                selector: *selector,
+                row,
+                usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                k: self.k,
+            }));
+        }
 
         // Track that this selector was enabled. We require that all selectors are enabled
         // inside some region (i.e. no floating selectors).
@@ -436,13 +444,14 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         column: Column<Instance>,
         row: usize,
     ) -> Result<circuit::Value<F>, Error> {
-        assert!(
-            self.usable_rows.contains(&row),
-            "row={}, usable_rows={:?}, k={}",
-            row,
-            self.usable_rows,
-            self.k,
-        );
+        if !self.usable_rows.contains(&row) {
+            return Err(Error::AssignmentError(AssignmentError::QueryInstance {
+                col: column.into(),
+                row,
+                usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                k: self.k,
+            }));
+        }
 
         Ok(self
             .instance
@@ -454,7 +463,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
 
     fn assign_advice<V, VR, A, AR>(
         &mut self,
-        _: A,
+        desc: A,
         column: Column<Advice>,
         row: usize,
         to: V,
@@ -466,13 +475,15 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         AR: Into<String>,
     {
         if self.in_phase(FirstPhase) {
-            assert!(
-                self.usable_rows.contains(&row),
-                "row={}, usable_rows={:?}, k={}",
-                row,
-                self.usable_rows,
-                self.k,
-            );
+            if !self.usable_rows.contains(&row) {
+                return Err(Error::AssignmentError(AssignmentError::AssignAdvice {
+                    desc: desc().into(),
+                    col: column.into(),
+                    row,
+                    usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                    k: self.k,
+                }));
+            }
 
             if let Some(region) = self.current_region.as_mut() {
                 region.update_extent(column.into(), row);
@@ -507,7 +518,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
 
     fn assign_fixed<V, VR, A, AR>(
         &mut self,
-        _: A,
+        desc: A,
         column: Column<Fixed>,
         row: usize,
         to: V,
@@ -522,13 +533,15 @@ impl<F: Field> Assignment<F> for MockProver<F> {
             return Ok(());
         }
 
-        assert!(
-            self.usable_rows.contains(&row),
-            "row={}, usable_rows={:?}, k={}",
-            row,
-            self.usable_rows,
-            self.k,
-        );
+        if !self.usable_rows.contains(&row) {
+            return Err(Error::AssignmentError(AssignmentError::AssignFixed {
+                desc: desc().into(),
+                col: column.into(),
+                row,
+                usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                k: self.k,
+            }));
+        }
 
         if let Some(region) = self.current_region.as_mut() {
             region.update_extent(column.into(), row);
@@ -559,14 +572,16 @@ impl<F: Field> Assignment<F> for MockProver<F> {
             return Ok(());
         }
 
-        assert!(
-            self.usable_rows.contains(&left_row) && self.usable_rows.contains(&right_row),
-            "left_row={}, right_row={}, usable_rows={:?}, k={}",
-            left_row,
-            right_row,
-            self.usable_rows,
-            self.k,
-        );
+        if !self.usable_rows.contains(&left_row) || !self.usable_rows.contains(&right_row) {
+            return Err(Error::AssignmentError(AssignmentError::Copy {
+                left_col: left_column,
+                left_row,
+                right_col: right_column,
+                right_row,
+                usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                k: self.k,
+            }));
+        }
 
         self.permutation
             .copy(left_column, left_row, right_column, right_row)
@@ -582,13 +597,14 @@ impl<F: Field> Assignment<F> for MockProver<F> {
             return Ok(());
         }
 
-        assert!(
-            self.usable_rows.contains(&from_row),
-            "row={}, usable_rows={:?}, k={}",
-            from_row,
-            self.usable_rows,
-            self.k,
-        );
+        if !self.usable_rows.contains(&from_row) {
+            return Err(Error::AssignmentError(AssignmentError::FillFromRow {
+                col: col.into(),
+                from_row,
+                usable_rows: (self.usable_rows.start, self.usable_rows.end),
+                k: self.k,
+            }));
+        }
 
         for row in self.usable_rows.clone().skip(from_row) {
             self.assign_fixed(|| "", col, row, || to)?;
@@ -1498,7 +1514,7 @@ mod tests {
     #[cfg(feature = "lookup-any-sanity-checks")]
     #[test]
     #[should_panic(
-        expected = "pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included"
+        expected = "pair of tagging expressions(query of the tag columns or multiple query combinations) should be included"
     )]
     fn bad_lookup_any_not_add_tagging_pairs() {
         const K: u32 = 4;
@@ -1991,7 +2007,7 @@ mod tests {
     }
 
     #[test]
-    fn contraint_unsatisfied() {
+    fn constraint_unsatisfied() {
         const K: u32 = 4;
 
         #[derive(Clone)]
@@ -2234,7 +2250,7 @@ mod tests {
         instance[0] = InstanceValue::Assigned(Fp::from(11));
         assert_eq!(prover.verify(), Err(vec![err2.clone()]));
 
-        // then we modify the witness -> the contraint `squared` will fail
+        // then we modify the witness -> the constraint `squared` will fail
         let advice0 = prover.advice_mut(0);
         advice0[2] = CellValue::Assigned(Fp::from(10));
         assert_eq!(prover.verify(), Err(vec![err1, err2]));
