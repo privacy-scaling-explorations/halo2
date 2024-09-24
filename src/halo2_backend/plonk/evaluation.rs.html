@@ -1240,11 +1240,11 @@
 <span class="doccomment">/// Evaluator
 </span><span class="attr">#[derive(Clone, Default, Debug)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Evaluator&lt;C: CurveAffine&gt; {
-    <span class="doccomment">///  Custom gates evalution
+    <span class="doccomment">///  Custom gates evaluation
     </span>custom_gates: GraphEvaluator&lt;C&gt;,
-    <span class="doccomment">///  Lookups evalution
+    <span class="doccomment">///  Lookups evaluation
     </span>lookups: Vec&lt;GraphEvaluator&lt;C&gt;&gt;,
-    <span class="doccomment">///  Shuffle evalution
+    <span class="doccomment">///  Shuffle evaluation
     </span>shuffles: Vec&lt;GraphEvaluator&lt;C&gt;&gt;,
 }
 

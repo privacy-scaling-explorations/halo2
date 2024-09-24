@@ -3805,7 +3805,7 @@
     <span class="attr">#[cfg(feature = <span class="string">"lookup-any-sanity-checks"</span>)]
     #[test]
     #[should_panic(
-        expected = <span class="string">"pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included"
+        expected = <span class="string">"pair of tagging expressions(query of the tag columns or multiple query combinations) should be included"
     </span>)]
     </span><span class="kw">fn </span>bad_lookup_any_not_add_tagging_pairs() {
         <span class="kw">const </span>K: u32 = <span class="number">4</span>;
@@ -4298,7 +4298,7 @@
     }
 
     <span class="attr">#[test]
-    </span><span class="kw">fn </span>contraint_unsatisfied() {
+    </span><span class="kw">fn </span>constraint_unsatisfied() {
         <span class="kw">const </span>K: u32 = <span class="number">4</span>;
 
         <span class="attr">#[derive(Clone)]
@@ -4541,7 +4541,7 @@
         instance[<span class="number">0</span>] = InstanceValue::Assigned(Fp::from(<span class="number">11</span>));
         <span class="macro">assert_eq!</span>(prover.verify(), <span class="prelude-val">Err</span>(<span class="macro">vec!</span>[err2.clone()]));
 
-        <span class="comment">// then we modify the witness -&gt; the contraint `squared` will fail
+        <span class="comment">// then we modify the witness -&gt; the constraint `squared` will fail
         </span><span class="kw">let </span>advice0 = prover.advice_mut(<span class="number">0</span>);
         advice0[<span class="number">2</span>] = CellValue::Assigned(Fp::from(<span class="number">10</span>));
         <span class="macro">assert_eq!</span>(prover.verify(), <span class="prelude-val">Err</span>(<span class="macro">vec!</span>[err1, err2]));
