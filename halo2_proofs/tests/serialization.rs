@@ -215,7 +215,7 @@ fn test_serialization() {
                 SingleStrategy<Bn256>,
             >(
                 &verifier_params,
-                &vk, // pk.get_vk()
+                &vk,
                 strategy,
                 instances.as_slice(),
                 &mut transcript

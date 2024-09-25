@@ -773,7 +773,7 @@ mod tests {
                         let mut offset = 0;
                         let mut instance_copy = Vec::new();
                         // First "a" value comes from instance
-                        config.s_instance.enable(&mut region, offset).expect("todo");
+                        config.s_instance.enable(&mut region, offset).unwrap();
                         let res = region
                             .assign_advice_from_instance(
                                 || "",
@@ -782,19 +782,19 @@ mod tests {
                                 config.a,
                                 offset,
                             )
-                            .expect("todo");
+                            .unwrap();
                         // Enable the gate on a few consecutive rows with rotations
                         let (res, _) = config
                             .assign_gate(&mut region, &mut offset, Some(res), [0, 3, 4, 1])
-                            .expect("todo");
+                            .unwrap();
                         instance_copy.push(res.clone());
                         let (res, _) = config
                             .assign_gate(&mut region, &mut offset, Some(res), [0, 6, 7, 1])
-                            .expect("todo");
+                            .unwrap();
                         instance_copy.push(res.clone());
                         let (res, _) = config
                             .assign_gate(&mut region, &mut offset, Some(res), [0, 8, 9, 1])
-                            .expect("todo");
+                            .unwrap();
                         instance_copy.push(res.clone());
                         let (res, _) = config
                             .assign_gate(
@@ -803,7 +803,7 @@ mod tests {
                                 Some(res),
                                 [0, 0xffffffff, 0xdeadbeef, 1],
                             )
-                            .expect("todo");
+                            .unwrap();
                         let _ = config
                             .assign_gate(
                                 &mut region,
@@ -811,53 +811,53 @@ mod tests {
                                 Some(res),
                                 [0, 0xabad1d3a, 0x12345678, 0x42424242],
                             )
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
 
                         // Enable the gate on non-consecutive rows with advice-advice copy constraints enabled
                         let (_, abcd1) = config
                             .assign_gate(&mut region, &mut offset, None, [5, 2, 1, 1])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         let (_, abcd2) = config
                             .assign_gate(&mut region, &mut offset, None, [2, 3, 1, 1])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         let (_, abcd3) = config
                             .assign_gate(&mut region, &mut offset, None, [4, 2, 1, 1])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         region
                             .constrain_equal(abcd1[1].cell(), abcd2[0].cell())
-                            .expect("todo");
+                            .unwrap();
                         region
                             .constrain_equal(abcd2[0].cell(), abcd3[1].cell())
-                            .expect("todo");
+                            .unwrap();
                         instance_copy.push(abcd1[1].clone());
                         instance_copy.push(abcd2[0].clone());
 
                         // Enable the gate on non-consecutive rows with advice-fixed copy constraints enabled
                         let (_, abcd1) = config
                             .assign_gate(&mut region, &mut offset, None, [5, 9, 1, 9])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         let (_, abcd2) = config
                             .assign_gate(&mut region, &mut offset, None, [2, 9, 1, 1])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         let (_, abcd3) = config
                             .assign_gate(&mut region, &mut offset, None, [9, 2, 1, 1])
-                            .expect("todo");
+                            .unwrap();
                         offset += 1;
                         region
                             .constrain_equal(abcd1[1].cell(), abcd1[3].cell())
-                            .expect("todo");
+                            .unwrap();
                         region
                             .constrain_equal(abcd2[1].cell(), abcd1[3].cell())
-                            .expect("todo");
+                            .unwrap();
                         region
                             .constrain_equal(abcd3[0].cell(), abcd1[3].cell())
-                            .expect("todo");
+                            .unwrap();
 
                         // Enable a dynamic lookup (powers of two)
                         let table: Vec<_> =
@@ -874,7 +874,7 @@ mod tests {
                                     offset,
                                     || Value::known(F::ONE),
                                 )
-                                .expect("todo");
+                                .unwrap();
                             region
                                 .assign_fixed(
                                     || "",
@@ -882,23 +882,23 @@ mod tests {
                                     offset,
                                     || Value::known(F::ONE),
                                 )
-                                .expect("todo");
+                                .unwrap();
                             let lookup_row0 = Value::known(F::from(lookup_row.0));
                             let lookup_row1 = Value::known(F::from(lookup_row.1));
                             region
                                 .assign_advice(|| "", config.a, offset, || lookup_row0)
-                                .expect("todo");
+                                .unwrap();
                             region
                                 .assign_advice(|| "", config.b, offset, || lookup_row1)
-                                .expect("todo");
+                                .unwrap();
                             let table_row0 = Value::known(F::from(table_row.0));
                             let table_row1 = Value::known(F::from(table_row.1));
                             region
                                 .assign_fixed(|| "", config.d, offset, || table_row0)
-                                .expect("todo");
+                                .unwrap();
                             region
                                 .assign_advice(|| "", config.c, offset, || table_row1)
-                                .expect("todo");
+                                .unwrap();
                             offset += 1;
                         }
 
@@ -907,14 +907,14 @@ mod tests {
                             config.s_rlc.enable(&mut region, offset)?;
                             let (_, _) = config
                                 .assign_gate(&mut region, &mut offset, None, abcd)
-                                .expect("todo");
+                                .unwrap();
                             let rlc = challenge.map(|ch| {
                                 let [a, b, ..] = abcd;
                                 F::from(a) + ch * F::from(b)
                             });
                             region
                                 .assign_advice(|| "", config.e, offset - 1, || rlc)
-                                .expect("todo");
+                                .unwrap();
                             offset += 1;
                         }
 
@@ -931,7 +931,7 @@ mod tests {
                                     offset,
                                     || Value::known(F::ONE),
                                 )
-                                .expect("todo");
+                                .unwrap();
                             region
                                 .assign_fixed(
                                     || "",
@@ -939,15 +939,15 @@ mod tests {
                                     offset,
                                     || Value::known(F::ONE),
                                 )
-                                .expect("todo");
+                                .unwrap();
                             let shuffle_row0 = Value::known(F::from(*shuffle_row));
                             region
                                 .assign_advice(|| "", config.a, offset, || shuffle_row0)
-                                .expect("todo");
+                                .unwrap();
                             let table_row0 = Value::known(F::from(*table_row));
                             region
                                 .assign_advice(|| "", config.b, offset, || table_row0)
-                                .expect("todo");
+                                .unwrap();
                             offset += 1;
                         }
 
@@ -994,7 +994,7 @@ mod tests {
                     loop {
                         let (rows, instance_copy) = self
                             .synthesize_unit(config, &mut layouter, id, unit_id)
-                            .expect("todo");
+                            .unwrap();
                         if total_rows == 0 {
                             for (i, instance) in instance_copy.iter().enumerate() {
                                 layouter.constrain_instance(

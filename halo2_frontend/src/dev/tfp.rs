@@ -607,13 +607,11 @@ mod tests {
             }
         }
 
-        // // At the start of your test, enable tracing.
-        // tracing_subscriber::fmt()
-        //     .with_max_level(tracing::Level::DEBUG)
-        //     .with_ansi(false)
-        //     .without_time()
-        //     .init();
-
+        // At the start of your test, enable tracing.
+        //
+        // Following setup of `SharedStorage` and `tracing_subscriber::fmt` is just for this test.
+        // For real tests, you don't need to do this.
+        // Check the example in the doc of [`TracingFloorPlanner`] for details.
         let subscriber = tracing_subscriber::fmt()
             .with_max_level(tracing::Level::DEBUG)
             .with_ansi(false)
