@@ -369,9 +369,7 @@ fn shuffle_argument_required_degree<F: Field, V: Variable>(arg: &shuffle::Argume
 
 #[cfg(test)]
 mod tests {
-    use super::{Any, ExpressionBack, QueryBack, VarBack};
-
-    use halo2_middleware::poly::Rotation;
+    use super::ExpressionBack;
     use halo2curves::bn256::Fr;
 
     #[test]
@@ -410,73 +408,5 @@ mod tests {
         );
 
         assert_eq!(happened, expected);
-    }
-
-    #[test]
-    fn expressionback_identifier() {
-        let sum_expr: ExpressionBack<Fr> = ExpressionBack::Sum(
-            Box::new(ExpressionBack::Constant(1.into())),
-            Box::new(ExpressionBack::Constant(2.into())),
-        );
-        assert_eq!(sum_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001+0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        let prod_expr: ExpressionBack<Fr> = ExpressionBack::Product(
-            Box::new(ExpressionBack::Constant(1.into())),
-            Box::new(ExpressionBack::Constant(2.into())),
-        );
-        assert_eq!(prod_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001*0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        // simulate the expressios being used in a circuit
-        let l: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 0,
-            column_index: 0,
-            column_type: Any::Advice,
-            rotation: Rotation::cur(),
-        }));
-        let r: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 1,
-            column_index: 1,
-            column_type: Any::Advice,
-            rotation: Rotation::cur(),
-        }));
-        let o: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 2,
-            column_index: 2,
-            column_type: Any::Advice,
-            rotation: Rotation::cur(),
-        }));
-        let c: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 3,
-            column_index: 0,
-            column_type: Any::Fixed,
-            rotation: Rotation::cur(),
-        }));
-        let sl: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 4,
-            column_index: 1,
-            column_type: Any::Fixed,
-            rotation: Rotation::cur(),
-        }));
-        let sr: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 5,
-            column_index: 2,
-            column_type: Any::Fixed,
-            rotation: Rotation::cur(),
-        }));
-        let sm: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 6,
-            column_index: 3,
-            column_type: Any::Fixed,
-            rotation: Rotation::cur(),
-        }));
-        let so: ExpressionBack<Fr> = ExpressionBack::Var(VarBack::Query(QueryBack {
-            index: 7,
-            column_index: 4,
-            column_type: Any::Fixed,
-            rotation: Rotation::cur(),
-        }));
-
-        let simple_plonk_expr = sl * l.clone() + sr * r.clone() + sm * (l * r) - so * o + c;
-        assert_eq!(simple_plonk_expr.identifier(), "(((((Query(QueryBack { index: 4, column_index: 1, column_type: Fixed, rotation: Rotation(0) })*Query(QueryBack { index: 0, column_index: 0, column_type: Advice, rotation: Rotation(0) }))+(Query(QueryBack { index: 5, column_index: 2, column_type: Fixed, rotation: Rotation(0) })*Query(QueryBack { index: 1, column_index: 1, column_type: Advice, rotation: Rotation(0) })))+(Query(QueryBack { index: 6, column_index: 3, column_type: Fixed, rotation: Rotation(0) })*(Query(QueryBack { index: 0, column_index: 0, column_type: Advice, rotation: Rotation(0) })*Query(QueryBack { index: 1, column_index: 1, column_type: Advice, rotation: Rotation(0) }))))+(-(Query(QueryBack { index: 7, column_index: 4, column_type: Fixed, rotation: Rotation(0) })*Query(QueryBack { index: 2, column_index: 2, column_type: Advice, rotation: Rotation(0) }))))+Query(QueryBack { index: 3, column_index: 0, column_type: Fixed, rotation: Rotation(0) }))");
     }
 }

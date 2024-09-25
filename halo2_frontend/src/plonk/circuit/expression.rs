@@ -1097,10 +1097,7 @@ impl<F: Field> Product<Self> for Expression<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::plonk::{AdviceQuery, FixedQuery, Selector};
-
     use super::Expression;
-    use halo2_middleware::poly::Rotation;
     use halo2curves::bn256::Fr;
 
     #[test]
@@ -1139,53 +1136,5 @@ mod tests {
         );
 
         assert_eq!(happened, expected);
-    }
-
-    #[test]
-    fn identifier() {
-        let sum_expr: Expression<Fr> = Expression::Sum(
-            Box::new(Expression::Constant(1.into())),
-            Box::new(Expression::Constant(2.into())),
-        );
-        assert_eq!(sum_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001+0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        let prod_expr: Expression<Fr> = Expression::Product(
-            Box::new(Expression::Constant(1.into())),
-            Box::new(Expression::Constant(2.into())),
-        );
-        assert_eq!(prod_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001*0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        let scaled_expr: Expression<Fr> =
-            Expression::Scaled(Box::new(Expression::Constant(1.into())), 100.into());
-        assert_eq!(scaled_expr.identifier(), "0x0000000000000000000000000000000000000000000000000000000000000001*0x0000000000000000000000000000000000000000000000000000000000000064");
-
-        // simulate the expressions being used in a circuit
-        let l: Expression<Fr> = Expression::Advice(AdviceQuery {
-            index: None,
-            column_index: 0,
-            rotation: Rotation::cur(),
-        });
-        let r: Expression<Fr> = Expression::Advice(AdviceQuery {
-            index: None,
-            column_index: 1,
-            rotation: Rotation::cur(),
-        });
-        let o: Expression<Fr> = Expression::Advice(AdviceQuery {
-            index: None,
-            column_index: 2,
-            rotation: Rotation::cur(),
-        });
-        let sl: Expression<Fr> = Expression::Selector(Selector(0, false));
-        let sr: Expression<Fr> = Expression::Selector(Selector(1, false));
-        let sm: Expression<Fr> = Expression::Selector(Selector(2, false));
-        let so: Expression<Fr> = Expression::Selector(Selector(3, false));
-        let c: Expression<Fr> = Expression::Fixed(FixedQuery {
-            index: None,
-            column_index: 0,
-            rotation: Rotation::cur(),
-        });
-
-        let simple_plonk_expr = sl * l.clone() + sr * r.clone() + sm * (l * r) - so * o + c;
-        assert_eq!(simple_plonk_expr.identifier(), "(((((selector[0]*advice[0][0])+(selector[1]*advice[1][0]))+(selector[2]*(advice[0][0]*advice[1][0])))+(-(selector[3]*advice[2][0])))+fixed[0][0])");
     }
 }

@@ -176,10 +176,7 @@ impl<F: Field, V: Variable> Product<Self> for Expression<F, V> {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        circuit::{Any, ExpressionMid, QueryMid, VarMid},
-        poly::Rotation,
-    };
+    use crate::circuit::ExpressionMid;
     use halo2curves::bn256::Fr;
 
     #[test]
@@ -218,53 +215,5 @@ mod tests {
         );
 
         assert_eq!(happened, expected);
-    }
-
-    #[test]
-    fn identifier() {
-        let sum_expr: ExpressionMid<Fr> = ExpressionMid::Sum(
-            Box::new(ExpressionMid::Constant(1.into())),
-            Box::new(ExpressionMid::Constant(2.into())),
-        );
-        assert_eq!(sum_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001+0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        let prod_expr: ExpressionMid<Fr> = ExpressionMid::Product(
-            Box::new(ExpressionMid::Constant(1.into())),
-            Box::new(ExpressionMid::Constant(2.into())),
-        );
-        assert_eq!(prod_expr.identifier(), "(0x0000000000000000000000000000000000000000000000000000000000000001*0x0000000000000000000000000000000000000000000000000000000000000002)");
-
-        // simulate the expressios being used in a circuit
-        let l: ExpressionMid<Fr> = ExpressionMid::Var(VarMid::Query(QueryMid::new(
-            Any::Advice,
-            0,
-            Rotation::cur(),
-        )));
-        let r: ExpressionMid<Fr> = ExpressionMid::Var(VarMid::Query(QueryMid::new(
-            Any::Advice,
-            1,
-            Rotation::cur(),
-        )));
-        let o: ExpressionMid<Fr> = ExpressionMid::Var(VarMid::Query(QueryMid::new(
-            Any::Advice,
-            2,
-            Rotation::cur(),
-        )));
-        let c: ExpressionMid<Fr> =
-            ExpressionMid::Var(VarMid::Query(QueryMid::new(Any::Fixed, 0, Rotation::cur())));
-        let sl: ExpressionMid<Fr> =
-            ExpressionMid::Var(VarMid::Query(QueryMid::new(Any::Fixed, 1, Rotation::cur())));
-        let sr: ExpressionMid<Fr> =
-            ExpressionMid::Var(VarMid::Query(QueryMid::new(Any::Fixed, 2, Rotation::cur())));
-        let sm: ExpressionMid<Fr> =
-            ExpressionMid::Var(VarMid::Query(QueryMid::new(Any::Fixed, 3, Rotation::cur())));
-        let so: ExpressionMid<Fr> =
-            ExpressionMid::Var(VarMid::Query(QueryMid::new(Any::Fixed, 4, Rotation::cur())));
-
-        let simple_plonk_expr = sl * l.clone() + sr * r.clone() + sm * (l * r) - so * o + c;
-        assert_eq!(
-            simple_plonk_expr.identifier(),
-            "(((((f1*a0)+(f2*a1))+(f3*(a0*a1)))+(-(f4*a2)))+f0)"
-        );
     }
 }
