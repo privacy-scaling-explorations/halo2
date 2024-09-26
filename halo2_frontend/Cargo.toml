@@ -1,6 +1,6 @@
 [package]
 name = "halo2_frontend"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
     "Sean Bowe <sean@electriccoin.co>",
     "Ying Tong Lai <yingtong@electriccoin.co>",
@@ -28,7 +28,7 @@ rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "katex-header.html"]
 backtrace = { version = "0.3", optional = true }
 ff = "0.13"
 group = "0.13"
-halo2curves = { version = "0.6.1", default-features = false }
+halo2curves = { version = "0.7.0", default-features = false }
 tracing = "0.1"
 blake2b_simd = "1" # MSRV 1.66.0
 serde = { version = "1", optional = true, features = ["derive"] }
@@ -43,6 +43,9 @@ tabbycat = { version = "0.1", features = ["attributes"], optional = true }
 proptest = "1"
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 serde_json = "1"
+tracing-subscriber = { version = "0.3" }
+tracing = "0.1"
+tracing-capture = "0.1"
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
 getrandom = { version = "0.2", features = ["js"] }

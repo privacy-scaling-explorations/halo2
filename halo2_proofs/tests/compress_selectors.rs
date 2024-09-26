@@ -484,17 +484,17 @@ fn test_compress_gates() {
 }
 
 #[test]
-fn test_success() -> Result<(), halo2_proofs::plonk::Error> {
-    // vk & pk keygen both WITH compress
+fn test_key_compression() -> Result<(), halo2_proofs::plonk::Error> {
+    // vk & pk keygen both WITH compression
     test_result(
         || test_mycircuit(true, true).expect("should pass"),
-        "8326140d1873a91630d439a8812d1f104667144e03e0cd5c59eb358ae5d1a4eb",
+        "acae50508de5ead584170dd83b139daf40e1026b6debbb78eb05d515173fc2dd",
     );
 
-    // vk & pk keygen both WITHOUT compress
+    // vk & pk keygen both WITHOUT compression
     test_result(
         || test_mycircuit(false, false).expect("should pass"),
-        "73dd4c3c9c51d55dc8cf68ca2b5d8acdb40ed44bc8a88d718325bc0023688f64",
+        "f9c99bd341705ac6a13724a526dd28df0bac1c745e0cde40ab39cab3e1b95309",
     );
 
     Ok(())
@@ -502,14 +502,14 @@ fn test_success() -> Result<(), halo2_proofs::plonk::Error> {
 
 #[should_panic]
 #[test]
-fn test_failure_1() {
+fn test_key_compression_failure_1() {
     // vk keygen WITH compress
     // pk keygen WITHOUT compress
     assert!(test_mycircuit(false, true).is_err());
 }
 
 #[test]
-fn test_failure_2() {
+fn test_key_compression_failure_2() {
     // vk keygen WITHOUT compress
     // pk keygen WITH compress
     assert!(test_mycircuit(true, false).is_err());

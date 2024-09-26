@@ -6,4 +6,5 @@ Cargo.lock
 .DS_Store
 
 layout.png
-serialization-test.pk
+serialization-example.vk
+serialization-example.pk
