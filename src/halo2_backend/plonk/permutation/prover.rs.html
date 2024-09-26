@@ -317,6 +317,22 @@
 <a href="#301" id="301">301</a>
 <a href="#302" id="302">302</a>
 <a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>group::{
     ff::{BatchInvert, Field},
     Curve,
@@ -339,19 +355,35 @@
 <span class="kw">use </span>halo2_middleware::circuit::Any;
 <span class="kw">use </span>halo2_middleware::poly::Rotation;
 
-<span class="comment">// TODO: Document a bit these types
-// https://github.com/privacy-scaling-explorations/halo2/issues/264
-
+<span class="doccomment">/// Single permutation product polynomial, which has been **committed**.
+///
+/// This struct contains two fields:
+/// - `permutation_product_poly`: A (coefficient-form) polynomial representing the permutation grand product.
+/// - `permutation_product_blind`: A scalar value used for blinding, in the commitment of the `permutation_product_poly`.
+///
+/// It stores a single `Z_P` in [permutation argument specification](https://zcash.github.io/halo2/design/proving-system/permutation.html#argument-specification).  
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>CommittedSet&lt;C: CurveAffine&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) permutation_product_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
     permutation_product_blind: Blind&lt;C::Scalar&gt;,
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Committed&lt;C: CurveAffine&gt; {
+<span class="doccomment">/// Set of permutation product polynomials, which have been **committed**.
+///
+/// This struct is to contain all of the permutation product polynomials([`CommittedSet`]), from a single circuit.
+///
+/// It stores multiple `Z_P` in [permutation argument specification](https://zcash.github.io/halo2/design/proving-system/permutation.html#spanning-a-large-number-of-columns).
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Committed&lt;C: CurveAffine&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) sets: Vec&lt;CommittedSet&lt;C&gt;&gt;,
 }
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Evaluated&lt;C: CurveAffine&gt; {
+<span class="doccomment">/// Set of permutation product polynomials, which have been **evaluated**.
+///
+/// This struct is, in essence, the same as [`Committed`].  
+///
+/// It indicates that the permutation product polynomials([`Committed`]) have been evaluated in the evaluation domain, and converted to [`Evaluated`](see [`Committed::evaluate`]).  
+///
+/// It also indicates that the permuted product polynomials([`Evaluated`]) can be **opened** (see [`Evaluated::open`]).  
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Evaluated&lt;C: CurveAffine&gt; {
     constructed: Committed&lt;C&gt;,
 }
 
