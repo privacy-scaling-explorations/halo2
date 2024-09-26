@@ -574,6 +574,12 @@
 <a href="#558" id="558">558</a>
 <a href="#559" id="559">559</a>
 <a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Developer tools for investigating the cost of a circuit.
 
 </span><span class="kw">use </span>std::{
@@ -1131,7 +1137,13 @@
                 <span class="prelude-val">Ok</span>(())
             }
         }
-        CircuitCost::&lt;Eq, MyCircuit&gt;::measure(K, <span class="kw-2">&amp;</span>MyCircuit).proof_size(<span class="number">1</span>);
+        <span class="kw">let </span>cost = CircuitCost::&lt;Eq, MyCircuit&gt;::measure(K, <span class="kw-2">&amp;</span>MyCircuit);
+
+        <span class="kw">let </span>marginal_proof_size = cost.marginal_proof_size();
+        <span class="macro">assert_eq!</span>(usize::from(marginal_proof_size), <span class="number">0</span>);
+
+        <span class="kw">let </span>proof_size = cost.proof_size(<span class="number">1</span>);
+        <span class="macro">assert_eq!</span>(usize::from(proof_size), <span class="number">608</span>);
     }
 }
 </code></pre></div></section></main></body></html>
