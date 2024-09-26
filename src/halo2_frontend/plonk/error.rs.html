@@ -238,6 +238,11 @@
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt;
 
 <span class="kw">use </span><span class="kw">super</span>::TableColumn;
@@ -246,7 +251,7 @@
 
 <span class="doccomment">/// This is an error that could occur during circuit synthesis.  
 ///
-/// **NOTE**: [`AssignmentError`] is introduced to provide more debugging info     
+/// **NOTE**: [`AssignError`] is introduced to provide more debugging info     
 /// to developers when assigning witnesses to circuit cells.  
 /// Hence, they are used for [`MockProver`] and [`WitnessCollection`].  
 /// The [`keygen`] process use the [`NotEnoughRowsAvailable`], since it is just enough.
@@ -272,8 +277,8 @@
     </span>ColumnNotInPermutation(Column&lt;Any&gt;),
     <span class="doccomment">/// An error relating to a lookup table.
     </span>TableError(TableError),
-    <span class="doccomment">/// An error relating to an `Assignment`.
-    </span>AssignmentError(AssignmentError),
+    <span class="doccomment">/// An error relating to a circuit assignment.
+    </span>AssignError(AssignError),
     <span class="doccomment">/// Generic error not covered by previous cases
     </span>Other(String),
 }
@@ -305,7 +310,7 @@
                 <span class="string">"Column {column:?} must be included in the permutation. Help: try applying `meta.enable_equalty` on the column"</span>,
             ),
             Error::TableError(error) =&gt; <span class="macro">write!</span>(f, <span class="string">"{error}"</span>),
-            Error::AssignmentError(error) =&gt; <span class="macro">write!</span>(f, <span class="string">"{error}"</span>),
+            Error::AssignError(error) =&gt; <span class="macro">write!</span>(f, <span class="string">"{error}"</span>),
             Error::Other(error) =&gt; <span class="macro">write!</span>(f, <span class="string">"Other: {error}"</span>),
         }
     }
@@ -352,7 +357,7 @@
 
 <span class="doccomment">/// This is an error that could occur during `assign_advice`, `assign_fixed`, `copy`, etc.
 </span><span class="attr">#[derive(Debug)]
-</span><span class="kw">pub enum </span>AssignmentError {
+</span><span class="kw">pub enum </span>AssignError {
     AssignAdvice {
         desc: String,
         col: Column&lt;Any&gt;,
@@ -394,12 +399,16 @@
         usable_rows: (usize, usize),
         k: u32,
     },
+    WitnessMissing {
+        func: String,
+        desc: String,
+    },
 }
 
-<span class="kw">impl </span>fmt::Display <span class="kw">for </span>AssignmentError {
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>AssignError {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
-            AssignmentError::AssignAdvice { desc, col, row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::AssignAdvice { desc, col, row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"assign_advice `{}` error: column={:?}({}), row={}, usable_rows={}..{}, k={}"</span>,
                 desc,
@@ -409,7 +418,7 @@
                 start, end,
                 k,
             ),
-            AssignmentError::AssignFixed {desc, col, row, usable_rows: (start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::AssignFixed {desc, col, row, usable_rows: (start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"assign_fixed `{}` error: column={:?}({}), row={}, usable_rows={}..{}, k={}"</span>,
                 desc,
@@ -419,7 +428,7 @@
                 start, end,
                 k,
             ),
-            AssignmentError::EnableSelector { desc, selector, row, usable_rows: (start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::EnableSelector { desc, selector, row, usable_rows: (start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"enable_selector `{}` error: column=Selector({:?}), row={}, usable_rows={}..{}, k={}"</span>,
                 desc,
@@ -428,7 +437,7 @@
                 start, end,
                 k,
             ),
-            AssignmentError::QueryInstance { col, row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::QueryInstance { col, row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"query_instance error: column={:?}({}), row={}, usable_rows={}..{}, k={}"</span>,
                 col.column_type,
@@ -438,7 +447,7 @@
                 end,
                 k,
             ),
-            AssignmentError::Copy { left_col, left_row, right_col, right_row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::Copy { left_col, left_row, right_col, right_row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"copy error: left_column={:?}({}), left_row={}, right_column={:?}({}), right_row={}, usable_rows={}..{}, k={}"</span>,
                 left_col.column_type(),
@@ -450,7 +459,7 @@
                 start, end,
                 k,
             ),
-            AssignmentError::FillFromRow { col, from_row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
+            AssignError::FillFromRow { col, from_row, usable_rows:(start, end), k } =&gt; <span class="macro">write!</span>(
                 f,
                 <span class="string">"fill_from_row error: column={:?}({}), from_row={}, usable_rows={}..{}, k={}"</span>,
                 col.column_type(),
@@ -459,6 +468,7 @@
                 start, end,
                 k,
             ),
+            AssignError::WitnessMissing { func, desc } =&gt; <span class="macro">write!</span>(f, <span class="string">"witness missing/unknown when {} `{}`"</span>, func, desc),
         }
     }
 }

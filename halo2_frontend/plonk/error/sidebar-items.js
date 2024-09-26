@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["AssignmentError","Error","TableError"]};
+window.SIDEBAR_ITEMS = {"enum":["AssignError","Error","TableError"]};

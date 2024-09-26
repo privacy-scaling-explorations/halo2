@@ -2289,6 +2289,19 @@
 <a href="#2273" id="2273">2273</a>
 <a href="#2274" id="2274">2274</a>
 <a href="#2275" id="2275">2275</a>
+<a href="#2276" id="2276">2276</a>
+<a href="#2277" id="2277">2277</a>
+<a href="#2278" id="2278">2278</a>
+<a href="#2279" id="2279">2279</a>
+<a href="#2280" id="2280">2280</a>
+<a href="#2281" id="2281">2281</a>
+<a href="#2282" id="2282">2282</a>
+<a href="#2283" id="2283">2283</a>
+<a href="#2284" id="2284">2284</a>
+<a href="#2285" id="2285">2285</a>
+<a href="#2286" id="2286">2286</a>
+<a href="#2287" id="2287">2287</a>
+<a href="#2288" id="2288">2288</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Tools for developing circuits.
 
 </span><span class="kw">use </span>std::collections::HashMap;
@@ -2298,7 +2311,7 @@
 
 <span class="kw">use </span>blake2b_simd::blake2b;
 
-<span class="kw">use </span><span class="kw">crate</span>::plonk::AssignmentError;
+<span class="kw">use </span><span class="kw">crate</span>::plonk::AssignError;
 <span class="kw">use crate</span>::{
     circuit,
     plonk::{
@@ -2706,7 +2719,7 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::EnableSelector {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::EnableSelector {
                 desc: desc().into(),
                 selector: <span class="kw-2">*</span>selector,
                 row,
@@ -2736,7 +2749,7 @@
         row: usize,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;circuit::Value&lt;F&gt;, Error&gt; {
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::QueryInstance {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::QueryInstance {
                 col: column.into(),
                 row,
                 usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),
@@ -2767,7 +2780,7 @@
     {
         <span class="kw">if </span><span class="self">self</span>.in_phase(FirstPhase) {
             <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignAdvice {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::AssignAdvice {
                     desc: desc().into(),
                     col: column.into(),
                     row,
@@ -2795,11 +2808,14 @@
                     .expect(<span class="string">"bounds failure"</span>);
                 <span class="kw-2">*</span>value = CellValue::Assigned(to);
             }
-            <span class="prelude-val">Err</span>(err) =&gt; {
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                 <span class="comment">// Propagate `assign` error if the column is in current phase.
                 </span><span class="kw">let </span>phase = <span class="self">self</span>.cs.advice_column_phase[column.index];
                 <span class="kw">if </span><span class="self">self</span>.in_phase(phase) {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(err);
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::WitnessMissing {
+                        func: <span class="string">"assign_advice"</span>.to_string(),
+                        desc: desc().into(),
+                    }));
                 }
             }
         }
@@ -2825,7 +2841,7 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignFixed {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::AssignFixed {
                 desc: desc().into(),
                 col: column.into(),
                 row,
@@ -2843,11 +2859,21 @@
                 .or_default();
         }
 
+        <span class="kw">let </span>value = <span class="kw">match </span>to().into_field().evaluate().assign() {
+            <span class="prelude-val">Ok</span>(v) =&gt; CellValue::Assigned(v),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::WitnessMissing {
+                    func: <span class="string">"assign_fixed"</span>.to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         <span class="kw-2">*</span><span class="self">self
             </span>.fixed
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .expect(<span class="string">"bounds failure"</span>) = CellValue::Assigned(to().into_field().evaluate().assign()<span class="question-mark">?</span>);
+            .expect(<span class="string">"bounds failure"</span>) = value;
 
         <span class="prelude-val">Ok</span>(())
     }
@@ -2864,7 +2890,7 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>left_row) || !<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>right_row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::Copy {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::Copy {
                 left_col: left_column,
                 left_row,
                 right_col: right_column,
@@ -2889,7 +2915,7 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>from_row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::FillFromRow {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::FillFromRow {
                 col: col.into(),
                 from_row,
                 usable_rows: (<span class="self">self</span>.usable_rows.start, <span class="self">self</span>.usable_rows.end),

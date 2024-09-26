@@ -1004,9 +1004,19 @@
 <a href="#988" id="988">988</a>
 <a href="#989" id="989">989</a>
 <a href="#990" id="990">990</a>
+<a href="#991" id="991">991</a>
+<a href="#992" id="992">992</a>
+<a href="#993" id="993">993</a>
+<a href="#994" id="994">994</a>
+<a href="#995" id="995">995</a>
+<a href="#996" id="996">996</a>
+<a href="#997" id="997">997</a>
+<a href="#998" id="998">998</a>
+<a href="#999" id="999">999</a>
+<a href="#1000" id="1000">1000</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Traits and structs for implementing circuit components.
 
-</span><span class="kw">use </span><span class="kw">crate</span>::plonk::{<span class="self">self</span>, AssignmentError};
+</span><span class="kw">use </span><span class="kw">crate</span>::plonk::{<span class="self">self</span>, AssignError};
 <span class="kw">use </span><span class="kw">crate</span>::plonk::{
     permutation,
     sealed::{<span class="self">self</span>, SealedPhase},
@@ -1160,7 +1170,7 @@
 
     <span class="kw">fn </span>query_instance(<span class="kw-2">&amp;</span><span class="self">self</span>, column: Column&lt;Instance&gt;, row: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Value&lt;F&gt;, Error&gt; {
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::QueryInstance {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::QueryInstance {
                 col: column.into(),
                 row,
                 usable_rows: (<span class="number">0</span>, <span class="self">self</span>.usable_rows.end),
@@ -1195,7 +1205,7 @@
         }
 
         <span class="kw">if </span>!<span class="self">self</span>.usable_rows.contains(<span class="kw-2">&amp;</span>row) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignmentError(AssignmentError::AssignAdvice {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::AssignAdvice {
                 desc: desc().into(),
                 col: column.into(),
                 row,
@@ -1204,11 +1214,21 @@
             }));
         }
 
+        <span class="kw">let </span>value = <span class="kw">match </span>to().into_field().assign() {
+            <span class="prelude-val">Ok</span>(v) =&gt; v,
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(Error::AssignError(AssignError::WitnessMissing {
+                    func: <span class="string">"assign_advice"</span>.to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         <span class="kw-2">*</span><span class="self">self
             </span>.advice
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .ok_or(Error::BoundsFailure)<span class="question-mark">? </span>= to().into_field().assign()<span class="question-mark">?</span>;
+            .ok_or(Error::BoundsFailure)<span class="question-mark">? </span>= value;
 
         <span class="prelude-val">Ok</span>(())
     }
