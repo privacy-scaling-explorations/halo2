@@ -555,6 +555,12 @@ mod tests {
                 Ok(())
             }
         }
-        CircuitCost::<Eq, MyCircuit>::measure(K, &MyCircuit).proof_size(1);
+        let cost = CircuitCost::<Eq, MyCircuit>::measure(K, &MyCircuit);
+
+        let marginal_proof_size = cost.marginal_proof_size();
+        assert_eq!(usize::from(marginal_proof_size), 0);
+
+        let proof_size = cost.proof_size(1);
+        assert_eq!(usize::from(proof_size), 608);
     }
 }

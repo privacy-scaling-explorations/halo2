@@ -8,7 +8,7 @@ use halo2_debug::test_rng;
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof_multi, Advice, Circuit,
+        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof_multi, vk_read, Advice, Circuit,
         Column, ConstraintSystem, ErrorFront, Fixed, Instance,
     },
     poly::{
@@ -141,8 +141,29 @@ fn test_serialization() {
             let compress_selectors = true;
             let vk = keygen_vk_custom(&params, &circuit, compress_selectors)
                 .expect("vk should not fail");
-            let pk = keygen_pk(&params, vk, &circuit).expect("pk should not fail");
+            let pk = keygen_pk(&params, vk.clone(), &circuit).expect("pk should not fail");
 
+            // serialization test for vk
+            let f = File::create("serialization-test.vk").unwrap();
+            let mut writer = BufWriter::new(f);
+            vk.write(&mut writer, SerdeFormat::RawBytes).unwrap();
+            writer.flush().unwrap();
+
+            let f = File::open("serialization-test.vk").unwrap();
+            let mut reader = BufReader::new(f);
+            #[allow(clippy::unit_arg)]
+            let vk = vk_read::<G1Affine, _, StandardPlonk>(
+                &mut reader,
+                SerdeFormat::RawBytes,
+                k,
+                &circuit,
+                compress_selectors,
+            )
+            .unwrap();
+
+            std::fs::remove_file("serialization-test.vk").unwrap();
+
+            // serialization test for pk
             let f = File::create("serialization-test.pk").unwrap();
             let mut writer = BufWriter::new(f);
             pk.write(&mut writer, SerdeFormat::RawBytes).unwrap();
@@ -162,6 +183,7 @@ fn test_serialization() {
 
             std::fs::remove_file("serialization-test.pk").unwrap();
 
+            // create & verify proof
             let instances: Vec<Vec<Vec<Fr>>> = vec![vec![vec![circuit.0]]];
             let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
             create_proof::<
@@ -193,7 +215,7 @@ fn test_serialization() {
                     SingleStrategy<Bn256>,
                 >(
                     &verifier_params,
-                    pk.get_vk(),
+                    &vk,
                     instances.as_slice(),
                     &mut transcript
                 ),
