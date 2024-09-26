@@ -7,7 +7,7 @@ use std::ops::{Add, Mul, Neg, Range};
 
 use blake2b_simd::blake2b;
 
-use crate::plonk::AssignmentError;
+use crate::plonk::AssignError;
 use crate::{
     circuit,
     plonk::{
@@ -415,7 +415,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         }
 
         if !self.usable_rows.contains(&row) {
-            return Err(Error::AssignmentError(AssignmentError::EnableSelector {
+            return Err(Error::AssignError(AssignError::EnableSelector {
                 desc: desc().into(),
                 selector: *selector,
                 row,
@@ -445,7 +445,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         row: usize,
     ) -> Result<circuit::Value<F>, Error> {
         if !self.usable_rows.contains(&row) {
-            return Err(Error::AssignmentError(AssignmentError::QueryInstance {
+            return Err(Error::AssignError(AssignError::QueryInstance {
                 col: column.into(),
                 row,
                 usable_rows: (self.usable_rows.start, self.usable_rows.end),
@@ -476,7 +476,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
     {
         if self.in_phase(FirstPhase) {
             if !self.usable_rows.contains(&row) {
-                return Err(Error::AssignmentError(AssignmentError::AssignAdvice {
+                return Err(Error::AssignError(AssignError::AssignAdvice {
                     desc: desc().into(),
                     col: column.into(),
                     row,
@@ -504,11 +504,14 @@ impl<F: Field> Assignment<F> for MockProver<F> {
                     .expect("bounds failure");
                 *value = CellValue::Assigned(to);
             }
-            Err(err) => {
+            Err(_) => {
                 // Propagate `assign` error if the column is in current phase.
                 let phase = self.cs.advice_column_phase[column.index];
                 if self.in_phase(phase) {
-                    return Err(err);
+                    return Err(Error::AssignError(AssignError::WitnessMissing {
+                        func: "assign_advice".to_string(),
+                        desc: desc().into(),
+                    }));
                 }
             }
         }
@@ -534,7 +537,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         }
 
         if !self.usable_rows.contains(&row) {
-            return Err(Error::AssignmentError(AssignmentError::AssignFixed {
+            return Err(Error::AssignError(AssignError::AssignFixed {
                 desc: desc().into(),
                 col: column.into(),
                 row,
@@ -552,11 +555,21 @@ impl<F: Field> Assignment<F> for MockProver<F> {
                 .or_default();
         }
 
+        let value = match to().into_field().evaluate().assign() {
+            Ok(v) => CellValue::Assigned(v),
+            Err(_) => {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
+                    func: "assign_fixed".to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         *self
             .fixed
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .expect("bounds failure") = CellValue::Assigned(to().into_field().evaluate().assign()?);
+            .expect("bounds failure") = value;
 
         Ok(())
     }
@@ -573,7 +586,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         }
 
         if !self.usable_rows.contains(&left_row) || !self.usable_rows.contains(&right_row) {
-            return Err(Error::AssignmentError(AssignmentError::Copy {
+            return Err(Error::AssignError(AssignError::Copy {
                 left_col: left_column,
                 left_row,
                 right_col: right_column,
@@ -598,7 +611,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         }
 
         if !self.usable_rows.contains(&from_row) {
-            return Err(Error::AssignmentError(AssignmentError::FillFromRow {
+            return Err(Error::AssignError(AssignError::FillFromRow {
                 col: col.into(),
                 from_row,
                 usable_rows: (self.usable_rows.start, self.usable_rows.end),

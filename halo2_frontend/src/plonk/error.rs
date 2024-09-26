@@ -6,7 +6,7 @@ use halo2_middleware::circuit::Any;
 
 /// This is an error that could occur during circuit synthesis.  
 ///
-/// **NOTE**: [`AssignmentError`] is introduced to provide more debugging info     
+/// **NOTE**: [`AssignError`] is introduced to provide more debugging info     
 /// to developers when assigning witnesses to circuit cells.  
 /// Hence, they are used for [`MockProver`] and [`WitnessCollection`].  
 /// The [`keygen`] process use the [`NotEnoughRowsAvailable`], since it is just enough.
@@ -32,8 +32,8 @@ pub enum Error {
     ColumnNotInPermutation(Column<Any>),
     /// An error relating to a lookup table.
     TableError(TableError),
-    /// An error relating to an `Assignment`.
-    AssignmentError(AssignmentError),
+    /// An error relating to a circuit assignment.
+    AssignError(AssignError),
     /// Generic error not covered by previous cases
     Other(String),
 }
@@ -65,7 +65,7 @@ impl fmt::Display for Error {
                 "Column {column:?} must be included in the permutation. Help: try applying `meta.enable_equalty` on the column",
             ),
             Error::TableError(error) => write!(f, "{error}"),
-            Error::AssignmentError(error) => write!(f, "{error}"),
+            Error::AssignError(error) => write!(f, "{error}"),
             Error::Other(error) => write!(f, "Other: {error}"),
         }
     }
@@ -112,7 +112,7 @@ impl fmt::Display for TableError {
 
 /// This is an error that could occur during `assign_advice`, `assign_fixed`, `copy`, etc.
 #[derive(Debug)]
-pub enum AssignmentError {
+pub enum AssignError {
     AssignAdvice {
         desc: String,
         col: Column<Any>,
@@ -154,12 +154,16 @@ pub enum AssignmentError {
         usable_rows: (usize, usize),
         k: u32,
     },
+    WitnessMissing {
+        func: String,
+        desc: String,
+    },
 }
 
-impl fmt::Display for AssignmentError {
+impl fmt::Display for AssignError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AssignmentError::AssignAdvice { desc, col, row, usable_rows:(start, end), k } => write!(
+            AssignError::AssignAdvice { desc, col, row, usable_rows:(start, end), k } => write!(
                 f,
                 "assign_advice `{}` error: column={:?}({}), row={}, usable_rows={}..{}, k={}",
                 desc,
@@ -169,7 +173,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
-            AssignmentError::AssignFixed {desc, col, row, usable_rows: (start, end), k } => write!(
+            AssignError::AssignFixed {desc, col, row, usable_rows: (start, end), k } => write!(
                 f,
                 "assign_fixed `{}` error: column={:?}({}), row={}, usable_rows={}..{}, k={}",
                 desc,
@@ -179,7 +183,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
-            AssignmentError::EnableSelector { desc, selector, row, usable_rows: (start, end), k } => write!(
+            AssignError::EnableSelector { desc, selector, row, usable_rows: (start, end), k } => write!(
                 f,
                 "enable_selector `{}` error: column=Selector({:?}), row={}, usable_rows={}..{}, k={}",
                 desc,
@@ -188,7 +192,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
-            AssignmentError::QueryInstance { col, row, usable_rows:(start, end), k } => write!(
+            AssignError::QueryInstance { col, row, usable_rows:(start, end), k } => write!(
                 f,
                 "query_instance error: column={:?}({}), row={}, usable_rows={}..{}, k={}",
                 col.column_type,
@@ -198,7 +202,7 @@ impl fmt::Display for AssignmentError {
                 end,
                 k,
             ),
-            AssignmentError::Copy { left_col, left_row, right_col, right_row, usable_rows:(start, end), k } => write!(
+            AssignError::Copy { left_col, left_row, right_col, right_row, usable_rows:(start, end), k } => write!(
                 f,
                 "copy error: left_column={:?}({}), left_row={}, right_column={:?}({}), right_row={}, usable_rows={}..{}, k={}",
                 left_col.column_type(),
@@ -210,7 +214,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
-            AssignmentError::FillFromRow { col, from_row, usable_rows:(start, end), k } => write!(
+            AssignError::FillFromRow { col, from_row, usable_rows:(start, end), k } => write!(
                 f,
                 "fill_from_row error: column={:?}({}), from_row={}, usable_rows={}..{}, k={}",
                 col.column_type(),
@@ -219,6 +223,7 @@ impl fmt::Display for AssignmentError {
                 start, end,
                 k,
             ),
+            AssignError::WitnessMissing { func, desc } => write!(f, "witness missing/unknown when {} `{}`", func, desc),
         }
     }
 }

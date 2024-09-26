@@ -1,6 +1,6 @@
 //! Traits and structs for implementing circuit components.
 
-use crate::plonk::{self, AssignmentError};
+use crate::plonk::{self, AssignError};
 use crate::plonk::{
     permutation,
     sealed::{self, SealedPhase},
@@ -154,7 +154,7 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
 
     fn query_instance(&self, column: Column<Instance>, row: usize) -> Result<Value<F>, Error> {
         if !self.usable_rows.contains(&row) {
-            return Err(Error::AssignmentError(AssignmentError::QueryInstance {
+            return Err(Error::AssignError(AssignError::QueryInstance {
                 col: column.into(),
                 row,
                 usable_rows: (0, self.usable_rows.end),
@@ -189,7 +189,7 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
         }
 
         if !self.usable_rows.contains(&row) {
-            return Err(Error::AssignmentError(AssignmentError::AssignAdvice {
+            return Err(Error::AssignError(AssignError::AssignAdvice {
                 desc: desc().into(),
                 col: column.into(),
                 row,
@@ -198,11 +198,21 @@ impl<'a, F: Field> Assignment<F> for WitnessCollection<'a, F> {
             }));
         }
 
+        let value = match to().into_field().assign() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
+                    func: "assign_advice".to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         *self
             .advice
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .ok_or(Error::BoundsFailure)? = to().into_field().assign()?;
+            .ok_or(Error::BoundsFailure)? = value;
 
         Ok(())
     }
