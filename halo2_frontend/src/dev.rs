@@ -1527,7 +1527,7 @@ mod tests {
     #[cfg(feature = "lookup-any-sanity-checks")]
     #[test]
     #[should_panic(
-        expected = "pair of tagging expressions(query of the tag columns or mutiple query combinations) should be included"
+        expected = "pair of tagging expressions(query of the tag columns or multiple query combinations) should be included"
     )]
     fn bad_lookup_any_not_add_tagging_pairs() {
         const K: u32 = 4;
@@ -2020,7 +2020,7 @@ mod tests {
     }
 
     #[test]
-    fn contraint_unsatisfied() {
+    fn constraint_unsatisfied() {
         const K: u32 = 4;
 
         #[derive(Clone)]
@@ -2263,7 +2263,7 @@ mod tests {
         instance[0] = InstanceValue::Assigned(Fp::from(11));
         assert_eq!(prover.verify(), Err(vec![err2.clone()]));
 
-        // then we modify the witness -> the contraint `squared` will fail
+        // then we modify the witness -> the constraint `squared` will fail
         let advice0 = prover.advice_mut(0);
         advice0[2] = CellValue::Assigned(Fp::from(10));
         assert_eq!(prover.verify(), Err(vec![err1, err2]));

@@ -366,3 +366,47 @@ fn shuffle_argument_required_degree<F: Field, V: Variable>(arg: &shuffle::Argume
     // (1 - (l_last + l_blind)) (z(\omega X) (s(X) + \gamma) - z(X) (a(X) + \gamma))
     std::cmp::max(2 + shuffle_degree, 2 + input_degree)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ExpressionBack;
+    use halo2curves::bn256::Fr;
+
+    #[test]
+    fn expressionback_iter_sum() {
+        let exprs: Vec<ExpressionBack<Fr>> = vec![
+            ExpressionBack::Constant(1.into()),
+            ExpressionBack::Constant(2.into()),
+            ExpressionBack::Constant(3.into()),
+        ];
+        let happened: ExpressionBack<Fr> = exprs.into_iter().sum();
+        let expected: ExpressionBack<Fr> = ExpressionBack::Sum(
+            Box::new(ExpressionBack::Sum(
+                Box::new(ExpressionBack::Constant(1.into())),
+                Box::new(ExpressionBack::Constant(2.into())),
+            )),
+            Box::new(ExpressionBack::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
+    }
+
+    #[test]
+    fn expressionback_iter_product() {
+        let exprs: Vec<ExpressionBack<Fr>> = vec![
+            ExpressionBack::Constant(1.into()),
+            ExpressionBack::Constant(2.into()),
+            ExpressionBack::Constant(3.into()),
+        ];
+        let happened: ExpressionBack<Fr> = exprs.into_iter().product();
+        let expected: ExpressionBack<Fr> = ExpressionBack::Product(
+            Box::new(ExpressionBack::Product(
+                Box::new(ExpressionBack::Constant(1.into())),
+                Box::new(ExpressionBack::Constant(2.into())),
+            )),
+            Box::new(ExpressionBack::Constant(3.into())),
+        );
+
+        assert_eq!(happened, expected);
+    }
+}

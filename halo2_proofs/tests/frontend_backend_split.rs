@@ -43,7 +43,7 @@ struct MyCircuitConfig {
     s_lookup: Column<Fixed>,
     s_ltable: Column<Fixed>,
 
-    // A shuffle: s_shufle * [1, a[0]] shuffle_of s_stable * [1, b[0]]
+    // A shuffle: s_shuffle * [1, a[0]] shuffle_of s_stable * [1, b[0]]
     s_shuffle: Column<Fixed>,
     s_stable: Column<Fixed>,
 

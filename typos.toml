@@ -1,0 +1,7 @@
+[default]
+extend-ignore-re=[
+    "master-thm",
+    "[aA]dvices",
+    "projectives"
+]
+check-filename = true
