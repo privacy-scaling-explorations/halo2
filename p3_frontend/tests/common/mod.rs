@@ -4,21 +4,22 @@ use halo2_backend::poly::kzg::strategy::SingleStrategy;
 use halo2_backend::{
     plonk::{
         keygen::{keygen_pk, keygen_vk},
-        prover::ProverSingle,
-        verifier::verify_proof_single,
+        prover::Prover,
+        verifier::verify_proof,
     },
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
     },
 };
+use halo2_debug::check_witness;
 use halo2_debug::test_rng;
 use halo2_middleware::circuit::CompiledCircuit;
 use halo2_middleware::zal::impls::H2cEngine;
 use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use p3_air::Air;
 use p3_frontend::{
-    check_witness, compile_circuit_cs, compile_preprocessing, get_public_inputs, trace_to_wit,
-    CompileParams, FWrap, SymbolicAirBuilder,
+    compile_circuit_cs, compile_preprocessing, get_public_inputs, trace_to_wit, CompileParams,
+    FWrap, SymbolicAirBuilder,
 };
 use p3_matrix::dense::RowMajorMatrix;
 use std::time::Instant;
@@ -50,8 +51,12 @@ where
     let witness = trace_to_wit(k, trace);
     let pis = get_public_inputs(&preprocessing_info, size, &witness);
 
-    check_witness(&compiled_circuit, k, &witness, &pis);
-    (compiled_circuit, witness, pis)
+    check_witness(&compiled_circuit, k, 5, &witness, &pis);
+    (
+        compiled_circuit,
+        witness.into_iter().map(Some).collect(),
+        pis,
+    )
 }
 
 pub(crate) fn setup_prove_verify(
@@ -73,7 +78,7 @@ pub(crate) fn setup_prove_verify(
     println!("Proving...");
     let start = Instant::now();
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
-    let mut prover = ProverSingle::<
+    let mut prover = Prover::<
         KZGCommitmentScheme<Bn256>,
         ProverSHPLONK<'_, Bn256>,
         _,
@@ -93,15 +98,15 @@ pub(crate) fn setup_prove_verify(
     println!("Verifying...");
     let mut verifier_transcript =
         Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
-    let strategy = SingleStrategy::new(&verifier_params);
 
-    verify_proof_single::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, _>(
-        &verifier_params,
-        &vk,
-        strategy,
-        pis.to_vec(),
-        &mut verifier_transcript,
-    )
-    .expect("verify succeeds");
+    assert!(
+        verify_proof::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, SingleStrategy<_>>(
+            &verifier_params,
+            &vk,
+            pis.to_vec(),
+            &mut verifier_transcript,
+        ),
+        "failed to verify proof"
+    );
     println!("Verify: {:?}", start.elapsed());
 }

@@ -13,8 +13,8 @@ use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::dev::MockProver;
 use halo2_proofs::plonk::{
     create_proof_with_engine as create_plonk_proof_with_engine, keygen_pk, keygen_vk,
-    verify_proof as verify_plonk_proof, Advice, Assigned, Circuit, Column, ConstraintSystem, Error,
-    ErrorFront, Fixed, ProvingKey, TableColumn, VerifyingKey,
+    verify_proof_multi as verify_multi_plonk_proof, Advice, Assigned, Circuit, Column,
+    ConstraintSystem, Error, ErrorFront, Fixed, ProvingKey, TableColumn, VerifyingKey,
 };
 use halo2_proofs::poly::commitment::{CommitmentScheme, ParamsProver, Prover, Verifier};
 use halo2_proofs::poly::Rotation;
@@ -547,7 +547,7 @@ fn plonk_api() {
         V: Verifier<'params, Scheme>,
         E: EncodedChallenge<Scheme::Curve>,
         T: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
-        Strategy: VerificationStrategy<'params, Scheme, V, Output = Strategy>,
+        Strategy: VerificationStrategy<'params, Scheme, V>,
     >(
         params_verifier: &'params Scheme::ParamsVerifier,
         vk: &VerifyingKey<Scheme::Curve>,
@@ -560,11 +560,12 @@ fn plonk_api() {
         let mut transcript = T::init(proof);
         let instance = [vec![vec![instance_val]], vec![vec![instance_val]]];
 
-        let strategy = Strategy::new(params_verifier);
-        let strategy =
-            verify_plonk_proof(params_verifier, vk, strategy, &instance, &mut transcript).unwrap();
-
-        assert!(strategy.finalize());
+        assert!(verify_multi_plonk_proof::<_, _, _, _, Strategy>(
+            params_verifier,
+            vk,
+            &instance,
+            &mut transcript
+        ));
     }
 
     fn test_plonk_api_gwc() {
@@ -601,7 +602,7 @@ fn plonk_api() {
 
                 proof
             },
-            "b749dfa90ac3bc3d45f994cc8bf527928a274c2225e4e87668eece79938e6d12",
+            "f87ba1010dede5a2148ed94403ca12a566d3154ebb12ccb6c20a330e9b280af8",
         );
     }
 
@@ -638,7 +639,7 @@ fn plonk_api() {
 
                 proof
             },
-            "284001f93f86a5d18ad9ebff6da81031e5ad9f799ea1dc2606271a6ff240fbd3",
+            "0fc67d890faef0ef8ea7ef680cc566b2ab7dabef12fcceb74d3655a0fb08c708",
         );
     }
 

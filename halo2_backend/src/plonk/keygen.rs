@@ -107,7 +107,6 @@ where
     }
 
     // Compute fixeds
-
     let fixed_polys: Vec<_> = circuit
         .preprocessing
         .fixed
@@ -131,13 +130,7 @@ where
         .map(Polynomial::new_lagrange_from_vec)
         .collect();
 
-    // Compute l_0(X)
-    // TODO: this can be done more efficiently
-    // https://github.com/privacy-scaling-explorations/halo2/issues/269
-    let mut l0 = vk.domain.empty_lagrange();
-    l0[0] = C::Scalar::ONE;
-    let l0 = vk.domain.lagrange_to_coeff(l0);
-    let l0 = vk.domain.coeff_to_extended(l0);
+    let l0 = vk.domain.lagrange_extended(0usize);
 
     // Compute l_blind(X) which evaluates to 1 for each blinding factor row
     // and 0 otherwise over the domain.
@@ -150,10 +143,8 @@ where
 
     // Compute l_last(X) which evaluates to 1 on the first inactive row (just
     // before the blinding factors) and 0 otherwise over the domain
-    let mut l_last = vk.domain.empty_lagrange();
-    l_last[params.n() as usize - vk.cs.blinding_factors() - 1] = C::Scalar::ONE;
-    let l_last = vk.domain.lagrange_to_coeff(l_last);
-    let l_last = vk.domain.coeff_to_extended(l_last);
+    let idx = params.n() as usize - vk.cs.blinding_factors() - 1;
+    let l_last = vk.domain.lagrange_extended(idx);
 
     // Compute l_active_row(X)
     let one = C::Scalar::ONE;

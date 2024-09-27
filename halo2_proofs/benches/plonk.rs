@@ -10,13 +10,10 @@ use halo2curves::pasta::{EqAffine, Fp};
 use rand_core::OsRng;
 
 use halo2_proofs::{
-    poly::{
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsIPA},
-            multiopen::ProverIPA,
-            strategy::SingleStrategy,
-        },
-        VerificationStrategy,
+    poly::ipa::{
+        commitment::{IPACommitmentScheme, ParamsIPA},
+        multiopen::ProverIPA,
+        strategy::SingleStrategy,
     },
     transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
 };
@@ -300,9 +297,13 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     fn verifier(params: &ParamsIPA<EqAffine>, vk: &VerifyingKey<EqAffine>, proof: &[u8]) {
-        let strategy = SingleStrategy::new(params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(proof);
-        assert!(verify_proof(params, vk, strategy, &[vec![]], &mut transcript).is_ok());
+        assert!(verify_proof_multi::<_, _, _, _, SingleStrategy<_>>(
+            params,
+            vk,
+            &[vec![]],
+            &mut transcript
+        ));
     }
 
     let k_range = 8..=16;

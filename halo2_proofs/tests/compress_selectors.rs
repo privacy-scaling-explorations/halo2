@@ -17,8 +17,8 @@ use halo2_middleware::circuit::{Any, ColumnMid};
 use halo2_middleware::zal::impls::{H2cEngine, PlonkEngineConfig};
 use halo2_proofs::arithmetic::Field;
 use halo2_proofs::plonk::{
-    create_proof_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof, Advice, Assigned,
-    Circuit, Column, ConstraintSystem, Instance, Selector,
+    create_proof_with_engine, keygen_pk_custom, keygen_vk_custom, verify_proof_multi, Advice,
+    Assigned, Circuit, Column, ConstraintSystem, Instance, Selector,
 };
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
 use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
@@ -375,16 +375,22 @@ fn test_mycircuit(
     // Verify
     let mut verifier_transcript =
         Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
-    let strategy = SingleStrategy::new(&verifier_params);
-
-    verify_proof::<KZGCommitmentScheme<Bn256>, VerifierSHPLONK<Bn256>, _, _, _>(
+    if !verify_proof_multi::<
+        KZGCommitmentScheme<Bn256>,
+        VerifierSHPLONK<Bn256>,
+        _,
+        _,
+        SingleStrategy<_>,
+    >(
         &verifier_params,
         &vk,
-        strategy,
         instances.as_slice(),
         &mut verifier_transcript,
-    )
-    .map_err(halo2_proofs::plonk::Error::Backend)?;
+    ) {
+        return Err(halo2_proofs::plonk::Error::Backend(
+            halo2_backend::plonk::Error::Opening,
+        ));
+    };
 
     Ok(proof)
 }
@@ -484,17 +490,17 @@ fn test_compress_gates() {
 }
 
 #[test]
-fn test_success() -> Result<(), halo2_proofs::plonk::Error> {
-    // vk & pk keygen both WITH compress
+fn test_key_compression() -> Result<(), halo2_proofs::plonk::Error> {
+    // vk & pk keygen both WITH compression
     test_result(
         || test_mycircuit(true, true).expect("should pass"),
-        "8326140d1873a91630d439a8812d1f104667144e03e0cd5c59eb358ae5d1a4eb",
+        "acae50508de5ead584170dd83b139daf40e1026b6debbb78eb05d515173fc2dd",
     );
 
-    // vk & pk keygen both WITHOUT compress
+    // vk & pk keygen both WITHOUT compression
     test_result(
         || test_mycircuit(false, false).expect("should pass"),
-        "73dd4c3c9c51d55dc8cf68ca2b5d8acdb40ed44bc8a88d718325bc0023688f64",
+        "f9c99bd341705ac6a13724a526dd28df0bac1c745e0cde40ab39cab3e1b95309",
     );
 
     Ok(())
@@ -502,14 +508,14 @@ fn test_success() -> Result<(), halo2_proofs::plonk::Error> {
 
 #[should_panic]
 #[test]
-fn test_failure_1() {
+fn test_key_compression_failure_1() {
     // vk keygen WITH compress
     // pk keygen WITHOUT compress
     assert!(test_mycircuit(false, true).is_err());
 }
 
 #[test]
-fn test_failure_2() {
+fn test_key_compression_failure_2() {
     // vk keygen WITHOUT compress
     // pk keygen WITH compress
     assert!(test_mycircuit(true, false).is_err());

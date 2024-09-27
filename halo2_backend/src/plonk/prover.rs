@@ -39,9 +39,9 @@ struct AdviceSingle<C: CurveAffine, B: Basis> {
 }
 
 /// The prover object used to create proofs interactively by passing the witnesses to commit at
-/// each phase.  This works for a single proof.  This is a wrapper over Prover.
+/// each phase.  This works for a single proof.  This is a wrapper over ProverMulti.
 #[derive(Debug)]
-pub struct ProverSingle<
+pub struct Prover<
     'a,
     'params,
     Scheme: CommitmentScheme,
@@ -50,7 +50,7 @@ pub struct ProverSingle<
     R: RngCore,
     T: TranscriptWrite<Scheme::Curve, E>,
     M: MsmAccel<Scheme::Curve>,
->(Prover<'a, 'params, Scheme, P, E, R, T, M>);
+>(ProverMulti<'a, 'params, Scheme, P, E, R, T, M>);
 
 impl<
         'a,
@@ -61,9 +61,9 @@ impl<
         R: RngCore,
         T: TranscriptWrite<Scheme::Curve, E>,
         M: MsmAccel<Scheme::Curve>,
-    > ProverSingle<'a, 'params, Scheme, P, E, R, T, M>
+    > Prover<'a, 'params, Scheme, P, E, R, T, M>
 {
-    /// Create a new prover object
+    /// Create a new ProverMulti object
     pub fn new_with_engine(
         engine: PlonkEngine<Scheme::Curve, M>,
         params: &'params Scheme::ParamsProver,
@@ -75,7 +75,7 @@ impl<
     where
         Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
-        Ok(Self(Prover::new_with_engine(
+        Ok(Self(ProverMulti::new_with_engine(
             engine,
             params,
             pk,
@@ -91,12 +91,12 @@ impl<
         instance: Vec<Vec<Scheme::Scalar>>,
         rng: R,
         transcript: &'a mut T,
-    ) -> Result<ProverSingle<'a, 'params, Scheme, P, E, R, T, H2cEngine>, Error>
+    ) -> Result<Prover<'a, 'params, Scheme, P, E, R, T, H2cEngine>, Error>
     where
         Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
         let engine = PlonkEngineConfig::build_default();
-        ProverSingle::new_with_engine(engine, params, pk, instance, rng, transcript)
+        Prover::new_with_engine(engine, params, pk, instance, rng, transcript)
     }
 
     /// Commit the `witness` at `phase` and return the challenges after `phase`.
@@ -123,7 +123,7 @@ impl<
 /// The prover object used to create proofs interactively by passing the witnesses to commit at
 /// each phase.  This supports batch proving.
 #[derive(Debug)]
-pub struct Prover<
+pub struct ProverMulti<
     'a,
     'params,
     Scheme: CommitmentScheme,
@@ -164,7 +164,7 @@ impl<
         R: RngCore,
         T: TranscriptWrite<Scheme::Curve, E>,
         M: MsmAccel<Scheme::Curve>,
-    > Prover<'a, 'params, Scheme, P, E, R, T, M>
+    > ProverMulti<'a, 'params, Scheme, P, E, R, T, M>
 {
     /// Create a new prover object
     pub fn new_with_engine(
@@ -283,7 +283,7 @@ impl<
 
         let challenges = HashMap::<usize, Scheme::Scalar>::with_capacity(meta.num_challenges);
 
-        Ok(Prover {
+        Ok(ProverMulti {
             engine,
             params,
             pk,
@@ -489,10 +489,10 @@ impl<
 
     /// Finalizes the proof creation.
     /// The following steps are performed:
-    /// - 1. Generate commited lookup polys
-    /// - 2. Generate commited permutation polys
-    /// - 3. Generate commited lookup polys
-    /// - 4. Generate commited shuffle polys
+    /// - 1. Generate committed lookup polys
+    /// - 2. Generate committed permutation polys
+    /// - 3. Generate committed lookup polys
+    /// - 4. Generate committed shuffle polys
     /// - 5. Commit to the vanishing argument's random polynomial
     /// - 6. Generate the advice polys
     /// - 7. Evaluate the h(X) polynomial
@@ -513,7 +513,7 @@ impl<
             .map(|index| self.challenges.remove(&index).unwrap())
             .collect::<Vec<_>>();
 
-        // 1. Generate commited ( added to transcript ) lookup polys  ---------------------------------------
+        // 1. Generate committed ( added to transcript ) lookup polys  ---------------------------------------
 
         // Sample theta challenge for keeping lookup columns linearly independent
         // [TRANSCRIPT-5]
@@ -531,7 +531,7 @@ impl<
         // [TRANSCRIPT-8]
         let gamma: ChallengeGamma<_> = self.transcript.squeeze_challenge_scalar();
 
-        // 2. Generate commited permutation polys  -----------------------------------------
+        // 2. Generate committed permutation polys  -----------------------------------------
         // [TRANSCRIPT-9]
         let permutations_committed = self.gen_committed_permutation_polys(beta, gamma)?;
 
@@ -1072,11 +1072,11 @@ impl<
         circuits_instances: &[Vec<Vec<Scheme::Scalar>>],
         rng: R,
         transcript: &'a mut T,
-    ) -> Result<Prover<'a, 'params, Scheme, P, E, R, T, H2cEngine>, Error>
+    ) -> Result<ProverMulti<'a, 'params, Scheme, P, E, R, T, H2cEngine>, Error>
     where
         Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     {
         let engine = PlonkEngineConfig::build_default();
-        Prover::new_with_engine(engine, params, pk, circuits_instances, rng, transcript)
+        ProverMulti::new_with_engine(engine, params, pk, circuits_instances, rng, transcript)
     }
 }

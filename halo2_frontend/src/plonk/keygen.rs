@@ -5,7 +5,8 @@ use halo2_middleware::ff::Field;
 
 use crate::circuit::Value;
 use crate::plonk::{
-    permutation, Advice, Assigned, Assignment, Challenge, Column, Error, Fixed, Instance, Selector,
+    permutation, Advice, AssignError, Assigned, Assignment, Challenge, Column, Error, Fixed,
+    Instance, Selector,
 };
 
 /// Assembly to be used in circuit synthesis.
@@ -75,7 +76,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
 
     fn assign_fixed<V, VR, A, AR>(
         &mut self,
-        _: A,
+        desc: A,
         column: Column<Fixed>,
         row: usize,
         to: V,
@@ -90,11 +91,21 @@ impl<F: Field> Assignment<F> for Assembly<F> {
             return Err(Error::not_enough_rows_available(self.k));
         }
 
+        let value = match to().into_field().assign() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
+                    func: "assign_fixed".to_string(),
+                    desc: desc().into(),
+                }))
+            }
+        };
+
         *self
             .fixed
             .get_mut(column.index())
             .and_then(|v| v.get_mut(row))
-            .ok_or(Error::BoundsFailure)? = to().into_field().assign()?;
+            .ok_or(Error::BoundsFailure)? = value;
 
         Ok(())
     }
@@ -129,7 +140,15 @@ impl<F: Field> Assignment<F> for Assembly<F> {
             .get_mut(column.index())
             .ok_or(Error::BoundsFailure)?;
 
-        let filler = to.assign()?;
+        let filler = match to.assign() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(Error::AssignError(AssignError::WitnessMissing {
+                    func: "fill_from_row".to_string(),
+                    desc: "".to_string(),
+                }))
+            }
+        };
         for row in self.usable_rows.clone().skip(from_row) {
             col[row] = filler;
         }

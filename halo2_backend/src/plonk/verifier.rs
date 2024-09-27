@@ -30,13 +30,12 @@ pub use batch::BatchVerifier;
 
 /// Returns a boolean indicating whether or not the proof is valid.  Verifies a single proof (not
 /// batched).
-pub fn verify_proof_single<'params, Scheme, V, E, T, Strategy>(
+pub fn verify_proof<'params, Scheme, V, E, T, Strategy>(
     params: &'params Scheme::ParamsVerifier,
     vk: &VerifyingKey<Scheme::Curve>,
-    strategy: Strategy,
     instance: Vec<Vec<Scheme::Scalar>>,
     transcript: &mut T,
-) -> Result<Strategy::Output, Error>
+) -> bool
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
     Scheme: CommitmentScheme,
@@ -45,11 +44,11 @@ where
     T: TranscriptRead<Scheme::Curve, E>,
     Strategy: VerificationStrategy<'params, Scheme, V>,
 {
-    verify_proof(params, vk, strategy, &[instance], transcript)
+    verify_proof_multi::<Scheme, V, E, T, Strategy>(params, vk, &[instance], transcript)
 }
 
-/// Returns a boolean indicating whether or not the proof is valid
-pub fn verify_proof<
+/// Process the proof, checks that the proof is valid and returns the `Strategy` output.
+pub fn verify_proof_with_strategy<
     'params,
     Scheme: CommitmentScheme,
     V: Verifier<'params, Scheme>,
@@ -62,7 +61,7 @@ pub fn verify_proof<
     strategy: Strategy,
     instances: &[Vec<Vec<Scheme::Scalar>>],
     transcript: &mut T,
-) -> Result<Strategy::Output, Error>
+) -> Result<Strategy, Error>
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
@@ -518,4 +517,29 @@ where
             .verify_proof(transcript, queries, msm)
             .map_err(|_| Error::Opening)
     })
+}
+
+/// Returns a boolean indicating whether or not the proof is valid
+pub fn verify_proof_multi<
+    'params,
+    Scheme: CommitmentScheme,
+    V: Verifier<'params, Scheme>,
+    E: EncodedChallenge<Scheme::Curve>,
+    T: TranscriptRead<Scheme::Curve, E>,
+    Strategy: VerificationStrategy<'params, Scheme, V>,
+>(
+    params: &'params Scheme::ParamsVerifier,
+    vk: &VerifyingKey<Scheme::Curve>,
+    instances: &[Vec<Vec<Scheme::Scalar>>],
+    transcript: &mut T,
+) -> bool
+where
+    Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
+{
+    let strategy = Strategy::new(params);
+    let strategy = match verify_proof_with_strategy(params, vk, strategy, instances, transcript) {
+        Ok(strategy) => strategy,
+        Err(_) => return false,
+    };
+    strategy.finalize()
 }

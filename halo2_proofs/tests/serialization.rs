@@ -8,8 +8,8 @@ use halo2_debug::test_rng;
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof, Advice, Circuit, Column,
-        ConstraintSystem, ErrorFront, Fixed, Instance,
+        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof_multi, vk_read, Advice, Circuit,
+        Column, ConstraintSystem, ErrorFront, Fixed, Instance,
     },
     poly::{
         kzg::{
@@ -141,8 +141,29 @@ fn test_serialization() {
             let compress_selectors = true;
             let vk = keygen_vk_custom(&params, &circuit, compress_selectors)
                 .expect("vk should not fail");
-            let pk = keygen_pk(&params, vk, &circuit).expect("pk should not fail");
+            let pk = keygen_pk(&params, vk.clone(), &circuit).expect("pk should not fail");
 
+            // serialization test for vk
+            let f = File::create("serialization-test.vk").unwrap();
+            let mut writer = BufWriter::new(f);
+            vk.write(&mut writer, SerdeFormat::RawBytes).unwrap();
+            writer.flush().unwrap();
+
+            let f = File::open("serialization-test.vk").unwrap();
+            let mut reader = BufReader::new(f);
+            #[allow(clippy::unit_arg)]
+            let vk = vk_read::<G1Affine, _, StandardPlonk>(
+                &mut reader,
+                SerdeFormat::RawBytes,
+                k,
+                &circuit,
+                compress_selectors,
+            )
+            .unwrap();
+
+            std::fs::remove_file("serialization-test.vk").unwrap();
+
+            // serialization test for pk
             let f = File::create("serialization-test.pk").unwrap();
             let mut writer = BufWriter::new(f);
             pk.write(&mut writer, SerdeFormat::RawBytes).unwrap();
@@ -162,6 +183,7 @@ fn test_serialization() {
 
             std::fs::remove_file("serialization-test.pk").unwrap();
 
+            // create & verify proof
             let instances: Vec<Vec<Vec<Fr>>> = vec![vec![vec![circuit.0]]];
             let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
             create_proof::<
@@ -183,25 +205,25 @@ fn test_serialization() {
             let proof = transcript.finalize();
 
             let verifier_params = params.verifier_params();
-            let strategy = SingleStrategy::new(&verifier_params);
             let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-            assert!(verify_proof::<
-                KZGCommitmentScheme<Bn256>,
-                VerifierGWC<Bn256>,
-                Challenge255<G1Affine>,
-                Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
-                SingleStrategy<Bn256>,
-            >(
-                &verifier_params,
-                pk.get_vk(),
-                strategy,
-                instances.as_slice(),
-                &mut transcript
-            )
-            .is_ok());
+            assert!(
+                verify_proof_multi::<
+                    KZGCommitmentScheme<Bn256>,
+                    VerifierGWC<Bn256>,
+                    Challenge255<G1Affine>,
+                    Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
+                    SingleStrategy<Bn256>,
+                >(
+                    &verifier_params,
+                    &vk,
+                    instances.as_slice(),
+                    &mut transcript
+                ),
+                "failed to verify proof"
+            );
 
             proof
         },
-        "0d3baeea90249588c3939dc2f64b071b24b7e4744c4ca8442fe4b2553aae9167",
+        "b51ea51140e9fbd1f0c665c788bab9e4b3e648ac674b6d07a24ca0844f0962ad",
     );
 }

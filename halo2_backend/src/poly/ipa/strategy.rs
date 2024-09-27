@@ -79,8 +79,6 @@ pub struct AccumulatorStrategy<'params, C: CurveAffine> {
 impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<C>, VerifierIPA<C>>
     for AccumulatorStrategy<'params, C>
 {
-    type Output = Self;
-
     fn new(params: &'params ParamsIPA<C>) -> Self {
         AccumulatorStrategy {
             msm: MSMIPA::new(params),
@@ -90,7 +88,7 @@ impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<
     fn process(
         mut self,
         f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self, Error> {
         self.msm.scale(C::Scalar::random(OsRng));
         let guard = f(self.msm)?;
 
@@ -119,8 +117,6 @@ pub struct SingleStrategy<'params, C: CurveAffine> {
 impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<C>, VerifierIPA<C>>
     for SingleStrategy<'params, C>
 {
-    type Output = ();
-
     fn new(params: &'params ParamsIPA<C>) -> Self {
         SingleStrategy {
             msm: MSMIPA::new(params),
@@ -130,15 +126,11 @@ impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<
     fn process(
         self,
         f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
-    ) -> Result<Self::Output, Error> {
+    ) -> Result<Self, Error> {
         let guard = f(self.msm)?;
-        let msm = guard.use_challenges();
-        // ZAL: Verification is (supposedly) cheap, hence we don't use an accelerator engine
-        if msm.check(&H2cEngine::new()) {
-            Ok(())
-        } else {
-            Err(Error::ConstraintSystemFailure)
-        }
+        Ok(Self {
+            msm: guard.use_challenges(),
+        })
     }
 
     /// Finalizes the batch and checks its validity.
@@ -147,7 +139,8 @@ impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<
     /// specific failing proofs, it must re-process the proofs separately.
     #[must_use]
     fn finalize(self) -> bool {
-        unreachable!()
+        // TODO: Verification is cheap, ZkAccel on verifier is not a priority.
+        self.msm.check(&H2cEngine::new())
     }
 }
 
