@@ -573,7 +573,7 @@ impl<C: CurveAffine> Evaluator<C> {
                 parallelize(&mut values, |values, start| {
                     let input_evaluator = &self.shuffles[2 * n];
                     let shuffle_evaluator = &self.shuffles[2 * n + 1];
-                    let mut eval_data_input = shuffle_evaluator.instance();
+                    let mut eval_data_input = input_evaluator.instance();
                     let mut eval_data_shuffle = shuffle_evaluator.instance();
                     for (i, value) in values.iter_mut().enumerate() {
                         let idx = start + i;
