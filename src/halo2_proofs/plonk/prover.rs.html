@@ -246,7 +246,7 @@
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::plonk::{Error, ErrorBack};
 <span class="kw">use </span><span class="kw">crate</span>::poly::commitment::{<span class="self">self</span>, CommitmentScheme, Params};
 <span class="kw">use </span><span class="kw">crate</span>::transcript::{EncodedChallenge, TranscriptWrite};
-<span class="kw">use </span>halo2_backend::plonk::{prover::Prover, ProvingKey};
+<span class="kw">use </span>halo2_backend::plonk::{prover::ProverMulti, ProvingKey};
 <span class="kw">use </span>halo2_frontend::circuit::WitnessCalculator;
 <span class="kw">use </span>halo2_frontend::plonk::{Circuit, ConstraintSystem};
 <span class="kw">use </span>halo2_middleware::ff::{FromUniformBytes, WithSmallOrderMulGroup};
@@ -300,7 +300,7 @@
             WitnessCalculator::new(params.k(), circuit, <span class="kw-2">&amp;</span>config, <span class="kw-2">&amp;</span>cs, instances[i].as_slice())
         })
         .collect();
-    <span class="kw">let </span><span class="kw-2">mut </span>prover = Prover::&lt;Scheme, P, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;::new_with_engine(
+    <span class="kw">let </span><span class="kw-2">mut </span>prover = ProverMulti::&lt;Scheme, P, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>, <span class="kw">_</span>&gt;::new_with_engine(
         engine, params, pk, instances, rng, transcript,
     )<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>challenges = HashMap::new();

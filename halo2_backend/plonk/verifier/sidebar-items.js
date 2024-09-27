@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["verify_proof","verify_proof_single"],"struct":["BatchVerifier"]};
+window.SIDEBAR_ITEMS = {"fn":["verify_proof","verify_proof_multi","verify_proof_with_strategy"],"struct":["BatchVerifier"]};

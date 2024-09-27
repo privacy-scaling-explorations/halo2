@@ -968,9 +968,9 @@
 }
 
 <span class="doccomment">/// The prover object used to create proofs interactively by passing the witnesses to commit at
-/// each phase.  This works for a single proof.  This is a wrapper over Prover.
+/// each phase.  This works for a single proof.  This is a wrapper over ProverMulti.
 </span><span class="attr">#[derive(Debug)]
-</span><span class="kw">pub struct </span>ProverSingle&lt;
+</span><span class="kw">pub struct </span>Prover&lt;
     <span class="lifetime">'a</span>,
     <span class="lifetime">'params</span>,
     Scheme: CommitmentScheme,
@@ -979,7 +979,7 @@
     R: RngCore,
     T: TranscriptWrite&lt;Scheme::Curve, E&gt;,
     M: MsmAccel&lt;Scheme::Curve&gt;,
-&gt;(Prover&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;);
+&gt;(ProverMulti&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;);
 
 <span class="kw">impl</span>&lt;
         <span class="lifetime">'a</span>,
@@ -990,9 +990,9 @@
         R: RngCore,
         T: TranscriptWrite&lt;Scheme::Curve, E&gt;,
         M: MsmAccel&lt;Scheme::Curve&gt;,
-    &gt; ProverSingle&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;
+    &gt; Prover&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;
 {
-    <span class="doccomment">/// Create a new prover object
+    <span class="doccomment">/// Create a new ProverMulti object
     </span><span class="kw">pub fn </span>new_with_engine(
         engine: PlonkEngine&lt;Scheme::Curve, M&gt;,
         params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>Scheme::ParamsProver,
@@ -1004,7 +1004,7 @@
     <span class="kw">where
         </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
     {
-        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(Prover::new_with_engine(
+        <span class="prelude-val">Ok</span>(<span class="self">Self</span>(ProverMulti::new_with_engine(
             engine,
             params,
             pk,
@@ -1020,12 +1020,12 @@
         instance: Vec&lt;Vec&lt;Scheme::Scalar&gt;&gt;,
         rng: R,
         transcript: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>T,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;ProverSingle&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, H2cEngine&gt;, Error&gt;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Prover&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, H2cEngine&gt;, Error&gt;
     <span class="kw">where
         </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
     {
         <span class="kw">let </span>engine = PlonkEngineConfig::build_default();
-        ProverSingle::new_with_engine(engine, params, pk, instance, rng, transcript)
+        Prover::new_with_engine(engine, params, pk, instance, rng, transcript)
     }
 
     <span class="doccomment">/// Commit the `witness` at `phase` and return the challenges after `phase`.
@@ -1052,7 +1052,7 @@
 <span class="doccomment">/// The prover object used to create proofs interactively by passing the witnesses to commit at
 /// each phase.  This supports batch proving.
 </span><span class="attr">#[derive(Debug)]
-</span><span class="kw">pub struct </span>Prover&lt;
+</span><span class="kw">pub struct </span>ProverMulti&lt;
     <span class="lifetime">'a</span>,
     <span class="lifetime">'params</span>,
     Scheme: CommitmentScheme,
@@ -1093,7 +1093,7 @@
         R: RngCore,
         T: TranscriptWrite&lt;Scheme::Curve, E&gt;,
         M: MsmAccel&lt;Scheme::Curve&gt;,
-    &gt; Prover&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;
+    &gt; ProverMulti&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, M&gt;
 {
     <span class="doccomment">/// Create a new prover object
     </span><span class="kw">pub fn </span>new_with_engine(
@@ -1212,7 +1212,7 @@
 
         </span><span class="kw">let </span>challenges = HashMap::&lt;usize, Scheme::Scalar&gt;::with_capacity(meta.num_challenges);
 
-        <span class="prelude-val">Ok</span>(Prover {
+        <span class="prelude-val">Ok</span>(ProverMulti {
             engine,
             params,
             pk,
@@ -1832,12 +1832,12 @@
         circuits_instances: <span class="kw-2">&amp;</span>[Vec&lt;Vec&lt;Scheme::Scalar&gt;&gt;],
         rng: R,
         transcript: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>T,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Prover&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, H2cEngine&gt;, Error&gt;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ProverMulti&lt;<span class="lifetime">'a</span>, <span class="lifetime">'params</span>, Scheme, P, E, R, T, H2cEngine&gt;, Error&gt;
     <span class="kw">where
         </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
     {
         <span class="kw">let </span>engine = PlonkEngineConfig::build_default();
-        Prover::new_with_engine(engine, params, pk, circuits_instances, rng, transcript)
+        ProverMulti::new_with_engine(engine, params, pk, circuits_instances, rng, transcript)
     }
 }
 </code></pre></div></section></main></body></html>

@@ -192,11 +192,6 @@
 <a href="#176" id="176">176</a>
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     commitment::{KZGCommitmentScheme, ParamsVerifierKZG},
     msm::DualMSM,
@@ -319,8 +314,6 @@
     E::G1: CurveExt&lt;AffineExt = E::G1Affine&gt;,
     E::G2Affine: SerdeCurveAffine,
 {
-    <span class="kw">type </span>Output = <span class="self">Self</span>;
-
     <span class="kw">fn </span>new(params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>ParamsVerifierKZG&lt;E&gt;) -&gt; <span class="self">Self </span>{
         AccumulatorStrategy::new(params)
     }
@@ -328,7 +321,7 @@
     <span class="kw">fn </span>process(
         <span class="kw-2">mut </span><span class="self">self</span>,
         f: <span class="kw">impl </span>FnOnce(V::MSMAccumulator) -&gt; <span class="prelude-ty">Result</span>&lt;V::Guard, Error&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Output, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
         <span class="self">self</span>.msm_accumulator.scale(E::Fr::random(OsRng));
 
         <span class="comment">// Guard is updated with new msm contributions
@@ -354,8 +347,6 @@
     E::G1: CurveExt&lt;AffineExt = E::G1Affine&gt;,
     E::G2Affine: SerdeCurveAffine,
 {
-    <span class="kw">type </span>Output = ();
-
     <span class="kw">fn </span>new(params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>ParamsVerifierKZG&lt;E&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(params)
     }
@@ -363,21 +354,20 @@
     <span class="kw">fn </span>process(
         <span class="self">self</span>,
         f: <span class="kw">impl </span>FnOnce(V::MSMAccumulator) -&gt; <span class="prelude-ty">Result</span>&lt;V::Guard, Error&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Output, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
         <span class="comment">// Guard is updated with new msm contributions
         </span><span class="kw">let </span>guard = f(<span class="self">self</span>.msm)<span class="question-mark">?</span>;
         <span class="kw">let </span>msm = guard.msm_accumulator;
-        <span class="comment">// Verification is (supposedly) cheap, hence we don't use an accelerator engine
-        </span><span class="kw">let </span>default_engine = H2cEngine::new();
-        <span class="kw">if </span>msm.check(<span class="kw-2">&amp;</span>default_engine, <span class="kw-2">&amp;</span><span class="self">self</span>.params) {
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(Error::ConstraintSystemFailure)
-        }
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            msm,
+            params: <span class="self">self</span>.params,
+        })
     }
 
     <span class="kw">fn </span>finalize(<span class="self">self</span>) -&gt; bool {
-        <span class="macro">unreachable!</span>();
+        <span class="comment">// Verification is (supposedly) cheap, hence we don't use an accelerator engine
+        </span><span class="kw">let </span>default_engine = H2cEngine::new();
+        <span class="self">self</span>.msm.check(<span class="kw-2">&amp;</span>default_engine, <span class="kw-2">&amp;</span><span class="self">self</span>.params)
     }
 }
 </code></pre></div></section></main></body></html>

@@ -535,6 +535,30 @@
 <a href="#519" id="519">519</a>
 <a href="#520" id="520">520</a>
 <a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Verify a plonk proof
 
 </span><span class="kw">use </span>group::prime::PrimeCurveAffine;
@@ -567,13 +591,12 @@
 
 <span class="doccomment">/// Returns a boolean indicating whether or not the proof is valid.  Verifies a single proof (not
 /// batched).
-</span><span class="kw">pub fn </span>verify_proof_single&lt;<span class="lifetime">'params</span>, Scheme, V, E, T, Strategy&gt;(
+</span><span class="kw">pub fn </span>verify_proof&lt;<span class="lifetime">'params</span>, Scheme, V, E, T, Strategy&gt;(
     params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>Scheme::ParamsVerifier,
     vk: <span class="kw-2">&amp;</span>VerifyingKey&lt;Scheme::Curve&gt;,
-    strategy: Strategy,
     instance: Vec&lt;Vec&lt;Scheme::Scalar&gt;&gt;,
     transcript: <span class="kw-2">&amp;mut </span>T,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Strategy::Output, Error&gt;
+) -&gt; bool
 <span class="kw">where
     </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
     Scheme: CommitmentScheme,
@@ -582,11 +605,11 @@
     T: TranscriptRead&lt;Scheme::Curve, E&gt;,
     Strategy: VerificationStrategy&lt;<span class="lifetime">'params</span>, Scheme, V&gt;,
 {
-    verify_proof(params, vk, strategy, <span class="kw-2">&amp;</span>[instance], transcript)
+    verify_proof_multi::&lt;Scheme, V, E, T, Strategy&gt;(params, vk, <span class="kw-2">&amp;</span>[instance], transcript)
 }
 
-<span class="doccomment">/// Returns a boolean indicating whether or not the proof is valid
-</span><span class="kw">pub fn </span>verify_proof&lt;
+<span class="doccomment">/// Process the proof, checks that the proof is valid and returns the `Strategy` output.
+</span><span class="kw">pub fn </span>verify_proof_with_strategy&lt;
     <span class="lifetime">'params</span>,
     Scheme: CommitmentScheme,
     V: Verifier&lt;<span class="lifetime">'params</span>, Scheme&gt;,
@@ -599,7 +622,7 @@
     strategy: Strategy,
     instances: <span class="kw-2">&amp;</span>[Vec&lt;Vec&lt;Scheme::Scalar&gt;&gt;],
     transcript: <span class="kw-2">&amp;mut </span>T,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Strategy::Output, Error&gt;
+) -&gt; <span class="prelude-ty">Result</span>&lt;Strategy, Error&gt;
 <span class="kw">where
     </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
 {
@@ -1055,5 +1078,30 @@
             .verify_proof(transcript, queries, msm)
             .map_err(|<span class="kw">_</span>| Error::Opening)
     })
+}
+
+<span class="doccomment">/// Returns a boolean indicating whether or not the proof is valid
+</span><span class="kw">pub fn </span>verify_proof_multi&lt;
+    <span class="lifetime">'params</span>,
+    Scheme: CommitmentScheme,
+    V: Verifier&lt;<span class="lifetime">'params</span>, Scheme&gt;,
+    E: EncodedChallenge&lt;Scheme::Curve&gt;,
+    T: TranscriptRead&lt;Scheme::Curve, E&gt;,
+    Strategy: VerificationStrategy&lt;<span class="lifetime">'params</span>, Scheme, V&gt;,
+&gt;(
+    params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>Scheme::ParamsVerifier,
+    vk: <span class="kw-2">&amp;</span>VerifyingKey&lt;Scheme::Curve&gt;,
+    instances: <span class="kw-2">&amp;</span>[Vec&lt;Vec&lt;Scheme::Scalar&gt;&gt;],
+    transcript: <span class="kw-2">&amp;mut </span>T,
+) -&gt; bool
+<span class="kw">where
+    </span>Scheme::Scalar: WithSmallOrderMulGroup&lt;<span class="number">3</span>&gt; + FromUniformBytes&lt;<span class="number">64</span>&gt;,
+{
+    <span class="kw">let </span>strategy = Strategy::new(params);
+    <span class="kw">let </span>strategy = <span class="kw">match </span>verify_proof_with_strategy(params, vk, strategy, instances, transcript) {
+        <span class="prelude-val">Ok</span>(strategy) =&gt; strategy,
+        <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">return </span><span class="bool-val">false</span>,
+    };
+    strategy.finalize()
 }
 </code></pre></div></section></main></body></html>

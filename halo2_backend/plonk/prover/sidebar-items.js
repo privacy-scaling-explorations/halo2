@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Prover","ProverSingle"]};
+window.SIDEBAR_ITEMS = {"struct":["Prover","ProverMulti"]};

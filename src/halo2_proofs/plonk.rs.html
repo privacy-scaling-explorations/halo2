@@ -111,14 +111,14 @@
 <span class="kw">mod </span>keygen;
 <span class="kw">mod </span>prover;
 <span class="kw">mod </span>verifier {
-    <span class="kw">pub use </span>halo2_backend::plonk::verifier::verify_proof;
+    <span class="kw">pub use </span>halo2_backend::plonk::verifier::verify_proof_multi;
 }
 
 <span class="kw">use </span>halo2_frontend::circuit::compile_circuit;
 <span class="kw">pub use </span>keygen::{keygen_pk, keygen_pk_custom, keygen_vk, keygen_vk_custom};
 
 <span class="kw">pub use </span>prover::{create_proof, create_proof_with_engine};
-<span class="kw">pub use </span>verifier::verify_proof;
+<span class="kw">pub use </span>verifier::verify_proof_multi;
 
 <span class="kw">pub use </span>error::Error;
 <span class="kw">pub use </span>halo2_backend::plonk::{Error <span class="kw">as </span>ErrorBack, ProvingKey, VerifyingKey};

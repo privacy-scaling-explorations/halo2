@@ -143,6 +143,8 @@
 <a href="#127" id="127">127</a>
 <a href="#128" id="128">128</a>
 <a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
 </pre></div><pre class="rust"><code><span class="kw">use crate</span>::{plonk::Error, poly::commitment::ParamsVerifier};
 <span class="kw">use </span>group::ff::Field;
 <span class="kw">use </span>halo2_middleware::ff::FromUniformBytes;
@@ -150,7 +152,7 @@
 <span class="kw">use </span>halo2curves::CurveAffine;
 <span class="kw">use </span>rand_core::OsRng;
 
-<span class="kw">use super</span>::{verify_proof, VerificationStrategy};
+<span class="kw">use super</span>::{verify_proof_with_strategy, VerificationStrategy};
 <span class="kw">use crate</span>::{
     multicore::{
         IndexedParallelIterator, IntoParallelIterator, ParallelIterator, TryFoldAndReduce,
@@ -179,8 +181,6 @@
 <span class="kw">impl</span>&lt;<span class="lifetime">'params</span>, C: CurveAffine&gt; VerificationStrategy&lt;<span class="lifetime">'params</span>, IPACommitmentScheme&lt;C&gt;, VerifierIPA&lt;C&gt;&gt;
     <span class="kw">for </span>BatchStrategy&lt;<span class="lifetime">'params</span>, C&gt;
 {
-    <span class="kw">type </span>Output = MSMIPA&lt;<span class="lifetime">'params</span>, C&gt;;
-
     <span class="kw">fn </span>new(params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>ParamsVerifierIPA&lt;C&gt;) -&gt; <span class="self">Self </span>{
         BatchStrategy {
             msm: MSMIPA::new(params),
@@ -190,9 +190,11 @@
     <span class="kw">fn </span>process(
         <span class="self">self</span>,
         f: <span class="kw">impl </span>FnOnce(MSMIPA&lt;<span class="lifetime">'params</span>, C&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;GuardIPA&lt;<span class="lifetime">'params</span>, C&gt;, Error&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Output, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, Error&gt; {
         <span class="kw">let </span>guard = f(<span class="self">self</span>.msm)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(guard.use_challenges())
+        <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
+            msm: guard.use_challenges(),
+        })
     }
 
     <span class="kw">fn </span>finalize(<span class="self">self</span>) -&gt; bool {
@@ -255,10 +257,12 @@
             .map(|(i, item)| {
                 <span class="kw">let </span>strategy = BatchStrategy::new(params);
                 <span class="kw">let </span><span class="kw-2">mut </span>transcript = Blake2bRead::init(<span class="kw-2">&amp;</span>item.proof[..]);
-                verify_proof(params, vk, strategy, <span class="kw-2">&amp;</span>item.instances, <span class="kw-2">&amp;mut </span>transcript).map_err(|e| {
-                    <span class="macro">tracing::debug!</span>(<span class="string">"Batch item {} failed verification: {}"</span>, i, e);
-                    e
-                })
+                verify_proof_with_strategy(params, vk, strategy, <span class="kw-2">&amp;</span>item.instances, <span class="kw-2">&amp;mut </span>transcript)
+                    .map_err(|e| {
+                        <span class="macro">tracing::debug!</span>(<span class="string">"Batch item {} failed verification: {}"</span>, i, e);
+                        e
+                    })
+                    .map(|st| st.msm)
             })
             .try_fold_and_reduce(
                 || ParamsVerifier::&lt;<span class="lifetime">'_</span>, C&gt;::empty_msm(params),
