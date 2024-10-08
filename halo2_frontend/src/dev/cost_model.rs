@@ -51,6 +51,19 @@ pub struct CostOptions {
 
     /// 2^K bound on the number of rows.
     pub k: usize,
+
+    /// Rows count, not including table rows and not accounting for compression
+    /// (where multiple regions can use the same rows).
+    pub rows_count: usize,
+
+    /// Table rows count, not accounting for compression (where multiple regions
+    /// can use the same rows), but not much if any compression can happen with
+    /// table rows anyway.
+    pub table_rows_count: usize,
+
+    /// Compressed rows count, accounting for compression (where multiple
+    /// regions can use the same rows).
+    pub compressed_rows_count: usize,
 }
 
 /// Structure holding polynomial related data for benchmarks
@@ -76,7 +89,7 @@ impl FromStr for Poly {
 pub struct Lookup;
 
 impl Lookup {
-    fn queries(&self) -> impl Iterator<Item = Poly> {
+    pub fn queries(&self) -> impl Iterator<Item = Poly> {
         // - product commitments at x and \omega x
         // - input commitments at x and x_inv
         // - table commitments at x
@@ -98,7 +111,7 @@ pub struct Permutation {
 }
 
 impl Permutation {
-    fn queries(&self) -> impl Iterator<Item = Poly> {
+    pub fn queries(&self) -> impl Iterator<Item = Poly> {
         // - product commitments at x and x_inv
         // - polynomial commitments at x
         let product = "0,-1".parse().unwrap();
@@ -107,6 +120,10 @@ impl Permutation {
         iter::empty()
             .chain(Some(product))
             .chain(iter::repeat(poly).take(self.columns))
+    }
+
+    pub fn nr_columns(&self) -> usize {
+        self.columns
     }
 }
 
@@ -307,6 +324,38 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         .max()
         .unwrap_or(0);
 
+    // Note that this computation does't assume that `regions` is already in
+    // order of increasing row indices.
+    let (rows_count, table_rows_count, compressed_rows_count) = {
+        let mut rows_count = 0;
+        let mut table_rows_count = 0;
+        let mut compressed_rows_count = 0;
+        for region in prover.regions {
+            // If `region.rows == None`, then that region has no rows.
+            if let Some((start, end)) = region.rows {
+                // Note that `end` is the index of the last column, so when
+                // counting rows this last column needs to be counted via `end +
+                // 1`.
+
+                // A region is a _table region_ if all of its columns are `Fixed`
+                // columns (see that [`plonk::circuit::TableColumn` is a wrapper
+                // around `Column<Fixed>`]). All of a table region's rows are
+                // counted towards `table_rows_count.`
+                if region
+                    .columns
+                    .iter()
+                    .all(|c| *c.column_type() == halo2_middleware::circuit::Any::Fixed)
+                {
+                    table_rows_count += (end + 1) - start;
+                } else {
+                    rows_count += (end + 1) - start;
+                }
+                compressed_rows_count = std::cmp::max(compressed_rows_count, end + 1);
+            }
+        }
+        (rows_count, table_rows_count, compressed_rows_count)
+    };
+
     let k = prover.k.try_into().unwrap();
 
     CostOptions {
@@ -319,5 +368,8 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         permutation,
         shuffle,
         k,
+        rows_count,
+        table_rows_count,
+        compressed_rows_count,
     }
 }
