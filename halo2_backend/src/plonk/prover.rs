@@ -539,7 +539,7 @@ impl<
         // [TRANSCRIPT-10]
         let lookups_committed = self.gen_committed_lookups_polys(permuted_lookups, beta, gamma)?;
 
-        // 4. Generate commited shuffle polys  -------------------------------------------------------
+        // 4. Generate committed shuffle polys  -------------------------------------------------------
         // [TRANSCRIPT-11]
         let shuffles_committed = self.gen_committed_shuffles(theta, gamma, &challenges)?;
 
