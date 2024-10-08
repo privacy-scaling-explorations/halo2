@@ -535,7 +535,7 @@ impl<
         // [TRANSCRIPT-9]
         let permutations_committed = self.gen_committed_permutation_polys(beta, gamma)?;
 
-        // 3. Generate commited lookup polys ----------------------------------------------------------
+        // 3. Generate committed lookup polys ----------------------------------------------------------
         // [TRANSCRIPT-10]
         let lookups_committed = self.gen_committed_lookups_polys(permuted_lookups, beta, gamma)?;
 
