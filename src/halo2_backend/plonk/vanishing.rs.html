@@ -29,8 +29,8 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::arithmetic::CurveAffine;
 
-<span class="kw">mod </span>prover;
-<span class="kw">mod </span>verifier;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>prover;
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>verifier;
 
 <span class="doccomment">/// A vanishing argument.
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>Argument&lt;C: CurveAffine&gt; {
