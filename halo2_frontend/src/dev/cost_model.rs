@@ -145,6 +145,10 @@ impl Shuffle {
 pub struct ModelCircuit {
     /// Power-of-2 bound on the number of rows in the circuit.
     pub k: usize,
+    /// Number of rows in the circuit (not including table rows).
+    pub rows: usize,
+    /// Number of table rows in the circuit.
+    pub table_rows: usize,
     /// Maximum degree of the circuit.
     pub max_deg: usize,
     /// Number of advice columns.
@@ -245,6 +249,8 @@ impl CostOptions {
 
         ModelCircuit {
             k: self.k,
+            rows: self.rows_count,
+            table_rows: self.table_rows_count,
             max_deg: self.max_degree,
             advice_columns: self.advice.len(),
             lookups: self.lookup.len(),
