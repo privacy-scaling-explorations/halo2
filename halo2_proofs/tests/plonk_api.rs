@@ -707,8 +707,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 0,
-                                            column_index: 1,
-                                            column_type: Advice,
+                                            column: ColumnMid {
+                                                column_type: Advice,
+                                                index: 1,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -719,8 +721,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 0,
-                                            column_index: 2,
-                                            column_type: Fixed,
+                                            column: ColumnMid {
+                                                column_type: Fixed,
+                                                index: 2,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -733,8 +737,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 1,
-                                            column_index: 2,
-                                            column_type: Advice,
+                                            column: ColumnMid {
+                                                column_type: Advice,
+                                                index: 2,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -745,8 +751,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 1,
-                                            column_index: 3,
-                                            column_type: Fixed,
+                                            column: ColumnMid {
+                                                column_type: Fixed,
+                                                index: 3,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -761,8 +769,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 0,
-                                            column_index: 1,
-                                            column_type: Advice,
+                                            column: ColumnMid {
+                                                column_type: Advice,
+                                                index: 1,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -773,8 +783,10 @@ fn plonk_api() {
                                     Query(
                                         QueryBack {
                                             index: 1,
-                                            column_index: 2,
-                                            column_type: Advice,
+                                            column: ColumnMid {
+                                                column_type: Advice,
+                                                index: 2,
+                                            },
                                             rotation: Rotation(
                                                 0,
                                             ),
@@ -786,8 +798,10 @@ fn plonk_api() {
                                 Query(
                                     QueryBack {
                                         index: 2,
-                                        column_index: 1,
-                                        column_type: Fixed,
+                                        column: ColumnMid {
+                                            column_type: Fixed,
+                                            index: 1,
+                                        },
                                         rotation: Rotation(
                                             0,
                                         ),
@@ -802,8 +816,10 @@ fn plonk_api() {
                                 Query(
                                     QueryBack {
                                         index: 2,
-                                        column_index: 3,
-                                        column_type: Advice,
+                                        column: ColumnMid {
+                                            column_type: Advice,
+                                            index: 3,
+                                        },
                                         rotation: Rotation(
                                             0,
                                         ),
@@ -814,8 +830,10 @@ fn plonk_api() {
                                 Query(
                                     QueryBack {
                                         index: 3,
-                                        column_index: 4,
-                                        column_type: Fixed,
+                                        column: ColumnMid {
+                                            column_type: Fixed,
+                                            index: 4,
+                                        },
                                         rotation: Rotation(
                                             0,
                                         ),
@@ -830,8 +848,10 @@ fn plonk_api() {
                         Query(
                             QueryBack {
                                 index: 4,
-                                column_index: 0,
-                                column_type: Fixed,
+                                column: ColumnMid {
+                                    column_type: Fixed,
+                                    index: 0,
+                                },
                                 rotation: Rotation(
                                     0,
                                 ),
@@ -843,8 +863,10 @@ fn plonk_api() {
                             Query(
                                 QueryBack {
                                     index: 3,
-                                    column_index: 4,
-                                    column_type: Advice,
+                                    column: ColumnMid {
+                                        column_type: Advice,
+                                        index: 4,
+                                    },
                                     rotation: Rotation(
                                         1,
                                     ),
@@ -855,8 +877,10 @@ fn plonk_api() {
                             Query(
                                 QueryBack {
                                     index: 4,
-                                    column_index: 0,
-                                    column_type: Advice,
+                                    column: ColumnMid {
+                                        column_type: Advice,
+                                        index: 0,
+                                    },
                                     rotation: Rotation(
                                         -1,
                                     ),
@@ -871,8 +895,10 @@ fn plonk_api() {
                     Query(
                         QueryBack {
                             index: 5,
-                            column_index: 5,
-                            column_type: Fixed,
+                            column: ColumnMid {
+                                column_type: Fixed,
+                                index: 5,
+                            },
                             rotation: Rotation(
                                 0,
                             ),
@@ -884,8 +910,10 @@ fn plonk_api() {
                         Query(
                             QueryBack {
                                 index: 0,
-                                column_index: 1,
-                                column_type: Advice,
+                                column: ColumnMid {
+                                    column_type: Advice,
+                                    index: 1,
+                                },
                                 rotation: Rotation(
                                     0,
                                 ),
@@ -897,8 +925,10 @@ fn plonk_api() {
                             Query(
                                 QueryBack {
                                     index: 0,
-                                    column_index: 0,
-                                    column_type: Instance,
+                                    column: ColumnMid {
+                                        column_type: Instance,
+                                        index: 0,
+                                    },
                                     rotation: Rotation(
                                         0,
                                     ),
@@ -1110,8 +1140,10 @@ fn plonk_api() {
                         Query(
                             QueryBack {
                                 index: 0,
-                                column_index: 1,
-                                column_type: Advice,
+                                column: ColumnMid {
+                                    column_type: Advice,
+                                    index: 1,
+                                },
                                 rotation: Rotation(
                                     0,
                                 ),
@@ -1124,8 +1156,10 @@ fn plonk_api() {
                         Query(
                             QueryBack {
                                 index: 6,
-                                column_index: 6,
-                                column_type: Fixed,
+                                column: ColumnMid {
+                                    column_type: Fixed,
+                                    index: 6,
+                                },
                                 rotation: Rotation(
                                     0,
                                 ),

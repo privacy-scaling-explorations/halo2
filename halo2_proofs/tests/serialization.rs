@@ -8,8 +8,8 @@ use halo2_debug::test_rng;
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof_multi, vk_read, Advice, Circuit,
-        Column, ConstraintSystem, ErrorFront, Fixed, Instance,
+        create_proof, keygen_pk, keygen_vk_custom, pk_read, verify_proof_multi, vk_read, Advice,
+        Circuit, Column, ConstraintSystem, ErrorFront, Fixed, Instance,
     },
     poly::{
         kzg::{
@@ -213,12 +213,7 @@ fn test_serialization() {
                     Challenge255<G1Affine>,
                     Blake2bRead<&[u8], G1Affine, Challenge255<G1Affine>>,
                     SingleStrategy<Bn256>,
-                >(
-                    &verifier_params,
-                    &vk,
-                    instances.as_slice(),
-                    &mut transcript
-                ),
+                >(&verifier_params, &vk, instances.as_slice(), &mut transcript),
                 "failed to verify proof"
             );
 

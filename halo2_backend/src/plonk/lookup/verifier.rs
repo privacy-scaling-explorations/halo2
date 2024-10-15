@@ -119,13 +119,13 @@ impl<C: CurveAffine> Evaluated<C> {
                             &|scalar| scalar,
                             &|var| match var {
                                 VarBack::Challenge(challenge) => challenges[challenge.index],
-                                VarBack::Query(QueryBack {
-                                    index, column_type, ..
-                                }) => match column_type {
-                                    Any::Fixed => fixed_evals[index],
-                                    Any::Advice => advice_evals[index],
-                                    Any::Instance => instance_evals[index],
-                                },
+                                VarBack::Query(QueryBack { index, column, .. }) => {
+                                    match column.column_type {
+                                        Any::Fixed => fixed_evals[index],
+                                        Any::Advice => advice_evals[index],
+                                        Any::Instance => instance_evals[index],
+                                    }
+                                }
                             },
                             &|a| -a,
                             &|a, b| a + b,

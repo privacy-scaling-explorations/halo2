@@ -701,17 +701,17 @@ impl<C: CurveAffine> GraphEvaluator<C> {
             ExpressionBack::Constant(scalar) => self.add_constant(scalar),
             ExpressionBack::Var(VarBack::Query(query)) => {
                 let rot_idx = self.add_rotation(&query.rotation);
-                match query.column_type {
+                match query.column.column_type {
                     Any::Fixed => self.add_calculation(Calculation::Store(ValueSource::Fixed(
-                        query.column_index,
+                        query.column.index,
                         rot_idx,
                     ))),
                     Any::Advice => self.add_calculation(Calculation::Store(ValueSource::Advice(
-                        query.column_index,
+                        query.column.index,
                         rot_idx,
                     ))),
                     Any::Instance => self.add_calculation(Calculation::Store(
-                        ValueSource::Instance(query.column_index, rot_idx),
+                        ValueSource::Instance(query.column.index, rot_idx),
                     )),
                 }
             }
@@ -863,10 +863,10 @@ pub(crate) fn evaluate<F: Field, B: LagrangeBasis>(
                     VarBack::Challenge(challenge) => challenges[challenge.index()],
                     VarBack::Query(query) => {
                         let rot_idx = get_rotation_idx(idx, query.rotation.0, rot_scale, isize);
-                        match query.column_type {
-                            Any::Fixed => fixed[query.column_index][rot_idx],
-                            Any::Advice => advice[query.column_index][rot_idx],
-                            Any::Instance => instance[query.column_index][rot_idx],
+                        match query.column.column_type {
+                            Any::Fixed => fixed[query.column.index][rot_idx],
+                            Any::Advice => advice[query.column.index][rot_idx],
+                            Any::Instance => instance[query.column.index][rot_idx],
                         }
                     }
                 },
@@ -883,7 +883,7 @@ pub(crate) fn evaluate<F: Field, B: LagrangeBasis>(
 mod test {
     use crate::plonk::circuit::{ExpressionBack, QueryBack, VarBack};
     use crate::poly::LagrangeCoeff;
-    use halo2_middleware::circuit::{Any, ChallengeMid};
+    use halo2_middleware::circuit::{Any, ChallengeMid, ColumnMid};
     use halo2_middleware::poly::Rotation;
     use halo2curves::pasta::pallas::{Affine, Scalar};
 
@@ -954,8 +954,10 @@ mod test {
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: 0,
-                    column_index: col,
-                    column_type: Any::Fixed,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Fixed,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -965,8 +967,10 @@ mod test {
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: 0,
-                    column_index: col,
-                    column_type: Any::Advice,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Advice,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -976,8 +980,10 @@ mod test {
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: 0,
-                    column_index: col,
-                    column_type: Any::Instance,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Instance,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -1007,8 +1013,10 @@ mod test {
         let two = || {
             Box::new(ExpressionBack::<Scalar>::Var(Query(QueryBack {
                 index: 0,
-                column_index: 0,
-                column_type: Any::Fixed,
+                column: ColumnMid {
+                    index: 0,
+                    column_type: Any::Fixed,
+                },
                 rotation: Rotation(0),
             })))
         };
@@ -1016,8 +1024,10 @@ mod test {
         let three = || {
             Box::new(ExpressionBack::<Scalar>::Var(Query(QueryBack {
                 index: 0,
-                column_index: 0,
-                column_type: Any::Fixed,
+                column: ColumnMid {
+                    index: 0,
+                    column_type: Any::Fixed,
+                },
                 rotation: Rotation(1),
             })))
         };

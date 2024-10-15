@@ -100,8 +100,7 @@ pub(crate) fn compute_inner_product<F: Field>(a: &[F], b: &[F]) -> F {
         let chunk_size = (n + num_threads - 1) / num_threads;
         let mut parts = vec![F::ZERO; num_threads];
         multicore::scope(|scope| {
-            for (chunk_idx, (out, a)) in parts.chunks_mut(1).zip(a.chunks(chunk_size)).enumerate()
-            {
+            for (chunk_idx, (out, a)) in parts.chunks_mut(1).zip(a.chunks(chunk_size)).enumerate() {
                 scope.spawn(move |_| {
                     let mut acc = F::ZERO;
                     for (a, b) in a.iter().zip(&b[chunk_idx * chunk_size..]) {
