@@ -1,7 +1,10 @@
-use halo2_middleware::ff::{Field, PrimeField};
+use halo2_middleware::{
+    ff::{Field, PrimeField},
+    permutation::ArgumentMid,
+};
 use std::iter;
 
-use super::{Argument, VerifyingKey};
+use super::VerifyingKey;
 use crate::{
     arithmetic::CurveAffine,
     plonk::{self, ChallengeBeta, ChallengeGamma, ChallengeX, Error},
@@ -35,7 +38,7 @@ pub(crate) fn permutation_read_product_commitments<
     E: EncodedChallenge<C>,
     T: TranscriptRead<C, E>,
 >(
-    arg: &Argument,
+    arg: &ArgumentMid,
     vk: &plonk::VerifyingKey<C>,
     transcript: &mut T,
 ) -> Result<Committed<C>, Error> {
@@ -102,7 +105,7 @@ impl<C: CurveAffine> Evaluated<C> {
     pub(in crate::plonk) fn expressions<'a>(
         &'a self,
         vk: &'a plonk::VerifyingKey<C>,
-        p: &'a Argument,
+        p: &'a ArgumentMid,
         common: &'a CommonEvaluated<C>,
         advice_evals: &'a [C::Scalar],
         fixed_evals: &'a [C::Scalar],
