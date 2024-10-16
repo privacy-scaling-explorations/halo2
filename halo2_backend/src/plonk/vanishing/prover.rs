@@ -117,7 +117,12 @@ impl<C: CurveAffine> Committed<C> {
         let h_poly = domain.divide_by_vanishing_poly(h_poly);
 
         // Obtain final h(X) polynomial
-        let h_poly = domain.extended_to_coeff(h_poly);
+        let mut h_poly = domain.extended_to_coeff(h_poly);
+
+        // Truncate it to match the size of the quotient polynomial; the
+        // evaluation domain might be slightly larger than necessary because
+        // it always lies on a power-of-two boundary.
+        h_poly.truncate(((1u64 << domain.k()) as usize) * domain.get_quotient_poly_degree());
 
         // Split h(X) up into pieces
         let h_pieces = h_poly
