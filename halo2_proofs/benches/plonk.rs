@@ -2,21 +2,20 @@
 extern crate criterion;
 
 use group::ff::Field;
+use halo2_backend::plonk::verifier::verify_proof;
+use halo2_debug::test_rng;
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::plonk::*;
-use halo2_proofs::poly::{commitment::ParamsProver, Rotation};
+use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
+use halo2_proofs::poly::kzg::strategy::SingleStrategy;
+use halo2_proofs::poly::Rotation;
 use halo2_proofs::transcript::{Blake2bRead, Blake2bWrite, Challenge255};
-use halo2curves::pasta::{EqAffine, Fp};
+use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use rand_core::OsRng;
 
-use halo2_proofs::{
-    poly::ipa::{
-        commitment::{IPACommitmentScheme, ParamsIPA},
-        multiopen::ProverIPA,
-        strategy::SingleStrategy,
-    },
-    transcript::{TranscriptReadBuffer, TranscriptWriterBuffer},
-};
+use halo2_proofs::
+    transcript::{TranscriptReadBuffer, TranscriptWriterBuffer};
 
 use std::marker::PhantomData;
 
@@ -264,27 +263,26 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    fn keygen(k: u32) -> (ParamsIPA<EqAffine>, ProvingKey<EqAffine>) {
-        let params: ParamsIPA<EqAffine> = ParamsIPA::new(k);
-        let empty_circuit: MyCircuit<Fp> = MyCircuit {
-            a: Value::unknown(),
+    fn key_and_circuit_gen(k: u32) -> (ParamsKZG<Bn256>, ProvingKey<G1Affine>, MyCircuit<Fr>) {
+        // Setup
+        let mut rng = test_rng();
+        let params = ParamsKZG::<Bn256>::setup(k, &mut rng);
+
+        let circuit: MyCircuit<Fr> = MyCircuit {
+            a: Value::known(Fr::random(rng)),
             k,
         };
-        let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
-        (params, pk)
+
+        let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
+        let pk = keygen_pk(&params, vk.clone(), &circuit).expect("keygen_pk should not fail");
+        (params, pk, circuit)
     }
 
-    fn prover(k: u32, params: &ParamsIPA<EqAffine>, pk: &ProvingKey<EqAffine>) -> Vec<u8> {
+    fn prover(circuit: MyCircuit<Fr>, params: &ParamsKZG<Bn256>, pk: &ProvingKey<G1Affine>) -> Vec<u8> {
         let rng = OsRng;
 
-        let circuit: MyCircuit<Fp> = MyCircuit {
-            a: Value::known(Fp::random(rng)),
-            k,
-        };
-
-        let mut transcript = Blake2bWrite::<_, _, Challenge255<EqAffine>>::init(vec![]);
-        create_proof::<IPACommitmentScheme<EqAffine>, ProverIPA<EqAffine>, _, _, _, _>(
+        let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
+        create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
             params,
             pk,
             &[circuit],
@@ -296,14 +294,23 @@ fn criterion_benchmark(c: &mut Criterion) {
         transcript.finalize()
     }
 
-    fn verifier(params: &ParamsIPA<EqAffine>, vk: &VerifyingKey<EqAffine>, proof: &[u8]) {
-        let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(proof);
-        assert!(verify_proof_multi::<_, _, _, _, SingleStrategy<_>>(
-            params,
-            vk,
-            &[vec![]],
-            &mut transcript
-        ));
+
+    fn verifier(params: &ParamsKZG<Bn256>, vk: &VerifyingKey<G1Affine>, proof: &[u8]) {
+
+        let mut verifier_transcript =
+        Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof);
+    let verifier_params = params.verifier_params();
+
+    assert!(
+        verify_proof::<
+            KZGCommitmentScheme<Bn256>,
+            VerifierSHPLONK<Bn256>,
+            _,
+            _,
+            SingleStrategy<_>,
+        >(&verifier_params, &vk, vec![vec![]], &mut verifier_transcript),
+        "failed to verify proof"
+    );
     }
 
     let k_range = 8..=16;
@@ -312,7 +319,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     keygen_group.sample_size(10);
     for k in k_range.clone() {
         keygen_group.bench_with_input(BenchmarkId::from_parameter(k), &k, |b, &k| {
-            b.iter(|| keygen(k));
+            b.iter(|| key_and_circuit_gen(k));
         });
     }
     keygen_group.finish();
@@ -320,13 +327,13 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut prover_group = c.benchmark_group("plonk-prover");
     prover_group.sample_size(10);
     for k in k_range.clone() {
-        let (params, pk) = keygen(k);
+        let (params, pk, circuit) = key_and_circuit_gen(k);
 
         prover_group.bench_with_input(
             BenchmarkId::from_parameter(k),
             &(k, &params, &pk),
             |b, &(k, params, pk)| {
-                b.iter(|| prover(k, params, pk));
+                b.iter(|| prover(circuit.clone(),params, pk));
             },
         );
     }
@@ -334,8 +341,8 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let mut verifier_group = c.benchmark_group("plonk-verifier");
     for k in k_range {
-        let (params, pk) = keygen(k);
-        let proof = prover(k, &params, &pk);
+        let (params, pk, circuit) = key_and_circuit_gen(k);
+        let proof = prover(circuit,&params, &pk);
 
         verifier_group.bench_with_input(
             BenchmarkId::from_parameter(k),

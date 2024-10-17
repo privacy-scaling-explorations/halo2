@@ -1,59 +1,6 @@
-use crate::{plonk::Error, poly::commitment::ParamsVerifier};
-use group::ff::Field;
 use halo2_middleware::ff::FromUniformBytes;
-use halo2_middleware::zal::impls::H2cEngine;
 use halo2curves::CurveAffine;
-use rand_core::OsRng;
 
-use super::{verify_proof_with_strategy, VerificationStrategy};
-use crate::{
-    multicore::{
-        IndexedParallelIterator, IntoParallelIterator, ParallelIterator, TryFoldAndReduce,
-    },
-    plonk::VerifyingKey,
-    poly::{
-        commitment::MSM,
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsVerifierIPA},
-            msm::MSMIPA,
-            multiopen::VerifierIPA,
-            strategy::GuardIPA,
-        },
-    },
-    transcript::{Blake2bRead, TranscriptReadBuffer},
-};
-
-/// A proof verification strategy that returns the proof's MSM.
-///
-/// `BatchVerifier` handles the accumulation of the MSMs for the batched proofs.
-#[derive(Debug)]
-struct BatchStrategy<'params, C: CurveAffine> {
-    msm: MSMIPA<'params, C>,
-}
-
-impl<'params, C: CurveAffine> VerificationStrategy<'params, IPACommitmentScheme<C>, VerifierIPA<C>>
-    for BatchStrategy<'params, C>
-{
-    fn new(params: &'params ParamsVerifierIPA<C>) -> Self {
-        BatchStrategy {
-            msm: MSMIPA::new(params),
-        }
-    }
-
-    fn process(
-        self,
-        f: impl FnOnce(MSMIPA<'params, C>) -> Result<GuardIPA<'params, C>, Error>,
-    ) -> Result<Self, Error> {
-        let guard = f(self.msm)?;
-        Ok(Self {
-            msm: guard.use_challenges(),
-        })
-    }
-
-    fn finalize(self) -> bool {
-        unreachable!()
-    }
-}
 
 #[derive(Debug)]
 struct BatchItem<C: CurveAffine> {
@@ -80,52 +27,5 @@ where
     /// Adds a proof to the batch.
     pub fn add_proof(&mut self, instances: Vec<Vec<Vec<C::Scalar>>>, proof: Vec<u8>) {
         self.items.push(BatchItem { instances, proof })
-    }
-
-    /// Finalizes the batch and checks its validity.
-    ///
-    /// Returns `false` if *some* proof was invalid. If the caller needs to identify
-    /// specific failing proofs, it must re-process the proofs separately.
-    ///
-    /// This uses [`OsRng`] internally instead of taking an `R: RngCore` argument, because
-    /// the internal parallelization requires access to a RNG that is guaranteed to not
-    /// clone its internal state when shared between threads.
-    pub fn finalize(self, params: &ParamsVerifierIPA<C>, vk: &VerifyingKey<C>) -> bool {
-        fn accumulate_msm<'params, C: CurveAffine>(
-            mut acc: MSMIPA<'params, C>,
-            msm: MSMIPA<'params, C>,
-        ) -> MSMIPA<'params, C> {
-            // Scale the MSM by a random factor to ensure that if the existing MSM has
-            // `is_zero() == false` then this argument won't be able to interfere with it
-            // to make it true, with high probability.
-            acc.scale(C::Scalar::random(OsRng));
-            acc.add_msm(&msm);
-            acc
-        }
-
-        let final_msm = self
-            .items
-            .into_par_iter()
-            .enumerate()
-            .map(|(i, item)| {
-                let strategy = BatchStrategy::new(params);
-                let mut transcript = Blake2bRead::init(&item.proof[..]);
-                verify_proof_with_strategy(params, vk, strategy, &item.instances, &mut transcript)
-                    .map_err(|e| {
-                        tracing::debug!("Batch item {} failed verification: {}", i, e);
-                        e
-                    })
-                    .map(|st| st.msm)
-            })
-            .try_fold_and_reduce(
-                || ParamsVerifier::<'_, C>::empty_msm(params),
-                |acc, res| res.map(|proof_msm| accumulate_msm(acc, proof_msm)),
-            );
-
-        match final_msm {
-            // ZAL: Verification is (supposedly) cheap, hence we don't use an accelerator engine
-            Ok(msm) => msm.check(&H2cEngine::new()),
-            Err(_) => false,
-        }
     }
 }

@@ -1,23 +1,20 @@
 use ff::{BatchInvert, FromUniformBytes};
 use halo2_debug::test_rng;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::Field,
     circuit::{floor_planner::V1, Layouter, Value},
     dev::{metadata, FailureLocation, MockProver, VerifyFailure},
-    halo2curves::pasta::EqAffine,
     plonk::*,
-    poly::{
-        commitment::ParamsProver,
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsIPA},
-            multiopen::{ProverIPA, VerifierIPA},
-            strategy::AccumulatorStrategy,
-        },
+    poly::kzg::{
+        commitment::{KZGCommitmentScheme, ParamsKZG},
+        multiopen::{ProverSHPLONK, VerifierSHPLONK},
+        strategy::SingleStrategy,
     },
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
     },
 };
+use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use rand_core::RngCore;
 use std::iter;
 
@@ -269,46 +266,48 @@ fn test_mock_prover<F: Ord + FromUniformBytes<64>, const W: usize, const H: usiz
     };
 }
 
-fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
+fn test_prover<const W: usize, const H: usize>(
     k: u32,
-    circuit: MyCircuit<C::Scalar, W, H>,
+    circuit: MyCircuit<Fr, W, H>,
     expected: bool,
-) -> Vec<u8>
-where
-    C::Scalar: FromUniformBytes<64>,
-{
-    let rng = test_rng();
+) -> Vec<u8> {
+    let instances = vec![vec![]];
 
-    let params = ParamsIPA::<C>::new(k);
-    let vk = keygen_vk(&params, &circuit).unwrap();
-    let pk = keygen_pk(&params, vk, &circuit).unwrap();
+    // Setup
+    let mut rng = test_rng();
+    let params = ParamsKZG::<Bn256>::setup(k, &mut rng);
+    let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(&params, vk.clone(), &circuit).expect("keygen_pk should not fail");
 
-    let proof = {
-        let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+    let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
+    create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
+        &params,
+        &pk,
+        &[circuit],
+        &instances,
+        &mut rng,
+        &mut transcript,
+    )
+    .expect("proof generation should not fail");
+    let proof = transcript.finalize();
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
-            &params,
-            &pk,
-            &[circuit],
-            &[vec![]],
-            rng,
-            &mut transcript,
-        )
-        .expect("proof generation should not fail");
+    // Verify
+    let mut verifier_transcript =
+        Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
+    let verifier_params = params.verifier_params();
 
-        transcript.finalize()
-    };
-
-    let accepted = {
-        let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-
-        verify_proof_multi::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, AccumulatorStrategy<C>>(
-            &params,
-            pk.get_vk(),
-            &[vec![]],
-            &mut transcript,
-        )
-    };
+    let accepted = verify_proof_multi::<
+        KZGCommitmentScheme<Bn256>,
+        VerifierSHPLONK<Bn256>,
+        _,
+        _,
+        SingleStrategy<_>,
+    >(
+        &verifier_params,
+        &vk,
+        instances.as_slice(),
+        &mut verifier_transcript,
+    );
 
     assert_eq!(accepted, expected);
 
@@ -326,8 +325,8 @@ fn test_shuffle() {
     test_mock_prover(K, circuit.clone(), Ok(()));
 
     halo2_debug::test_result(
-        || test_prover::<EqAffine, W, H>(K, circuit.clone(), true),
-        "8526b66a372eaeccb687c21daf358d4fdb1c9d2b7e81470317c472634c5c1470",
+        || test_prover::<W, H>(K, circuit.clone(), true),
+        "513e85f35c818a35670bda274f5d5fe73e3a62948a43b0cdcdc317c606a3a2e3",
     );
 
     #[cfg(not(feature = "sanity-checks"))]
@@ -352,8 +351,8 @@ fn test_shuffle() {
             )]),
         );
         halo2_debug::test_result(
-            || test_prover::<EqAffine, W, H>(K, circuit.clone(), false),
-            "27ad558ee60a6675911b87a0df5de49d7c9b5673d723bb05a9811aa33bf486d1",
+            || test_prover::<W, H>(K, circuit.clone(), false),
+            "e3702897ecf9e9ea052887184fae88e499ed34669e8861c5b2e53c2f1d54e055",
         );
     }
 }
