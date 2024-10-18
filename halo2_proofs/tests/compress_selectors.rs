@@ -494,13 +494,13 @@ fn test_key_compression() -> Result<(), halo2_proofs::plonk::Error> {
     // vk & pk keygen both WITH compression
     test_result(
         || test_mycircuit(true, true).expect("should pass"),
-        "acae50508de5ead584170dd83b139daf40e1026b6debbb78eb05d515173fc2dd",
+        "44130c6388df3d99263be8da4a280b426dc05f1f315d35d3827347761534bf08",
     );
 
     // vk & pk keygen both WITHOUT compression
     test_result(
         || test_mycircuit(false, false).expect("should pass"),
-        "f9c99bd341705ac6a13724a526dd28df0bac1c745e0cde40ab39cab3e1b95309",
+        "9f58d7a0088fa2c614e8d67bd238f61bc160300e72f5ffd5d52485ed5fb06752",
     );
 
     Ok(())

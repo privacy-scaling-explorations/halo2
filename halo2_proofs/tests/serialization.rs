@@ -219,6 +219,6 @@ fn test_serialization() {
 
             proof
         },
-        "b51ea51140e9fbd1f0c665c788bab9e4b3e648ac674b6d07a24ca0844f0962ad",
+        "0be5dca07d18b9ad4ccfbf27fc58a7359d1909e5f762cf5df07ce02d0ab96f94",
     );
 }

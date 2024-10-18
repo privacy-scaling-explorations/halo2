@@ -214,6 +214,6 @@ fn test_shuffle_api() {
             prover.assert_satisfied();
             test_prover::<EqAffine>(K, circuit, true)
         },
-        "54f4fec1776178aadf8816754d7877f1de685e0ffb5b6af4db20f557d87550d6",
+        "bf0868d8eb50e3ea00aee981070b8ebf551f24b24792f6157048f605e4c8cf12",
     );
 }

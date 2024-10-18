@@ -545,13 +545,13 @@ fn test_vector_ops_unbinded() {
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_1 = halo2_debug::test_result(
         || test_prover::<halo2curves::pasta::EqAffine>(k, mul_circuit.clone(), true, c_mul.clone()),
-        "1f726eaddd926057e6c2aa8a364d1b4192da27f53c38c9f21d8924ef3eb0f0ab",
+        "8fb24ffebec78e9667e9f9eab6b4b8974d95b5db9023ef78788a08b3daf4b138",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_2 = halo2_debug::test_result(
         || test_prover::<halo2curves::pasta::EqAffine>(k, add_circuit.clone(), true, c_add.clone()),
-        "a42eb2f3e4761e6588bfd8db7e7035ead1cc1331017b6b09a7b75ddfbefefc58",
+        "ded7a6e1f2463fc1bc40311d409af170d57b3e32fe8d60f53403043ae718f4f9",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily

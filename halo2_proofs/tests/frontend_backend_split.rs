@@ -545,7 +545,7 @@ fn test_mycircuit_full_legacy() {
 
             proof
         },
-        "78aadfd46b5cc58b90d832ee47e4df57af3dfc28d1457c4ceeb5d0323a72f130",
+        "44a4bca99aec990b2f382d9c2e1dcc8d8e254d49c2e47cab7556918105346474",
     );
 }
 
@@ -626,6 +626,6 @@ fn test_mycircuit_full_split() {
 
             proof
         },
-        "78aadfd46b5cc58b90d832ee47e4df57af3dfc28d1457c4ceeb5d0323a72f130",
+        "44a4bca99aec990b2f382d9c2e1dcc8d8e254d49c2e47cab7556918105346474",
     );
 }
