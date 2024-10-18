@@ -14,8 +14,6 @@ use super::MockProver;
 /// Supported commitment schemes
 #[derive(Debug, Eq, PartialEq)]
 pub enum CommitmentScheme {
-    /// Inner Product Argument commitment scheme
-    IPA,
     /// KZG with GWC19 multi-open strategy
     KZGGWC,
     /// KZG with BDFG20 multi-open strategy
@@ -193,14 +191,6 @@ impl CostOptions {
         let multiopen = comp_bytes(1, point_sets);
 
         let polycomm = match comm_scheme {
-            CommitmentScheme::IPA => {
-                // Polycommit IPA:
-                // - s_poly commitment (COMM bytes)
-                // - inner product argument (k rounds * 2 * COMM bytes)
-                // - a (SCALAR bytes)
-                // - xi (SCALAR bytes)
-                comp_bytes(1 + 2 * self.k, 2)
-            }
             CommitmentScheme::KZGGWC => {
                 let mut nr_rotations = HashSet::new();
                 for poly in self.advice.iter() {

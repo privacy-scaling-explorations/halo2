@@ -29,7 +29,6 @@ struct Compressed<C: CurveAffine> {
 #[derive(Debug)]
 pub(in crate::plonk) struct Committed<C: CurveAffine> {
     pub(in crate::plonk) product_poly: Polynomial<C::Scalar, Coeff>,
-    product_blind: Blind<C::Scalar>,
 }
 
 pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
@@ -198,10 +197,7 @@ where
     // Hash product commitment
     transcript.write_point(product_commitment)?;
 
-    Ok(Committed::<C> {
-        product_poly: z,
-        product_blind,
-    })
+    Ok(Committed::<C> { product_poly: z })
 }
 
 impl<C: CurveAffine> Committed<C> {
@@ -242,13 +238,11 @@ impl<C: CurveAffine> Evaluated<C> {
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.constructed.product_poly,
-                blind: self.constructed.product_blind,
             }))
             // Open shuffle product commitments at x_next
             .chain(Some(ProverQuery {
                 point: x_next,
                 poly: &self.constructed.product_poly,
-                blind: self.constructed.product_blind,
             }))
     }
 }

@@ -613,7 +613,6 @@ impl<
                             .map(move |&(column, at)| ProverQuery {
                                 point: self.pk.vk.domain.rotate_omega(*x, at),
                                 poly: &advice.advice_polys[column.index],
-                                blind: advice.advice_blinds[column.index],
                             }),
                     )
                     // Permutations
@@ -633,7 +632,7 @@ impl<
                     .map(|&(column, at)| ProverQuery {
                         point: self.pk.vk.domain.rotate_omega(*x, at),
                         poly: &self.pk.fixed_polys[column.index],
-                        blind: Blind::default(),
+                        // blind: Blind::default(),
                     }),
             )
             // Copy constraints

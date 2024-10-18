@@ -308,12 +308,7 @@ fn criterion_benchmark(c: &mut Criterion) {
                 _,
                 _,
                 SingleStrategy<_>,
-            >(
-                &verifier_params,
-                &vk,
-                vec![vec![]],
-                &mut verifier_transcript
-            ),
+            >(&verifier_params, vk, vec![vec![]], &mut verifier_transcript),
             "failed to verify proof"
         );
     }
@@ -337,7 +332,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         prover_group.bench_with_input(
             BenchmarkId::from_parameter(k),
             &(k, &params, &pk),
-            |b, &(k, params, pk)| {
+            |b, &(_k, params, pk)| {
                 b.iter(|| prover(circuit.clone(), params, pk));
             },
         );

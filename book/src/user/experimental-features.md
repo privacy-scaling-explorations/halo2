@@ -4,11 +4,7 @@ In `privacy-scaling-explorations/halo2` fork we have implemented many experiment
 
 ## Commitment scheme abstraction
 
-To support different kinds of polynomial commitment schemes, we've added a trait `CommitmentScheme` to allow create/verify proofs with different commitment scheme implementations, currently there are 2 available implementations in this fork:
-
-- [`IPACommitmentScheme`](https://privacy-scaling-explorations.github.io/halo2/halo2_proofs/poly/ipa/commitment/struct.IPACommitmentScheme.html)
-
-  The original implementation from `zcash/halo2` with the original multi-open strategy `{Prover,Verifier}IPA`
+To support different kinds of polynomial commitment schemes, we've added a trait `CommitmentScheme` to allow create/verify proofs with different commitment scheme implementations, currently there are one available implementations in this fork:
 
 - [`KZGCommitmentScheme`](https://privacy-scaling-explorations.github.io/halo2/halo2_proofs/poly/kzg/commitment/struct.KZGCommitmentScheme.html)
 
@@ -20,10 +16,6 @@ To support different kinds of polynomial commitment schemes, we've added a trait
 When using `create_proof` and `verify_proof`, we need to specify the commitment scheme and multi-open strategy like:
 
 ```rust
-// Using IPA
-create_proof<IPACommitmentScheme<_>, ProverIPA<_>, _, _, _, _>
-verify_proof<IPACommitmentScheme<_>, ProverIPA<_>, _, _, _>
-
 // Using KZG with GWC19 multi-open strategy
 create_proof<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _, _>
 verify_proof<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _>

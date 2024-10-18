@@ -142,33 +142,14 @@ impl<F: Field> Circuit<F> for MyCircuit<F> {
     }
 }
 
-#[test]
-fn test_shuffle_api() {
-    const K: u32 = 4;
-    let input_0 = [1, 2, 4, 1]
-        .map(|e: u64| Value::known(Fr::from(e)))
-        .to_vec();
-    let input_1 = [10, 20, 40, 10].map(Fr::from).to_vec();
-    let shuffle_0 = [4, 1, 1, 2]
-        .map(|e: u64| Value::known(Fr::from(e)))
-        .to_vec();
-    let shuffle_1 = [40, 10, 10, 20]
-        .map(|e: u64| Value::known(Fr::from(e)))
-        .to_vec();
-    let circuit = MyCircuit {
-        input_0,
-        input_1,
-        shuffle_0,
-        shuffle_1,
-    };
-
-    let instances = vec![vec![]];
-
+fn test_prover(k: u32, circuit: MyCircuit<Fr>, expected: bool) -> Vec<u8> {
     // Setup
     let mut rng = test_rng();
-    let params = ParamsKZG::<Bn256>::setup(K, &mut rng);
+    let params = ParamsKZG::<Bn256>::setup(k, &mut rng);
     let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
     let pk = keygen_pk(&params, vk.clone(), &circuit).expect("keygen_pk should not fail");
+
+    let instances = vec![vec![]];
 
     let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
     create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
@@ -187,24 +168,49 @@ fn test_shuffle_api() {
         Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
     let verifier_params = params.verifier_params();
 
-    assert!(
-        verify_proof_multi::<
-            KZGCommitmentScheme<Bn256>,
-            VerifierSHPLONK<Bn256>,
-            _,
-            _,
-            SingleStrategy<_>,
-        >(
-            &verifier_params,
-            &vk,
-            instances.as_slice(),
-            &mut verifier_transcript,
-        ),
-        "failed to verify proof"
+    let accepted = verify_proof_multi::<
+        KZGCommitmentScheme<Bn256>,
+        VerifierSHPLONK<Bn256>,
+        _,
+        _,
+        SingleStrategy<_>,
+    >(
+        &verifier_params,
+        &vk,
+        instances.as_slice(),
+        &mut verifier_transcript,
     );
 
+    assert_eq!(accepted, expected);
+
+    proof
+}
+
+#[test]
+fn test_shuffle_api() {
+    use halo2_proofs::dev::MockProver;
+    const K: u32 = 4;
+    let input_0 = [1, 2, 4, 1]
+        .map(|e: u64| Value::known(Fr::from(e)))
+        .to_vec();
+    let input_1 = [10, 20, 40, 10].map(Fr::from).to_vec();
+    let shuffle_0 = [4, 1, 1, 2]
+        .map(|e: u64| Value::known(Fr::from(e)))
+        .to_vec();
+    let shuffle_1 = [40, 10, 10, 20]
+        .map(|e: u64| Value::known(Fr::from(e)))
+        .to_vec();
+    let circuit = MyCircuit {
+        input_0,
+        input_1,
+        shuffle_0,
+        shuffle_1,
+    };
+    let prover = MockProver::run(K, &circuit, vec![]).unwrap();
+    prover.assert_satisfied();
+
     halo2_debug::test_result(
-        || proof,
-        "6f291e2142b6740955076f5f79fae89bc9bb729b65ce7f577de7e2091c9c0d06",
+        || test_prover(K, circuit, true),
+        "c4a5b69cf43d3e84ee311a2801ca194b756f2b21437756bd54204113d42e6f07",
     );
 }

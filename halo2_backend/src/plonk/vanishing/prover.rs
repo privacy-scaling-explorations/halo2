@@ -21,18 +21,15 @@ use crate::{
 
 pub(in crate::plonk) struct Committed<C: CurveAffine> {
     random_poly: Polynomial<C::Scalar, Coeff>,
-    random_blind: Blind<C::Scalar>,
 }
 
 pub(in crate::plonk) struct Constructed<C: CurveAffine> {
     h_pieces: Vec<Polynomial<C::Scalar, Coeff>>,
-    h_blinds: Vec<Blind<C::Scalar>>,
     committed: Committed<C>,
 }
 
 pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
     h_poly: Polynomial<C::Scalar, Coeff>,
-    h_blind: Blind<C::Scalar>,
     committed: Committed<C>,
 }
 
@@ -90,10 +87,7 @@ impl<C: CurveAffine> Argument<C> {
             .to_affine();
         transcript.write_point(c)?;
 
-        Ok(Committed {
-            random_poly,
-            random_blind,
-        })
+        Ok(Committed { random_poly })
     }
 }
 
@@ -149,7 +143,6 @@ impl<C: CurveAffine> Committed<C> {
 
         Ok(Constructed {
             h_pieces,
-            h_blinds,
             committed: self,
         })
     }
@@ -169,18 +162,11 @@ impl<C: CurveAffine> Constructed<C> {
             .rev()
             .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval);
 
-        let h_blind = self
-            .h_blinds
-            .iter()
-            .rev()
-            .fold(Blind(C::Scalar::ZERO), |acc, eval| acc * Blind(xn) + *eval);
-
         let random_eval = eval_polynomial(&self.committed.random_poly, *x);
         transcript.write_scalar(random_eval)?;
 
         Ok(Evaluated {
             h_poly,
-            h_blind,
             committed: self.committed,
         })
     }
@@ -195,12 +181,10 @@ impl<C: CurveAffine> Evaluated<C> {
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.h_poly,
-                blind: self.h_blind,
             }))
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.committed.random_poly,
-                blind: self.committed.random_blind,
             }))
     }
 }

@@ -29,7 +29,6 @@ use halo2_middleware::poly::Rotation;
 /// It stores a single `Z_P` in [permutation argument specification](https://zcash.github.io/halo2/design/proving-system/permutation.html#argument-specification).  
 pub(crate) struct CommittedSet<C: CurveAffine> {
     pub(crate) permutation_product_poly: Polynomial<C::Scalar, Coeff>,
-    permutation_product_blind: Blind<C::Scalar>,
 }
 
 /// Set of permutation product polynomials, which have been **committed**.
@@ -182,7 +181,6 @@ pub(in crate::plonk) fn permutation_commit<
         let permutation_product_commitment = params
             .commit_lagrange(&engine.msm_backend, &z, blind)
             .to_affine();
-        let permutation_product_blind = blind;
         let permutation_product_poly = domain.lagrange_to_coeff(z);
 
         // Hash the permutation product commitment
@@ -190,7 +188,6 @@ pub(in crate::plonk) fn permutation_commit<
 
         sets.push(CommittedSet {
             permutation_product_poly,
-            permutation_product_blind,
         });
     }
 
@@ -202,11 +199,9 @@ impl<C: CurveAffine> super::ProvingKey<C> {
         &self,
         x: ChallengeX<C>,
     ) -> impl Iterator<Item = ProverQuery<'_, C>> + Clone {
-        self.polys.iter().map(move |poly| ProverQuery {
-            point: *x,
-            poly,
-            blind: Blind::default(),
-        })
+        self.polys
+            .iter()
+            .map(move |poly| ProverQuery { point: *x, poly })
     }
 
     pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
@@ -290,12 +285,10 @@ impl<C: CurveAffine> Evaluated<C> {
                     .chain(Some(ProverQuery {
                         point: *x,
                         poly: &set.permutation_product_poly,
-                        blind: set.permutation_product_blind,
                     }))
                     .chain(Some(ProverQuery {
                         point: x_next,
                         poly: &set.permutation_product_poly,
-                        blind: set.permutation_product_blind,
                     }))
             }))
             // Open it at \omega^{last} x for all but the last set. This rotation is only
@@ -311,7 +304,6 @@ impl<C: CurveAffine> Evaluated<C> {
                         Some(ProverQuery {
                             point: x_last,
                             poly: &set.permutation_product_poly,
-                            blind: set.permutation_product_blind,
                         })
                     }),
             )
