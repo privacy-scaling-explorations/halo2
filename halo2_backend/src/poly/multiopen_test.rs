@@ -11,8 +11,8 @@ mod test {
         EvaluationDomain,
     };
     use crate::transcript::{
-        Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge,
-        TranscriptReadBuffer, TranscriptWriterBuffer,
+        Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge, TranscriptReadBuffer,
+        TranscriptWriterBuffer,
     };
     use group::Curve;
     use halo2_middleware::ff::WithSmallOrderMulGroup;

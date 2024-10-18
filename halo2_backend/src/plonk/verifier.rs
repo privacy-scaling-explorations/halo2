@@ -1,11 +1,7 @@
 //! Verify a plonk proof
 
-use group::prime::PrimeCurveAffine;
-use group::Curve;
 use halo2_middleware::circuit::Any;
 use halo2_middleware::ff::{Field, FromUniformBytes, WithSmallOrderMulGroup};
-use halo2_middleware::zal::impls::H2cEngine;
-use halo2curves::CurveAffine;
 use std::iter;
 
 use super::{vanishing, VerifyingKey};
@@ -16,9 +12,8 @@ use crate::plonk::{
     shuffle::verifier::shuffle_read_product_commitment, ChallengeBeta, ChallengeGamma,
     ChallengeTheta, ChallengeX, ChallengeY, Error,
 };
-use crate::poly::commitment::ParamsVerifier;
 use crate::poly::{
-    commitment::{Blind, CommitmentScheme, Params, Verifier},
+    commitment::{CommitmentScheme, Params, Verifier},
     VerificationStrategy, VerifierQuery,
 };
 use crate::transcript::{read_n_scalars, EncodedChallenge, TranscriptRead};
@@ -65,9 +60,6 @@ pub fn verify_proof_with_strategy<
 where
     Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
 {
-    // ZAL: Verification is (supposedly) cheap, hence we don't use an accelerator engine
-    let default_engine = H2cEngine::new();
-
     // Check that instances matches the expected number of instance columns
     for instances in instances.iter() {
         if instances.len() != vk.cs.num_instance_columns {
@@ -75,52 +67,7 @@ where
         }
     }
 
-    // Check that the Scheme parameters support commitment to instance
-    // if it is required by the verifier.
-    assert!(
-        !V::QUERY_INSTANCE
-            || <Scheme::ParamsVerifier as ParamsVerifier<Scheme::Curve>>::COMMIT_INSTANCE
-    );
-
-    // 1. Get the commitments of the instance polynomials. ----------------------------------------
-
-    let instance_commitments = if V::QUERY_INSTANCE {
-        let mut instance_commitments = Vec::with_capacity(instances.len());
-
-        let instances_projective = instances
-            .iter()
-            .map(|instance| {
-                instance
-                    .iter()
-                    .map(|instance| {
-                        if instance.len() > params.n() as usize - (vk.cs.blinding_factors() + 1) {
-                            return Err(Error::InstanceTooLarge);
-                        }
-                        let mut poly = instance.to_vec();
-                        poly.resize(params.n() as usize, Scheme::Scalar::ZERO);
-                        let poly = vk.domain.lagrange_from_vec(poly);
-
-                        Ok(params.commit_lagrange(&default_engine, &poly, Blind::default()))
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        for instance_projective in instances_projective {
-            let mut affines =
-                vec![<Scheme as CommitmentScheme>::Curve::identity(); instance_projective.len()];
-            <<Scheme as CommitmentScheme>::Curve as CurveAffine>::CurveExt::batch_normalize(
-                &instance_projective,
-                &mut affines,
-            );
-            instance_commitments.push(affines);
-        }
-        instance_commitments
-    } else {
-        vec![vec![]; instances.len()]
-    };
-
-    let num_proofs = instance_commitments.len();
+    let num_proofs = instances.len();
 
     // 2. Add hash of verification key and instances into transcript. -----------------------------
     // [TRANSCRIPT-1]
@@ -130,19 +77,10 @@ where
     // 3. Add instance commitments into the transcript. --------------------------------------------
     // [TRANSCRIPT-2]
 
-    if V::QUERY_INSTANCE {
-        for instance_commitments in instance_commitments.iter() {
-            // Hash the instance (external) commitments into the transcript
-            for commitment in instance_commitments {
-                transcript.common_point(*commitment)?
-            }
-        }
-    } else {
-        for instance in instances.iter() {
-            for instance in instance.iter() {
-                for value in instance.iter() {
-                    transcript.common_scalar(*value)?;
-                }
+    for instance in instances.iter() {
+        for instance in instance.iter() {
+            for value in instance.iter() {
+                transcript.common_scalar(*value)?;
             }
         }
     }
@@ -261,14 +199,7 @@ where
     let x: ChallengeX<_> = transcript.squeeze_challenge_scalar();
 
     // 12. Get the instance evaluations
-    let instance_evals = if V::QUERY_INSTANCE {
-        // [TRANSCRIPT-16]
-        (0..num_proofs)
-            .map(|_| -> Result<Vec<_>, _> {
-                read_n_scalars(transcript, vk.cs.instance_queries.len())
-            })
-            .collect::<Result<Vec<_>, _>>()?
-    } else {
+    let instance_evals = {
         let xn = x.pow([params.n()]);
         let (min_rotation, max_rotation) =
             vk.cs
@@ -454,30 +385,14 @@ where
     };
 
     #[rustfmt::skip]
-    let queries = instance_commitments
-        .iter()
-        .zip(instance_evals.iter())
-        .zip(advice_commitments.iter())
+    let queries = 
+        advice_commitments.iter()
         .zip(advice_evals.iter())
         .zip(permutations_evaluated.iter())
         .zip(lookups_evaluated.iter())
         .zip(shuffles_evaluated.iter())
-        .flat_map(|((((((instance_commitments, instance_evals), advice_commitments),advice_evals),permutation),lookups),shuffles)| {
+        .flat_map(|((((advice_commitments,advice_evals),permutation),lookups),shuffles)| {
                 iter::empty()
-                    .chain(
-                        V::QUERY_INSTANCE
-                            .then_some(vk.cs.instance_queries.iter().enumerate().map(
-                                move |(query_index, &(column, at))| {
-                                    VerifierQuery::new_commitment(
-                                        &instance_commitments[column.index],
-                                        vk.domain.rotate_omega(*x, at),
-                                        instance_evals[query_index],
-                                    )
-                                },
-                            ))
-                            .into_iter()
-                            .flatten(),
-                    )
                     .chain(vk.cs.advice_queries.iter().enumerate().map(
                         move |(query_index, &(column, at))| {
                             VerifierQuery::new_commitment(

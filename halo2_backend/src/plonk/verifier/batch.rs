@@ -1,7 +1,6 @@
 use halo2_middleware::ff::FromUniformBytes;
 use halo2curves::CurveAffine;
 
-
 #[derive(Debug)]
 struct BatchItem<C: CurveAffine> {
     instances: Vec<Vec<Vec<C::ScalarExt>>>,

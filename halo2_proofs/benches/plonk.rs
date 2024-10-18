@@ -14,8 +14,7 @@ use halo2_proofs::transcript::{Blake2bRead, Blake2bWrite, Challenge255};
 use halo2curves::bn256::{Bn256, Fr, G1Affine};
 use rand_core::OsRng;
 
-use halo2_proofs::
-    transcript::{TranscriptReadBuffer, TranscriptWriterBuffer};
+use halo2_proofs::transcript::{TranscriptReadBuffer, TranscriptWriterBuffer};
 
 use std::marker::PhantomData;
 
@@ -278,7 +277,11 @@ fn criterion_benchmark(c: &mut Criterion) {
         (params, pk, circuit)
     }
 
-    fn prover(circuit: MyCircuit<Fr>, params: &ParamsKZG<Bn256>, pk: &ProvingKey<G1Affine>) -> Vec<u8> {
+    fn prover(
+        circuit: MyCircuit<Fr>,
+        params: &ParamsKZG<Bn256>,
+        pk: &ProvingKey<G1Affine>,
+    ) -> Vec<u8> {
         let rng = OsRng;
 
         let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
@@ -294,23 +297,25 @@ fn criterion_benchmark(c: &mut Criterion) {
         transcript.finalize()
     }
 
-
     fn verifier(params: &ParamsKZG<Bn256>, vk: &VerifyingKey<G1Affine>, proof: &[u8]) {
+        let mut verifier_transcript = Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof);
+        let verifier_params = params.verifier_params();
 
-        let mut verifier_transcript =
-        Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof);
-    let verifier_params = params.verifier_params();
-
-    assert!(
-        verify_proof::<
-            KZGCommitmentScheme<Bn256>,
-            VerifierSHPLONK<Bn256>,
-            _,
-            _,
-            SingleStrategy<_>,
-        >(&verifier_params, &vk, vec![vec![]], &mut verifier_transcript),
-        "failed to verify proof"
-    );
+        assert!(
+            verify_proof::<
+                KZGCommitmentScheme<Bn256>,
+                VerifierSHPLONK<Bn256>,
+                _,
+                _,
+                SingleStrategy<_>,
+            >(
+                &verifier_params,
+                &vk,
+                vec![vec![]],
+                &mut verifier_transcript
+            ),
+            "failed to verify proof"
+        );
     }
 
     let k_range = 8..=16;
@@ -333,7 +338,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             BenchmarkId::from_parameter(k),
             &(k, &params, &pk),
             |b, &(k, params, pk)| {
-                b.iter(|| prover(circuit.clone(),params, pk));
+                b.iter(|| prover(circuit.clone(), params, pk));
             },
         );
     }
@@ -342,7 +347,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let mut verifier_group = c.benchmark_group("plonk-verifier");
     for k in k_range {
         let (params, pk, circuit) = key_and_circuit_gen(k);
-        let proof = prover(circuit,&params, &pk);
+        let proof = prover(circuit, &params, &pk);
 
         verifier_group.bench_with_input(
             BenchmarkId::from_parameter(k),

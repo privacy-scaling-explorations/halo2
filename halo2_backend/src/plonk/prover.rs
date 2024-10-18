@@ -207,38 +207,13 @@ impl<
                             return Err(Error::InstanceTooLarge);
                         }
                         for (poly, value) in poly.iter_mut().zip(values.iter()) {
-                            if !P::QUERY_INSTANCE {
-                                // Add to the transcript the instance polynomials lagrange value.
-                                transcript.common_scalar(*value)?;
-                            }
+                            // Add to the transcript the instance polynomials lagrange value.
+                            transcript.common_scalar(*value)?;
                             *poly = *value;
                         }
                         Ok(poly)
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-
-                if P::QUERY_INSTANCE {
-                    // Add to the transcript the commitments of the instance lagrange polynomials
-
-                    let instance_commitments_projective: Vec<_> = instance_values
-                        .iter()
-                        .map(|poly| {
-                            params.commit_lagrange(&engine.msm_backend, poly, Blind::default())
-                        })
-                        .collect();
-                    let mut instance_commitments =
-                        vec![Scheme::Curve::identity(); instance_commitments_projective.len()];
-                    <Scheme::Curve as CurveAffine>::CurveExt::batch_normalize(
-                        &instance_commitments_projective,
-                        &mut instance_commitments,
-                    );
-                    let instance_commitments = instance_commitments;
-                    drop(instance_commitments_projective);
-
-                    for commitment in &instance_commitments {
-                        transcript.common_point(*commitment)?;
-                    }
-                }
 
                 // Convert from evaluation to coefficient form.
 
@@ -587,9 +562,6 @@ impl<
 
         let x_pow_n = x.pow([self.params.n()]);
 
-        // [TRANSCRIPT-16]
-        self.write_instance_evals(x)?;
-
         // 10. Compute and hash advice evals for the circuit instance ------------------------------------
         // [TRANSCRIPT-17]
         self.write_advice_evals(x, &advice)?;
@@ -622,30 +594,15 @@ impl<
         let shuffles_evaluated = self.evaluate_shuffles(x, shuffles_committed)?;
 
         // 13. Generate all queries ([`ProverQuery`]) that needs to be sent to prover  --------------------
-        let instances = std::mem::take(&mut self.instances);
-        let queries = instances
-            // group the instance, advice, permutation, lookups and shuffles
+        // group the advice, permutation, lookups and shuffles
+        let queries = advice
             .iter()
-            .zip(advice.iter())
             .zip(permutations_evaluated.iter())
             .zip(lookups_evaluated.iter())
             .zip(shuffles_evaluated.iter())
-            .flat_map(|((((instance, advice), permutation), lookups), shuffles)| {
+            .flat_map(|(((advice, permutation), lookups), shuffles)| {
                 // Build a (an iterator) over a set of ProverQueries for each instance, advice, permutatiom, lookup and shuffle
                 iter::empty()
-                    // Instances
-                    .chain(
-                        P::QUERY_INSTANCE
-                            .then_some(self.pk.vk.cs.instance_queries.iter().map(
-                                move |&(column, at)| ProverQuery {
-                                    point: self.pk.vk.domain.rotate_omega(*x, at),
-                                    poly: &instance.instance_polys[column.index],
-                                    blind: Blind::default(),
-                                },
-                            ))
-                            .into_iter()
-                            .flatten(),
-                    )
                     // Advices
                     .chain(
                         self.pk
@@ -907,37 +864,6 @@ impl<
             self.transcript,
         )?;
         Ok(vanishing)
-    }
-
-    fn write_instance_evals(&mut self, x: ChallengeX<Scheme::Curve>) -> Result<(), Error>
-    where
-        Scheme::Scalar: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
-    {
-        if P::QUERY_INSTANCE {
-            // Compute and hash instance evals for the circuit instance
-            for instance in self.instances.iter() {
-                // Evaluate polynomials at omega^i x
-                let instance_evals: Vec<_> = self
-                    .pk
-                    .vk
-                    .cs
-                    .instance_queries
-                    .iter()
-                    .map(|&(column, at)| {
-                        eval_polynomial(
-                            &instance.instance_polys[column.index],
-                            self.pk.vk.domain.rotate_omega(*x, at),
-                        )
-                    })
-                    .collect();
-
-                // Hash each instance column evaluation
-                for eval in instance_evals.iter() {
-                    self.transcript.write_scalar(*eval)?;
-                }
-            }
-        }
-        Ok(())
     }
 
     fn write_advice_evals(

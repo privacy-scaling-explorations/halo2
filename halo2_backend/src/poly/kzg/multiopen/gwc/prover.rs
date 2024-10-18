@@ -30,8 +30,6 @@ where
     E::G1: CurveExt<AffineExt = E::G1Affine>,
     E::G2Affine: SerdeCurveAffine,
 {
-    const QUERY_INSTANCE: bool = false;
-
     fn new(params: &'params ParamsKZG<E>) -> Self {
         Self { params }
     }
