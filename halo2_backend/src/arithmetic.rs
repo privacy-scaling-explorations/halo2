@@ -88,30 +88,12 @@ pub(crate) fn eval_polynomial<F: Field>(poly: &[F], point: F) -> F {
 pub(crate) fn compute_inner_product<F: Field>(a: &[F], b: &[F]) -> F {
     assert_eq!(a.len(), b.len());
 
-    let n = a.len();
-    let num_threads = multicore::current_num_threads();
-    if n * 2 < num_threads {
-        let mut acc = F::ZERO;
-        for (a, b) in a.iter().zip(b.iter()) {
-            acc += (*a) * (*b);
-        }
-        acc
-    } else {
-        let chunk_size = (n + num_threads - 1) / num_threads;
-        let mut parts = vec![F::ZERO; num_threads];
-        multicore::scope(|scope| {
-            for (chunk_idx, (out, a)) in parts.chunks_mut(1).zip(a.chunks(chunk_size)).enumerate() {
-                scope.spawn(move |_| {
-                    let mut acc = F::ZERO;
-                    for (a, b) in a.iter().zip(&b[chunk_idx * chunk_size..]) {
-                        acc += (*a) * (*b);
-                    }
-                    out[0] = acc;
-                });
-            }
-        });
-        parts.iter().fold(F::ZERO, |acc, coeff| acc + coeff)
+    let mut acc = F::ZERO;
+    for (a, b) in a.iter().zip(b.iter()) {
+        acc += (*a) * (*b);
     }
+
+    acc
 }
 
 /// Divides polynomial `a` in `X` by `X - b` with
