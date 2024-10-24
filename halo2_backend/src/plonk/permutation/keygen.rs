@@ -2,7 +2,7 @@ use group::Curve;
 use halo2_middleware::ff::{Field, PrimeField};
 use halo2_middleware::zal::impls::H2cEngine;
 
-use super::{Argument, ProvingKey, VerifyingKey};
+use super::{ProvingKey, VerifyingKey};
 use crate::{
     arithmetic::{parallelize, CurveAffine},
     plonk::Error,
@@ -40,7 +40,7 @@ impl Assembly {
         Ok(assembly)
     }
 
-    pub(crate) fn new(n: usize, p: &Argument) -> Self {
+    pub(crate) fn new(n: usize, p: &ArgumentMid) -> Self {
         // Initialize the copy vector to keep track of copy constraints in all
         // the permutation arguments.
         let mut columns = vec![];
@@ -121,7 +121,7 @@ impl Assembly {
         self,
         params: &P,
         domain: &EvaluationDomain<C::Scalar>,
-        p: &Argument,
+        p: &ArgumentMid,
     ) -> VerifyingKey<C> {
         build_vk(params, domain, p, |i, j| self.mapping[i][j])
     }
@@ -130,7 +130,7 @@ impl Assembly {
         self,
         params: &P,
         domain: &EvaluationDomain<C::Scalar>,
-        p: &Argument,
+        p: &ArgumentMid,
     ) -> ProvingKey<C> {
         build_pk(params, domain, p, |i, j| self.mapping[i][j])
     }
@@ -139,7 +139,7 @@ impl Assembly {
 pub(crate) fn build_pk<C: CurveAffine, P: Params<C>>(
     params: &P,
     domain: &EvaluationDomain<C::Scalar>,
-    p: &Argument,
+    p: &ArgumentMid,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
 ) -> ProvingKey<C> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
@@ -215,7 +215,7 @@ pub(crate) fn build_pk<C: CurveAffine, P: Params<C>>(
 pub(crate) fn build_vk<C: CurveAffine, P: Params<C>>(
     params: &P,
     domain: &EvaluationDomain<C::Scalar>,
-    p: &Argument,
+    p: &ArgumentMid,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
 ) -> VerifyingKey<C> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]

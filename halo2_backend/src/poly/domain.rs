@@ -328,7 +328,6 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
     ///
     /// This function will panic if the provided vector is not the correct
     /// length.
-    // TODO/FIXME: caller should be responsible for truncating
     pub fn extended_to_coeff(&self, mut a: Polynomial<F, ExtendedLagrangeCoeff>) -> Vec<F> {
         assert_eq!(a.values.len(), self.extended_len());
 
@@ -343,12 +342,6 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         // Distribute powers to move from coset; opposite from the
         // transformation we performed earlier.
         self.distribute_powers_zeta(&mut a.values, false);
-
-        // Truncate it to match the size of the quotient polynomial; the
-        // evaluation domain might be slightly larger than necessary because
-        // it always lies on a power-of-two boundary.
-        a.values
-            .truncate((self.n * self.quotient_poly_degree) as usize);
 
         a.values
     }

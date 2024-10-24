@@ -86,7 +86,6 @@ pub(crate) fn eval_polynomial<F: Field>(poly: &[F], point: F) -> F {
 ///
 /// This function will panic if the two vectors are not the same size.
 pub(crate) fn compute_inner_product<F: Field>(a: &[F], b: &[F]) -> F {
-    // TODO: parallelize?
     assert_eq!(a.len(), b.len());
 
     let mut acc = F::ZERO;

@@ -211,6 +211,6 @@ fn test_shuffle_api() {
 
     halo2_debug::test_result(
         || test_prover(K, circuit, true),
-        "c4a5b69cf43d3e84ee311a2801ca194b756f2b21437756bd54204113d42e6f07",
+        "c8d44278f8b6ed8e15c9bb34c81a1d634398152d3a09a6589acb65d806a33b0d",
     );
 }

@@ -218,8 +218,10 @@ impl QueriesMap {
                 let index = self.add(column, query.rotation);
                 ExpressionBack::Var(VarBack::Query(QueryBack {
                     index,
-                    column_index: query.column_index,
-                    column_type: query.column_type,
+                    column: ColumnMid {
+                        index: query.column_index,
+                        column_type: query.column_type,
+                    },
                     rotation: query.rotation,
                 }))
             }

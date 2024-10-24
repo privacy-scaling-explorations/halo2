@@ -536,13 +536,13 @@ fn test_vector_ops_unbinded() {
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_1 = halo2_debug::test_result(
         || test_prover(k, mul_circuit.clone(), true, c_mul.clone()),
-        "4cadce029aad5ba7ceafa4052656926698e9308932244e90b7ec63adffa5ba6f",
+        "1d0e66c45ff1868d2fa3de6cc4b7aa0f8c9d761929ed26c1307251a33f9c5950",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_2 = halo2_debug::test_result(
         || test_prover(k, add_circuit.clone(), true, c_add.clone()),
-        "c791ad2a321ef9d8ab8dd7f111e5c6599be63c0146fae664267407b02afb8c82",
+        "4d64c68078008db27906a54ecb25fb8f8b41d85850aeb2db136072baff266f3e",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily

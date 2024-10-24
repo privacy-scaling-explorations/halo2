@@ -4,15 +4,12 @@ use halo2_middleware::expression::{Expression, Variable};
 use halo2_middleware::poly::Rotation;
 use halo2_middleware::{lookup, permutation::ArgumentMid, shuffle};
 
-// TODO: Reuse ColumnMid inside this.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct QueryBack {
     /// Query index
     pub(crate) index: usize,
-    /// Column index
-    pub(crate) column_index: usize,
-    /// The type of the column.
-    pub(crate) column_type: Any,
+    /// Column
+    pub(crate) column: ColumnMid,
     /// Rotation of this query
     pub(crate) rotation: Rotation,
 }

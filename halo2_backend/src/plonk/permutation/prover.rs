@@ -2,12 +2,11 @@ use group::{
     ff::{BatchInvert, Field},
     Curve,
 };
-use halo2_middleware::zal::traits::MsmAccel;
 use halo2_middleware::{ff::PrimeField, zal::impls::PlonkEngine};
+use halo2_middleware::{permutation::ArgumentMid, zal::traits::MsmAccel};
 use rand_core::RngCore;
 use std::iter::{self, ExactSizeIterator};
 
-use super::Argument;
 use crate::{
     arithmetic::{eval_polynomial, parallelize, CurveAffine},
     plonk::{self, permutation::ProvingKey, ChallengeBeta, ChallengeGamma, ChallengeX, Error},
@@ -61,7 +60,7 @@ pub(in crate::plonk) fn permutation_commit<
     M: MsmAccel<C>,
 >(
     engine: &PlonkEngine<C, M>,
-    arg: &Argument,
+    arg: &ArgumentMid,
     params: &P,
     pk: &plonk::ProvingKey<C>,
     pkey: &ProvingKey<C>,

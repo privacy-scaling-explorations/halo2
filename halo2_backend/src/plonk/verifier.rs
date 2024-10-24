@@ -314,7 +314,7 @@ where
                             gate.poly.evaluate(
                                 &|scalar| scalar,
                                 &|var| match var {
-                                    VarBack::Query(query) => match query.column_type {
+                                    VarBack::Query(query) => match query.column.column_type {
                                         Any::Fixed => fixed_evals[query.index],
                                         Any::Advice => advice_evals[query.index],
                                         Any::Instance => instance_evals[query.index],

@@ -326,7 +326,7 @@ fn test_shuffle() {
 
     halo2_debug::test_result(
         || test_prover::<W, H>(K, circuit.clone(), true),
-        "513e85f35c818a35670bda274f5d5fe73e3a62948a43b0cdcdc317c606a3a2e3",
+        "2a91b131950f5c9d9bf8d6486caf3870edcdb772d0021bead607076497762fac",
     );
 
     #[cfg(not(feature = "sanity-checks"))]

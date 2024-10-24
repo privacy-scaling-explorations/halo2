@@ -6,8 +6,7 @@ use crate::{
     helpers::{polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice},
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
 };
-// TODO: Remove the renaming
-pub use halo2_middleware::permutation::ArgumentMid as Argument;
+pub use halo2_middleware::permutation::ArgumentMid;
 
 use std::io;
 
@@ -34,7 +33,7 @@ impl<C: CurveAffine> VerifyingKey<C> {
 
     pub(crate) fn read<R: io::Read>(
         reader: &mut R,
-        argument: &Argument,
+        argument: &ArgumentMid,
         format: SerdeFormat,
     ) -> io::Result<Self>
     where
