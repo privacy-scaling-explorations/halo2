@@ -43,7 +43,7 @@ pub mod dev {
 /// the committed polynomials at arbitrary points.
 pub mod poly {
     pub use halo2_backend::poly::VerificationStrategy;
-    pub use halo2_backend::poly::{commitment, ipa, kzg, EvaluationDomain};
+    pub use halo2_backend::poly::{commitment, kzg, EvaluationDomain};
     pub use halo2_middleware::poly::Rotation;
 }
 /// This module contains utilities and traits for dealing with Fiat-Shamir

@@ -30,21 +30,16 @@ pub(in crate::plonk) struct Permuted<C: CurveAffine> {
     compressed_input_expression: Polynomial<C::Scalar, LagrangeCoeff>,
     permuted_input_expression: Polynomial<C::Scalar, LagrangeCoeff>,
     permuted_input_poly: Polynomial<C::Scalar, Coeff>,
-    permuted_input_blind: Blind<C::Scalar>,
     compressed_table_expression: Polynomial<C::Scalar, LagrangeCoeff>,
     permuted_table_expression: Polynomial<C::Scalar, LagrangeCoeff>,
     permuted_table_poly: Polynomial<C::Scalar, Coeff>,
-    permuted_table_blind: Blind<C::Scalar>,
 }
 
 #[derive(Debug)]
 pub(in crate::plonk) struct Committed<C: CurveAffine> {
     pub(in crate::plonk) permuted_input_poly: Polynomial<C::Scalar, Coeff>,
-    permuted_input_blind: Blind<C::Scalar>,
     pub(in crate::plonk) permuted_table_poly: Polynomial<C::Scalar, Coeff>,
-    permuted_table_blind: Blind<C::Scalar>,
     pub(in crate::plonk) product_poly: Polynomial<C::Scalar, Coeff>,
-    product_blind: Blind<C::Scalar>,
 }
 
 pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
@@ -130,15 +125,15 @@ where
         let poly = pk.vk.domain.lagrange_to_coeff(values.clone());
         let blind = Blind(C::Scalar::random(&mut rng));
         let commitment = params.commit_lagrange(&engine.msm_backend, values, blind);
-        (poly, blind, commitment)
+        (poly, commitment)
     };
 
     // Commit to permuted input expression
-    let (permuted_input_poly, permuted_input_blind, permuted_input_commitment_projective) =
+    let (permuted_input_poly, permuted_input_commitment_projective) =
         commit_values(&permuted_input_expression);
 
     // Commit to permuted table expression
-    let (permuted_table_poly, permuted_table_blind, permuted_table_commitment_projective) =
+    let (permuted_table_poly, permuted_table_commitment_projective) =
         commit_values(&permuted_table_expression);
 
     let [permuted_input_commitment, permuted_table_commitment] = {
@@ -163,11 +158,9 @@ where
         compressed_input_expression,
         permuted_input_expression,
         permuted_input_poly,
-        permuted_input_blind,
         compressed_table_expression,
         permuted_table_expression,
         permuted_table_poly,
-        permuted_table_blind,
     })
 }
 
@@ -313,11 +306,8 @@ impl<C: CurveAffine> Permuted<C> {
 
         Ok(Committed::<C> {
             permuted_input_poly: self.permuted_input_poly,
-            permuted_input_blind: self.permuted_input_blind,
             permuted_table_poly: self.permuted_table_poly,
-            permuted_table_blind: self.permuted_table_blind,
             product_poly: z,
-            product_blind,
         })
     }
 }
@@ -368,31 +358,26 @@ impl<C: CurveAffine> Evaluated<C> {
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.constructed.product_poly,
-                blind: self.constructed.product_blind,
             }))
             // Open lookup input commitments at x
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.constructed.permuted_input_poly,
-                blind: self.constructed.permuted_input_blind,
             }))
             // Open lookup table commitments at x
             .chain(Some(ProverQuery {
                 point: *x,
                 poly: &self.constructed.permuted_table_poly,
-                blind: self.constructed.permuted_table_blind,
             }))
             // Open lookup input commitments at x_inv
             .chain(Some(ProverQuery {
                 point: x_inv,
                 poly: &self.constructed.permuted_input_poly,
-                blind: self.constructed.permuted_input_blind,
             }))
             // Open lookup product commitments at x_next
             .chain(Some(ProverQuery {
                 point: x_next,
                 poly: &self.constructed.product_poly,
-                blind: self.constructed.product_blind,
             }))
     }
 }

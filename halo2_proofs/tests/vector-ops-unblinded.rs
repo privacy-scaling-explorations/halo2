@@ -3,18 +3,16 @@
 /// This is a simple example of how to use unblinded inputs to match up circuits that might be proved on different host machines.
 use std::marker::PhantomData;
 
-use ff::FromUniformBytes;
 use halo2_debug::test_rng;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::*,
     poly::{
-        commitment::ParamsProver,
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsIPA},
-            multiopen::{ProverIPA, VerifierIPA},
-            strategy::AccumulatorStrategy,
+        kzg::{
+            commitment::{KZGCommitmentScheme, ParamsKZG},
+            multiopen::{ProverSHPLONK, VerifierSHPLONK},
+            strategy::SingleStrategy,
         },
         Rotation,
     },
@@ -22,6 +20,7 @@ use halo2_proofs::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
     },
 };
+use halo2curves::bn256::{Bn256, Fr, G1Affine};
 
 // ANCHOR: instructions
 trait NumericInstructions<F: Field>: Chip<F> {
@@ -466,48 +465,42 @@ impl<F: Field> Circuit<F> for AddCircuit<F> {
 }
 // ANCHOR_END: circuit
 
-fn test_prover<C: CurveAffine>(
-    k: u32,
-    circuit: impl Circuit<C::Scalar>,
-    expected: bool,
-    instances: Vec<C::Scalar>,
-) -> Vec<u8>
-where
-    C::Scalar: FromUniformBytes<64>,
-{
-    let rng = test_rng();
+fn test_prover(k: u32, circuit: impl Circuit<Fr>, expected: bool, instances: Vec<Fr>) -> Vec<u8> {
+    // Setup
+    let mut rng = test_rng();
+    let params = ParamsKZG::<Bn256>::setup(k, &mut rng);
+    let vk = keygen_vk(&params, &circuit).expect("keygen_vk should not fail");
+    let pk = keygen_pk(&params, vk.clone(), &circuit).expect("keygen_pk should not fail");
 
-    let params = ParamsIPA::<C>::new(k);
-    let vk = keygen_vk(&params, &circuit).unwrap();
-    let pk = keygen_pk(&params, vk, &circuit).unwrap();
+    let mut transcript = Blake2bWrite::<_, G1Affine, Challenge255<_>>::init(vec![]);
+    create_proof::<KZGCommitmentScheme<Bn256>, ProverSHPLONK<'_, Bn256>, _, _, _, _>(
+        &params,
+        &pk,
+        &[circuit],
+        &[vec![instances.clone()]],
+        &mut rng,
+        &mut transcript,
+    )
+    .expect("proof generation should not fail");
+    let proof = transcript.finalize();
 
-    let instances = vec![vec![instances]];
-    let proof = {
-        let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
+    // Verify
+    let mut verifier_transcript =
+        Blake2bRead::<_, G1Affine, Challenge255<_>>::init(proof.as_slice());
+    let verifier_params = params.verifier_params();
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
-            &params,
-            &pk,
-            &[circuit],
-            &instances,
-            rng,
-            &mut transcript,
-        )
-        .expect("proof generation should not fail");
-
-        transcript.finalize()
-    };
-
-    let accepted = {
-        let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
-
-        verify_proof_multi::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, AccumulatorStrategy<_>>(
-            &params,
-            pk.get_vk(),
-            &instances,
-            &mut transcript,
-        )
-    };
+    let accepted = verify_proof_multi::<
+        KZGCommitmentScheme<Bn256>,
+        VerifierSHPLONK<Bn256>,
+        _,
+        _,
+        SingleStrategy<_>,
+    >(
+        &verifier_params,
+        &vk,
+        &[vec![instances]],
+        &mut verifier_transcript,
+    );
 
     assert_eq!(accepted, expected);
 
@@ -516,8 +509,6 @@ where
 
 #[test]
 fn test_vector_ops_unbinded() {
-    use halo2curves::pasta::Fp;
-
     const N: usize = 10;
     // ANCHOR: test-circuit
     // The number of rows in our circuit cannot exceed 2^k. Since our example
@@ -525,10 +516,10 @@ fn test_vector_ops_unbinded() {
     let k = 7;
 
     // Prepare the inputs to the circuit!
-    let a = [Fp::from(2); N];
-    let b = [Fp::from(3); N];
-    let c_mul: Vec<Fp> = a.iter().zip(b).map(|(&a, b)| a * b).collect();
-    let c_add: Vec<Fp> = a.iter().zip(b).map(|(&a, b)| a + b).collect();
+    let a = [Fr::from(2); N];
+    let b = [Fr::from(3); N];
+    let c_mul: Vec<Fr> = a.iter().zip(b).map(|(&a, b)| a * b).collect();
+    let c_add: Vec<Fr> = a.iter().zip(b).map(|(&a, b)| a + b).collect();
 
     // Instantiate the mul circuit with the inputs.
     let mul_circuit = MulCircuit {
@@ -544,14 +535,14 @@ fn test_vector_ops_unbinded() {
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_1 = halo2_debug::test_result(
-        || test_prover::<halo2curves::pasta::EqAffine>(k, mul_circuit.clone(), true, c_mul.clone()),
-        "8fb24ffebec78e9667e9f9eab6b4b8974d95b5db9023ef78788a08b3daf4b138",
+        || test_prover(k, mul_circuit.clone(), true, c_mul.clone()),
+        "1d0e66c45ff1868d2fa3de6cc4b7aa0f8c9d761929ed26c1307251a33f9c5950",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     let proof_2 = halo2_debug::test_result(
-        || test_prover::<halo2curves::pasta::EqAffine>(k, add_circuit.clone(), true, c_add.clone()),
-        "ded7a6e1f2463fc1bc40311d409af170d57b3e32fe8d60f53403043ae718f4f9",
+        || test_prover(k, add_circuit.clone(), true, c_add.clone()),
+        "4d64c68078008db27906a54ecb25fb8f8b41d85850aeb2db136072baff266f3e",
     );
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily

@@ -121,9 +121,6 @@ pub trait MSM<C: CurveAffine>: Clone + Debug + Send + Sync {
 
 /// Common multi-open prover interface for various commitment schemes
 pub trait Prover<'params, Scheme: CommitmentScheme> {
-    /// Query instance or not
-    const QUERY_INSTANCE: bool;
-
     /// Creates new prover instance
     fn new(params: &'params Scheme::ParamsProver) -> Self;
 
@@ -175,9 +172,6 @@ pub trait Verifier<'params, Scheme: CommitmentScheme> {
 
     /// Accumulator for compressed verification
     type MSMAccumulator;
-
-    /// Query instance or not
-    const QUERY_INSTANCE: bool;
 
     /// Creates new verifier instance
     fn new() -> Self;

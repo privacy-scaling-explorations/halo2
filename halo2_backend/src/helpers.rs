@@ -20,7 +20,6 @@ pub enum SerdeFormat {
     RawBytesUnchecked,
 }
 
-// Keep this trait for compatibility with IPA serialization
 pub trait CurveRead: CurveAffine {
     /// Reads a compressed element from the buffer and attempts to parse it
     /// using `from_bytes`.

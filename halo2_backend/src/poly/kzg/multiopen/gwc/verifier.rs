@@ -35,8 +35,6 @@ where
     type Guard = GuardKZG<E>;
     type MSMAccumulator = DualMSM<E>;
 
-    const QUERY_INSTANCE: bool = false;
-
     fn new() -> Self {
         Self {
             _marker: PhantomData,
