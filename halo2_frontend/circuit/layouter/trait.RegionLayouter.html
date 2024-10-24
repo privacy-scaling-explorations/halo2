@@ -25,7 +25,7 @@
 <span class="item-spacer"></span>    fn <a href="#tymethod.name_column" class="fn">name_column</a>&lt;'v&gt;(
         &amp;'v mut self,
         annotation: &amp;'v (dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.Fn.html" title="trait core::ops::function::Fn">Fn</a>() -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> + 'v),
-        column: <a class="struct" href="../../plonk/circuit/expression/struct.Column.html" title="struct halo2_frontend::plonk::circuit::expression::Column">Column</a>&lt;<a class="enum" href="../../../halo2_middleware/circuit/enum.Any.html" title="enum halo2_middleware::circuit::Any">Any</a>&gt;
+        column: <a class="struct" href="../../plonk/circuit/expression/struct.Column.html" title="struct halo2_frontend::plonk::circuit::expression::Column">Column</a>&lt;Any&gt;
     );
 <span class="item-spacer"></span>    fn <a href="#tymethod.assign_advice" class="fn">assign_advice</a>&lt;'v&gt;(
         &amp;'v mut self,
@@ -100,7 +100,7 @@
 </div></details><details class="toggle method-toggle" open><summary><section id="tymethod.name_column" class="method"><a class="src rightside" href="../../../src/halo2_frontend/circuit/layouter.rs.html#72-76">source</a><h4 class="code-header">fn <a href="#tymethod.name_column" class="fn">name_column</a>&lt;'v&gt;(
     &amp;'v mut self,
     annotation: &amp;'v (dyn <a class="trait" href="https://doc.rust-lang.org/nightly/core/ops/function/trait.Fn.html" title="trait core::ops::function::Fn">Fn</a>() -&gt; <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/string/struct.String.html" title="struct alloc::string::String">String</a> + 'v),
-    column: <a class="struct" href="../../plonk/circuit/expression/struct.Column.html" title="struct halo2_frontend::plonk::circuit::expression::Column">Column</a>&lt;<a class="enum" href="../../../halo2_middleware/circuit/enum.Any.html" title="enum halo2_middleware::circuit::Any">Any</a>&gt;
+    column: <a class="struct" href="../../plonk/circuit/expression/struct.Column.html" title="struct halo2_frontend::plonk::circuit::expression::Column">Column</a>&lt;Any&gt;
 )</h4></section></summary><div class="docblock"><p>Allows the circuit implementor to name/annotate a Column within a Region context.</p>
 <p>This is useful in order to improve the amount of information that <code>prover.verify()</code>
 and <code>prover.assert_satisfied()</code> can provide.</p>

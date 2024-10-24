@@ -298,7 +298,7 @@
 <span class="kw">use </span>halo2_middleware::ff::{Field, PrimeField};
 <span class="kw">use </span>halo2_middleware::zal::impls::H2cEngine;
 
-<span class="kw">use super</span>::{Argument, ProvingKey, VerifyingKey};
+<span class="kw">use super</span>::{ProvingKey, VerifyingKey};
 <span class="kw">use crate</span>::{
     arithmetic::{parallelize, CurveAffine},
     plonk::Error,
@@ -336,7 +336,7 @@
         <span class="prelude-val">Ok</span>(assembly)
     }
 
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(n: usize, p: <span class="kw-2">&amp;</span>Argument) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new(n: usize, p: <span class="kw-2">&amp;</span>ArgumentMid) -&gt; <span class="self">Self </span>{
         <span class="comment">// Initialize the copy vector to keep track of copy constraints in all
         // the permutation arguments.
         </span><span class="kw">let </span><span class="kw-2">mut </span>columns = <span class="macro">vec!</span>[];
@@ -417,7 +417,7 @@
         <span class="self">self</span>,
         params: <span class="kw-2">&amp;</span>P,
         domain: <span class="kw-2">&amp;</span>EvaluationDomain&lt;C::Scalar&gt;,
-        p: <span class="kw-2">&amp;</span>Argument,
+        p: <span class="kw-2">&amp;</span>ArgumentMid,
     ) -&gt; VerifyingKey&lt;C&gt; {
         build_vk(params, domain, p, |i, j| <span class="self">self</span>.mapping[i][j])
     }
@@ -426,7 +426,7 @@
         <span class="self">self</span>,
         params: <span class="kw-2">&amp;</span>P,
         domain: <span class="kw-2">&amp;</span>EvaluationDomain&lt;C::Scalar&gt;,
-        p: <span class="kw-2">&amp;</span>Argument,
+        p: <span class="kw-2">&amp;</span>ArgumentMid,
     ) -&gt; ProvingKey&lt;C&gt; {
         build_pk(params, domain, p, |i, j| <span class="self">self</span>.mapping[i][j])
     }
@@ -435,7 +435,7 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>build_pk&lt;C: CurveAffine, P: Params&lt;C&gt;&gt;(
     params: <span class="kw-2">&amp;</span>P,
     domain: <span class="kw-2">&amp;</span>EvaluationDomain&lt;C::Scalar&gt;,
-    p: <span class="kw-2">&amp;</span>Argument,
+    p: <span class="kw-2">&amp;</span>ArgumentMid,
     mapping: <span class="kw">impl </span>Fn(usize, usize) -&gt; (usize, usize) + Sync,
 ) -&gt; ProvingKey&lt;C&gt; {
     <span class="comment">// Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
@@ -511,7 +511,7 @@
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>build_vk&lt;C: CurveAffine, P: Params&lt;C&gt;&gt;(
     params: <span class="kw-2">&amp;</span>P,
     domain: <span class="kw-2">&amp;</span>EvaluationDomain&lt;C::Scalar&gt;,
-    p: <span class="kw-2">&amp;</span>Argument,
+    p: <span class="kw-2">&amp;</span>ArgumentMid,
     mapping: <span class="kw">impl </span>Fn(usize, usize) -&gt; (usize, usize) + Sync,
 ) -&gt; VerifyingKey&lt;C&gt; {
     <span class="comment">// Compute [omega^0, omega^1, ..., omega^{params.n - 1}]

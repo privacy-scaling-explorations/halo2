@@ -332,17 +332,15 @@
 <a href="#316" id="316">316</a>
 <a href="#317" id="317">317</a>
 <a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>group::{
     ff::{BatchInvert, Field},
     Curve,
 };
-<span class="kw">use </span>halo2_middleware::zal::traits::MsmAccel;
 <span class="kw">use </span>halo2_middleware::{ff::PrimeField, zal::impls::PlonkEngine};
+<span class="kw">use </span>halo2_middleware::{permutation::ArgumentMid, zal::traits::MsmAccel};
 <span class="kw">use </span>rand_core::RngCore;
 <span class="kw">use </span>std::iter::{<span class="self">self</span>, ExactSizeIterator};
 
-<span class="kw">use </span><span class="kw">super</span>::Argument;
 <span class="kw">use crate</span>::{
     arithmetic::{eval_polynomial, parallelize, CurveAffine},
     plonk::{<span class="self">self</span>, permutation::ProvingKey, ChallengeBeta, ChallengeGamma, ChallengeX, Error},
@@ -397,7 +395,7 @@
     M: MsmAccel&lt;C&gt;,
 &gt;(
     engine: <span class="kw-2">&amp;</span>PlonkEngine&lt;C, M&gt;,
-    arg: <span class="kw-2">&amp;</span>Argument,
+    arg: <span class="kw-2">&amp;</span>ArgumentMid,
     params: <span class="kw-2">&amp;</span>P,
     pk: <span class="kw-2">&amp;</span>plonk::ProvingKey&lt;C&gt;,
     pkey: <span class="kw-2">&amp;</span>ProvingKey&lt;C&gt;,

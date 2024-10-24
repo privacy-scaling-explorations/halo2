@@ -423,24 +423,18 @@
 <a href="#407" id="407">407</a>
 <a href="#408" id="408">408</a>
 <a href="#409" id="409">409</a>
-<a href="#410" id="410">410</a>
-<a href="#411" id="411">411</a>
-<a href="#412" id="412">412</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>group::ff::Field;
 <span class="kw">use </span>halo2_middleware::circuit::{Any, ChallengeMid, ColumnMid, Gate};
 <span class="kw">use </span>halo2_middleware::expression::{Expression, Variable};
 <span class="kw">use </span>halo2_middleware::poly::Rotation;
 <span class="kw">use </span>halo2_middleware::{lookup, permutation::ArgumentMid, shuffle};
 
-<span class="comment">// TODO: Reuse ColumnMid inside this.
-</span><span class="attr">#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+<span class="attr">#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 </span><span class="kw">pub struct </span>QueryBack {
     <span class="doccomment">/// Query index
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) index: usize,
-    <span class="doccomment">/// Column index
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) column_index: usize,
-    <span class="doccomment">/// The type of the column.
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) column_type: Any,
+    <span class="doccomment">/// Column
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) column: ColumnMid,
     <span class="doccomment">/// Rotation of this query
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) rotation: Rotation,
 }

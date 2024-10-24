@@ -949,7 +949,7 @@
                             gate.poly.evaluate(
                                 <span class="kw-2">&amp;</span>|scalar| scalar,
                                 <span class="kw-2">&amp;</span>|var| <span class="kw">match </span>var {
-                                    VarBack::Query(query) =&gt; <span class="kw">match </span>query.column_type {
+                                    VarBack::Query(query) =&gt; <span class="kw">match </span>query.column.column_type {
                                         Any::Fixed =&gt; fixed_evals[query.index],
                                         Any::Advice =&gt; advice_evals[query.index],
                                         Any::Instance =&gt; instance_evals[query.index],

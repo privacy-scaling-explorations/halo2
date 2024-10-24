@@ -615,13 +615,6 @@
 <a href="#599" id="599">599</a>
 <a href="#600" id="600">600</a>
 <a href="#601" id="601">601</a>
-<a href="#602" id="602">602</a>
-<a href="#603" id="603">603</a>
-<a href="#604" id="604">604</a>
-<a href="#605" id="605">605</a>
-<a href="#606" id="606">606</a>
-<a href="#607" id="607">607</a>
-<a href="#608" id="608">608</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Contains utilities for performing polynomial arithmetic over an evaluation
 //! domain that is of a suitable size for the application.
 
@@ -952,7 +945,6 @@
     ///
     /// This function will panic if the provided vector is not the correct
     /// length.
-    </span><span class="comment">// TODO/FIXME: caller should be responsible for truncating
     </span><span class="kw">pub fn </span>extended_to_coeff(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>a: Polynomial&lt;F, ExtendedLagrangeCoeff&gt;) -&gt; Vec&lt;F&gt; {
         <span class="macro">assert_eq!</span>(a.values.len(), <span class="self">self</span>.extended_len());
 
@@ -967,12 +959,6 @@
         <span class="comment">// Distribute powers to move from coset; opposite from the
         // transformation we performed earlier.
         </span><span class="self">self</span>.distribute_powers_zeta(<span class="kw-2">&amp;mut </span>a.values, <span class="bool-val">false</span>);
-
-        <span class="comment">// Truncate it to match the size of the quotient polynomial; the
-        // evaluation domain might be slightly larger than necessary because
-        // it always lies on a power-of-two boundary.
-        </span>a.values
-            .truncate((<span class="self">self</span>.n * <span class="self">self</span>.quotient_poly_degree) <span class="kw">as </span>usize);
 
         a.values
     }

@@ -1064,6 +1064,16 @@
 <a href="#1048" id="1048">1048</a>
 <a href="#1049" id="1049">1049</a>
 <a href="#1050" id="1050">1050</a>
+<a href="#1051" id="1051">1051</a>
+<a href="#1052" id="1052">1052</a>
+<a href="#1053" id="1053">1053</a>
+<a href="#1054" id="1054">1054</a>
+<a href="#1055" id="1055">1055</a>
+<a href="#1056" id="1056">1056</a>
+<a href="#1057" id="1057">1057</a>
+<a href="#1058" id="1058">1058</a>
+<a href="#1059" id="1059">1059</a>
+<a href="#1060" id="1060">1060</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module:
 //! - Evaluates the h polynomial: Evaluator::new(ConstraintSystem).evaluate_h(...)
 //! - Evaluates an Expression using Lagrange basis
@@ -1767,17 +1777,17 @@
             ExpressionBack::Constant(scalar) =&gt; <span class="self">self</span>.add_constant(scalar),
             ExpressionBack::Var(VarBack::Query(query)) =&gt; {
                 <span class="kw">let </span>rot_idx = <span class="self">self</span>.add_rotation(<span class="kw-2">&amp;</span>query.rotation);
-                <span class="kw">match </span>query.column_type {
+                <span class="kw">match </span>query.column.column_type {
                     Any::Fixed =&gt; <span class="self">self</span>.add_calculation(Calculation::Store(ValueSource::Fixed(
-                        query.column_index,
+                        query.column.index,
                         rot_idx,
                     ))),
                     Any::Advice =&gt; <span class="self">self</span>.add_calculation(Calculation::Store(ValueSource::Advice(
-                        query.column_index,
+                        query.column.index,
                         rot_idx,
                     ))),
                     Any::Instance =&gt; <span class="self">self</span>.add_calculation(Calculation::Store(
-                        ValueSource::Instance(query.column_index, rot_idx),
+                        ValueSource::Instance(query.column.index, rot_idx),
                     )),
                 }
             }
@@ -1929,10 +1939,10 @@
                     VarBack::Challenge(challenge) =&gt; challenges[challenge.index()],
                     VarBack::Query(query) =&gt; {
                         <span class="kw">let </span>rot_idx = get_rotation_idx(idx, query.rotation.<span class="number">0</span>, rot_scale, isize);
-                        <span class="kw">match </span>query.column_type {
-                            Any::Fixed =&gt; fixed[query.column_index][rot_idx],
-                            Any::Advice =&gt; advice[query.column_index][rot_idx],
-                            Any::Instance =&gt; instance[query.column_index][rot_idx],
+                        <span class="kw">match </span>query.column.column_type {
+                            Any::Fixed =&gt; fixed[query.column.index][rot_idx],
+                            Any::Advice =&gt; advice[query.column.index][rot_idx],
+                            Any::Instance =&gt; instance[query.column.index][rot_idx],
                         }
                     }
                 },
@@ -1949,7 +1959,7 @@
 </span><span class="kw">mod </span>test {
     <span class="kw">use </span><span class="kw">crate</span>::plonk::circuit::{ExpressionBack, QueryBack, VarBack};
     <span class="kw">use </span><span class="kw">crate</span>::poly::LagrangeCoeff;
-    <span class="kw">use </span>halo2_middleware::circuit::{Any, ChallengeMid};
+    <span class="kw">use </span>halo2_middleware::circuit::{Any, ChallengeMid, ColumnMid};
     <span class="kw">use </span>halo2_middleware::poly::Rotation;
     <span class="kw">use </span>halo2curves::pasta::pallas::{Affine, Scalar};
 
@@ -2020,8 +2030,10 @@
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: <span class="number">0</span>,
-                    column_index: col,
-                    column_type: Any::Fixed,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Fixed,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -2031,8 +2043,10 @@
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: <span class="number">0</span>,
-                    column_index: col,
-                    column_type: Any::Advice,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Advice,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -2042,8 +2056,10 @@
             check_expr(
                 ExpressionBack::Var(Query(QueryBack {
                     index: <span class="number">0</span>,
-                    column_index: col,
-                    column_type: Any::Instance,
+                    column: ColumnMid {
+                        index: col,
+                        column_type: Any::Instance,
+                    },
                     rotation: Rotation(rot),
                 })),
                 expected,
@@ -2073,8 +2089,10 @@
         </span><span class="kw">let </span>two = || {
             Box::new(ExpressionBack::&lt;Scalar&gt;::Var(Query(QueryBack {
                 index: <span class="number">0</span>,
-                column_index: <span class="number">0</span>,
-                column_type: Any::Fixed,
+                column: ColumnMid {
+                    index: <span class="number">0</span>,
+                    column_type: Any::Fixed,
+                },
                 rotation: Rotation(<span class="number">0</span>),
             })))
         };
@@ -2082,8 +2100,10 @@
         <span class="kw">let </span>three = || {
             Box::new(ExpressionBack::&lt;Scalar&gt;::Var(Query(QueryBack {
                 index: <span class="number">0</span>,
-                column_index: <span class="number">0</span>,
-                column_type: Any::Fixed,
+                column: ColumnMid {
+                    index: <span class="number">0</span>,
+                    column_type: Any::Fixed,
+                },
                 rotation: Rotation(<span class="number">1</span>),
             })))
         };

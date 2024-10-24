@@ -347,13 +347,13 @@
                             <span class="kw-2">&amp;</span>|scalar| scalar,
                             <span class="kw-2">&amp;</span>|var| <span class="kw">match </span>var {
                                 VarBack::Challenge(challenge) =&gt; challenges[challenge.index],
-                                VarBack::Query(QueryBack {
-                                    index, column_type, ..
-                                }) =&gt; <span class="kw">match </span>column_type {
-                                    Any::Fixed =&gt; fixed_evals[index],
-                                    Any::Advice =&gt; advice_evals[index],
-                                    Any::Instance =&gt; instance_evals[index],
-                                },
+                                VarBack::Query(QueryBack { index, column, .. }) =&gt; {
+                                    <span class="kw">match </span>column.column_type {
+                                        Any::Fixed =&gt; fixed_evals[index],
+                                        Any::Advice =&gt; advice_evals[index],
+                                        Any::Instance =&gt; instance_evals[index],
+                                    }
+                                }
                             },
                             <span class="kw-2">&amp;</span>|a| -a,
                             <span class="kw-2">&amp;</span>|a, b| a + b,

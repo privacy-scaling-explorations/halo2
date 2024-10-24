@@ -399,6 +399,8 @@
 <a href="#383" id="383">383</a>
 <a href="#384" id="384">384</a>
 <a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This module
 //! - creates the proving and verifying keys for a circuit
 //! - crates a domain, constraint system, and configuration for a circuit
@@ -619,8 +621,10 @@
                 <span class="kw">let </span>index = <span class="self">self</span>.add(column, query.rotation);
                 ExpressionBack::Var(VarBack::Query(QueryBack {
                     index,
-                    column_index: query.column_index,
-                    column_type: query.column_type,
+                    column: ColumnMid {
+                        index: query.column_index,
+                        column_type: query.column_type,
+                    },
                     rotation: query.rotation,
                 }))
             }

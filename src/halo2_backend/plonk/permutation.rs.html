@@ -114,7 +114,6 @@
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
 <a href="#100" id="100">100</a>
-<a href="#101" id="101">101</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Verifying/Proving key of a permutation argument, with its serialization.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::helpers::{SerdeCurveAffine, SerdeFormat, SerdePrimeField};
@@ -123,8 +122,7 @@
     helpers::{polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice},
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
 };
-<span class="comment">// TODO: Remove the renaming
-</span><span class="kw">pub use </span>halo2_middleware::permutation::ArgumentMid <span class="kw">as </span>Argument;
+<span class="kw">pub use </span>halo2_middleware::permutation::ArgumentMid;
 
 <span class="kw">use </span>std::io;
 
@@ -151,7 +149,7 @@
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>read&lt;R: io::Read&gt;(
         reader: <span class="kw-2">&amp;mut </span>R,
-        argument: <span class="kw-2">&amp;</span>Argument,
+        argument: <span class="kw-2">&amp;</span>ArgumentMid,
         format: SerdeFormat,
     ) -&gt; io::Result&lt;<span class="self">Self</span>&gt;
     <span class="kw">where
