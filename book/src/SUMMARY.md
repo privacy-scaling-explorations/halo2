@@ -43,4 +43,5 @@
   - [Polynomials](background/polynomials.md)
   - [Cryptographic groups](background/groups.md)
   - [Elliptic curves](background/curves.md)
+  - [Polynomial commitment using inner product argument](background/pc-ipa.md)
   - [Recursion](background/recursion.md)
