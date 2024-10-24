@@ -1639,7 +1639,7 @@
                 </span>parallelize(<span class="kw-2">&amp;mut </span>values, |values, start| {
                     <span class="kw">let </span>input_evaluator = <span class="kw-2">&amp;</span><span class="self">self</span>.shuffles[<span class="number">2 </span>* n];
                     <span class="kw">let </span>shuffle_evaluator = <span class="kw-2">&amp;</span><span class="self">self</span>.shuffles[<span class="number">2 </span>* n + <span class="number">1</span>];
-                    <span class="kw">let </span><span class="kw-2">mut </span>eval_data_input = shuffle_evaluator.instance();
+                    <span class="kw">let </span><span class="kw-2">mut </span>eval_data_input = input_evaluator.instance();
                     <span class="kw">let </span><span class="kw-2">mut </span>eval_data_shuffle = shuffle_evaluator.instance();
                     <span class="kw">for </span>(i, value) <span class="kw">in </span>values.iter_mut().enumerate() {
                         <span class="kw">let </span>idx = start + i;
