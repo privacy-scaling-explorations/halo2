@@ -271,12 +271,6 @@
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
 <a href="#257" id="257">257</a>
-<a href="#258" id="258">258</a>
-<a href="#259" id="259">259</a>
-<a href="#260" id="260">260</a>
-<a href="#261" id="261">261</a>
-<a href="#262" id="262">262</a>
-<a href="#263" id="263">263</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::{
     query::{ProverQuery, VerifierQuery},
     strategy::Guard,
@@ -400,9 +394,6 @@
 
 <span class="doccomment">/// Common multi-open prover interface for various commitment schemes
 </span><span class="kw">pub trait </span>Prover&lt;<span class="lifetime">'params</span>, Scheme: CommitmentScheme&gt; {
-    <span class="doccomment">/// Query instance or not
-    </span><span class="kw">const </span>QUERY_INSTANCE: bool;
-
     <span class="doccomment">/// Creates new prover instance
     </span><span class="kw">fn </span>new(params: <span class="kw-2">&amp;</span><span class="lifetime">'params </span>Scheme::ParamsProver) -&gt; <span class="self">Self</span>;
 
@@ -454,9 +445,6 @@
 
     <span class="doccomment">/// Accumulator for compressed verification
     </span><span class="kw">type </span>MSMAccumulator;
-
-    <span class="doccomment">/// Query instance or not
-    </span><span class="kw">const </span>QUERY_INSTANCE: bool;
 
     <span class="doccomment">/// Creates new verifier instance
     </span><span class="kw">fn </span>new() -&gt; <span class="self">Self</span>;

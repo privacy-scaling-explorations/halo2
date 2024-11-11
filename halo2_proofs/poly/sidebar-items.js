@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["commitment","ipa","kzg"],"struct":["EvaluationDomain","Rotation"],"trait":["VerificationStrategy"]};
+window.SIDEBAR_ITEMS = {"mod":["commitment","kzg"],"struct":["EvaluationDomain","Rotation"],"trait":["VerificationStrategy"]};

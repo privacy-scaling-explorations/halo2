@@ -491,21 +491,6 @@
 <a href="#475" id="475">475</a>
 <a href="#476" id="476">476</a>
 <a href="#477" id="477">477</a>
-<a href="#478" id="478">478</a>
-<a href="#479" id="479">479</a>
-<a href="#480" id="480">480</a>
-<a href="#481" id="481">481</a>
-<a href="#482" id="482">482</a>
-<a href="#483" id="483">483</a>
-<a href="#484" id="484">484</a>
-<a href="#485" id="485">485</a>
-<a href="#486" id="486">486</a>
-<a href="#487" id="487">487</a>
-<a href="#488" id="488">488</a>
-<a href="#489" id="489">489</a>
-<a href="#490" id="490">490</a>
-<a href="#491" id="491">491</a>
-<a href="#492" id="492">492</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::<span class="kw">super</span>::ProvingKey;
 <span class="kw">use </span><span class="kw">super</span>::Argument;
 <span class="kw">use </span><span class="kw">crate</span>::plonk::evaluation::evaluate;
@@ -538,21 +523,16 @@
     compressed_input_expression: Polynomial&lt;C::Scalar, LagrangeCoeff&gt;,
     permuted_input_expression: Polynomial&lt;C::Scalar, LagrangeCoeff&gt;,
     permuted_input_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
-    permuted_input_blind: Blind&lt;C::Scalar&gt;,
     compressed_table_expression: Polynomial&lt;C::Scalar, LagrangeCoeff&gt;,
     permuted_table_expression: Polynomial&lt;C::Scalar, LagrangeCoeff&gt;,
     permuted_table_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
-    permuted_table_blind: Blind&lt;C::Scalar&gt;,
 }
 
 <span class="attr">#[derive(Debug)]
 </span><span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plonk) <span class="kw">struct </span>Committed&lt;C: CurveAffine&gt; {
     <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plonk) permuted_input_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
-    permuted_input_blind: Blind&lt;C::Scalar&gt;,
     <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plonk) permuted_table_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
-    permuted_table_blind: Blind&lt;C::Scalar&gt;,
     <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plonk) product_poly: Polynomial&lt;C::Scalar, Coeff&gt;,
-    product_blind: Blind&lt;C::Scalar&gt;,
 }
 
 <span class="kw">pub</span>(<span class="kw">in </span><span class="kw">crate</span>::plonk) <span class="kw">struct </span>Evaluated&lt;C: CurveAffine&gt; {
@@ -638,15 +618,15 @@
         <span class="kw">let </span>poly = pk.vk.domain.lagrange_to_coeff(values.clone());
         <span class="kw">let </span>blind = Blind(C::Scalar::random(<span class="kw-2">&amp;mut </span>rng));
         <span class="kw">let </span>commitment = params.commit_lagrange(<span class="kw-2">&amp;</span>engine.msm_backend, values, blind);
-        (poly, blind, commitment)
+        (poly, commitment)
     };
 
     <span class="comment">// Commit to permuted input expression
-    </span><span class="kw">let </span>(permuted_input_poly, permuted_input_blind, permuted_input_commitment_projective) =
+    </span><span class="kw">let </span>(permuted_input_poly, permuted_input_commitment_projective) =
         commit_values(<span class="kw-2">&amp;</span>permuted_input_expression);
 
     <span class="comment">// Commit to permuted table expression
-    </span><span class="kw">let </span>(permuted_table_poly, permuted_table_blind, permuted_table_commitment_projective) =
+    </span><span class="kw">let </span>(permuted_table_poly, permuted_table_commitment_projective) =
         commit_values(<span class="kw-2">&amp;</span>permuted_table_expression);
 
     <span class="kw">let </span>[permuted_input_commitment, permuted_table_commitment] = {
@@ -671,11 +651,9 @@
         compressed_input_expression,
         permuted_input_expression,
         permuted_input_poly,
-        permuted_input_blind,
         compressed_table_expression,
         permuted_table_expression,
         permuted_table_poly,
-        permuted_table_blind,
     })
 }
 
@@ -821,11 +799,8 @@
 
         <span class="prelude-val">Ok</span>(Committed::&lt;C&gt; {
             permuted_input_poly: <span class="self">self</span>.permuted_input_poly,
-            permuted_input_blind: <span class="self">self</span>.permuted_input_blind,
             permuted_table_poly: <span class="self">self</span>.permuted_table_poly,
-            permuted_table_blind: <span class="self">self</span>.permuted_table_blind,
             product_poly: z,
-            product_blind,
         })
     }
 }
@@ -876,31 +851,26 @@
             </span>.chain(<span class="prelude-val">Some</span>(ProverQuery {
                 point: <span class="kw-2">*</span>x,
                 poly: <span class="kw-2">&amp;</span><span class="self">self</span>.constructed.product_poly,
-                blind: <span class="self">self</span>.constructed.product_blind,
             }))
             <span class="comment">// Open lookup input commitments at x
             </span>.chain(<span class="prelude-val">Some</span>(ProverQuery {
                 point: <span class="kw-2">*</span>x,
                 poly: <span class="kw-2">&amp;</span><span class="self">self</span>.constructed.permuted_input_poly,
-                blind: <span class="self">self</span>.constructed.permuted_input_blind,
             }))
             <span class="comment">// Open lookup table commitments at x
             </span>.chain(<span class="prelude-val">Some</span>(ProverQuery {
                 point: <span class="kw-2">*</span>x,
                 poly: <span class="kw-2">&amp;</span><span class="self">self</span>.constructed.permuted_table_poly,
-                blind: <span class="self">self</span>.constructed.permuted_table_blind,
             }))
             <span class="comment">// Open lookup input commitments at x_inv
             </span>.chain(<span class="prelude-val">Some</span>(ProverQuery {
                 point: x_inv,
                 poly: <span class="kw-2">&amp;</span><span class="self">self</span>.constructed.permuted_input_poly,
-                blind: <span class="self">self</span>.constructed.permuted_input_blind,
             }))
             <span class="comment">// Open lookup product commitments at x_next
             </span>.chain(<span class="prelude-val">Some</span>(ProverQuery {
                 point: x_next,
                 poly: <span class="kw-2">&amp;</span><span class="self">self</span>.constructed.product_poly,
-                blind: <span class="self">self</span>.constructed.product_blind,
             }))
     }
 }

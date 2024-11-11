@@ -168,12 +168,6 @@
 <a href="#152" id="152">152</a>
 <a href="#153" id="153">153</a>
 <a href="#154" id="154">154</a>
-<a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
-<a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::fmt::Debug;
 
 <span class="kw">use </span><span class="kw">super</span>::commitment::{Blind, MSM};
@@ -199,8 +193,6 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) point: C::Scalar,
     <span class="doccomment">/// Coefficients of polynomial
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) poly: <span class="kw-2">&amp;</span><span class="lifetime">'com </span>Polynomial&lt;C::Scalar, Coeff&gt;,
-    <span class="doccomment">/// Blinding factor of polynomial
-    </span><span class="kw">pub</span>(<span class="kw">crate</span>) blind: Blind&lt;C::Scalar&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'com</span>, C&gt; ProverQuery&lt;<span class="lifetime">'com</span>, C&gt;
@@ -211,9 +203,9 @@
     </span><span class="kw">pub fn </span>new(
         point: C::Scalar,
         poly: <span class="kw-2">&amp;</span><span class="lifetime">'com </span>Polynomial&lt;C::Scalar, Coeff&gt;,
-        blind: Blind&lt;C::Scalar&gt;,
+        _blind: Blind&lt;C::Scalar&gt;,
     ) -&gt; <span class="self">Self </span>{
-        ProverQuery { point, poly, blind }
+        ProverQuery { point, poly }
     }
 }
 
@@ -221,7 +213,6 @@
 #[derive(Copy, Clone)]
 </span><span class="kw">pub struct </span>PolynomialPointer&lt;<span class="lifetime">'com</span>, C: CurveAffine&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) poly: <span class="kw-2">&amp;</span><span class="lifetime">'com </span>Polynomial&lt;C::Scalar, Coeff&gt;,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) blind: Blind&lt;C::Scalar&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'com</span>, C: CurveAffine&gt; PartialEq <span class="kw">for </span>PolynomialPointer&lt;<span class="lifetime">'com</span>, C&gt; {
@@ -241,10 +232,7 @@
         eval_polynomial(<span class="kw-2">&amp;</span><span class="self">self</span>.poly[..], <span class="self">self</span>.get_point())
     }
     <span class="kw">fn </span>get_commitment(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::Commitment {
-        PolynomialPointer {
-            poly: <span class="self">self</span>.poly,
-            blind: <span class="self">self</span>.blind,
-        }
+        PolynomialPointer { poly: <span class="self">self</span>.poly }
     }
 }
 

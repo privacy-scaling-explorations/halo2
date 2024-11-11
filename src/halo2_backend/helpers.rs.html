@@ -149,7 +149,6 @@
 <a href="#133" id="133">133</a>
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>halo2_middleware::ff::PrimeField;
 <span class="kw">use </span>halo2curves::{serde::SerdeObject, CurveAffine};
 <span class="kw">use </span>std::io;
@@ -172,8 +171,7 @@
     </span>RawBytesUnchecked,
 }
 
-<span class="comment">// Keep this trait for compatibility with IPA serialization
-</span><span class="kw">pub trait </span>CurveRead: CurveAffine {
+<span class="kw">pub trait </span>CurveRead: CurveAffine {
     <span class="doccomment">/// Reads a compressed element from the buffer and attempts to parse it
     /// using `from_bytes`.
     </span><span class="kw">fn </span>read&lt;R: io::Read&gt;(reader: <span class="kw-2">&amp;mut </span>R) -&gt; io::Result&lt;<span class="self">Self</span>&gt; {
