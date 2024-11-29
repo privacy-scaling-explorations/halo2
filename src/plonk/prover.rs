@@ -11,8 +11,8 @@ use super::{
         Advice, Any, Assignment, Challenge, Circuit, Column, ConstraintSystem, Fixed, FloorPlanner,
         Instance, Selector,
     },
-    lookup, permutation, shuffle, vanishing, ChallengeBeta, ChallengeGamma, ChallengeTheta,
-    ChallengeX, ChallengeY, Error, ProvingKey,
+    lookup, permutation, vanishing, ChallengeBeta, ChallengeGamma, ChallengeTheta, ChallengeX,
+    ChallengeY, Error, ProvingKey,
 };
 
 use crate::{
@@ -488,34 +488,6 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let shuffles: Vec<Vec<shuffle::prover::Committed<Scheme::Curve>>> = instance
-        .iter()
-        .zip(advice.iter())
-        .map(|(instance, advice)| -> Result<Vec<_>, _> {
-            // Compress expressions for each shuffle
-            pk.vk
-                .cs
-                .shuffles
-                .iter()
-                .map(|shuffle| {
-                    shuffle.commit_product(
-                        pk,
-                        params,
-                        domain,
-                        theta,
-                        gamma,
-                        &advice.advice_polys,
-                        &pk.fixed_values,
-                        &instance.instance_values,
-                        &challenges,
-                        &mut rng,
-                        transcript,
-                    )
-                })
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
     // Commit to the vanishing argument's random polynomial for blinding h(x_3)
     let vanishing = vanishing::Argument::commit(params, domain, &mut rng, transcript)?;
 
@@ -558,7 +530,6 @@ where
         *gamma,
         *theta,
         &lookups,
-        &shuffles,
         &permutations,
     );
 
@@ -646,24 +617,12 @@ where
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    // Evaluate the shuffles, if any, at omega^i x.
-    let shuffles: Vec<Vec<shuffle::prover::Evaluated<Scheme::Curve>>> = shuffles
-        .into_iter()
-        .map(|shuffles| -> Result<Vec<_>, _> {
-            shuffles
-                .into_iter()
-                .map(|p| p.evaluate(pk, x, transcript))
-                .collect::<Result<Vec<_>, _>>()
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
     let instances = instance
         .iter()
         .zip(advice.iter())
         .zip(permutations.iter())
         .zip(lookups.iter())
-        .zip(shuffles.iter())
-        .flat_map(|((((instance, advice), permutation), lookups), shuffles)| {
+        .flat_map(|(((instance, advice), permutation), lookups)| {
             iter::empty()
                 .chain(
                     P::QUERY_INSTANCE
@@ -690,7 +649,6 @@ where
                 )
                 .chain(permutation.open(pk, x))
                 .chain(lookups.iter().flat_map(move |p| p.open(pk, x)))
-                .chain(shuffles.iter().flat_map(move |p| p.open(pk, x)))
         })
         .chain(
             pk.vk

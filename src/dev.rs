@@ -1050,66 +1050,6 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                         .collect::<Vec<_>>()
                 });
 
-        let shuffle_errors =
-            self.cs
-                .shuffles
-                .iter()
-                .enumerate()
-                .flat_map(|(shuffle_index, shuffle)| {
-                    assert!(shuffle.shuffle_expressions.len() == shuffle.input_expressions.len());
-                    assert!(self.usable_rows.end > 0);
-
-                    let mut shuffle_rows: Vec<Vec<Value<F>>> = self
-                        .usable_rows
-                        .clone()
-                        .map(|row| {
-                            let t = shuffle
-                                .shuffle_expressions
-                                .iter()
-                                .map(move |c| load(c, row))
-                                .collect();
-                            t
-                        })
-                        .collect();
-                    shuffle_rows.sort();
-
-                    let mut input_rows: Vec<(Vec<Value<F>>, usize)> = self
-                        .usable_rows
-                        .clone()
-                        .map(|input_row| {
-                            let t = shuffle
-                                .input_expressions
-                                .iter()
-                                .map(move |c| load(c, input_row))
-                                .collect();
-
-                            (t, input_row)
-                        })
-                        .collect();
-                    input_rows.sort();
-
-                    input_rows
-                        .iter()
-                        .zip(shuffle_rows.iter())
-                        .filter_map(|((input_value, row), shuffle_value)| {
-                            if shuffle_value != input_value {
-                                Some(VerifyFailure::Shuffle {
-                                    name: shuffle.name.clone(),
-                                    shuffle_index,
-                                    location: FailureLocation::find_expressions(
-                                        &self.cs,
-                                        &self.regions,
-                                        *row,
-                                        shuffle.input_expressions.iter(),
-                                    ),
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                });
-
         let mapping = self.permutation.mapping();
         // Check that permutations preserve the original values of the cells.
         let perm_errors = {
@@ -1163,7 +1103,6 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
             .chain(gate_errors)
             .chain(lookup_errors)
             .chain(perm_errors)
-            .chain(shuffle_errors)
             .collect();
         if errors.is_empty() {
             Ok(())
