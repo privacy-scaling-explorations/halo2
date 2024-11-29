@@ -1,3 +1,6 @@
+//! HELPER FUNCTIONS
+//! TODO: CHECK IF WE ACTUALLY WANT TO EXPOSE THIS
+
 use crate::poly::Polynomial;
 use ff::PrimeField;
 use halo2curves::{serde::SerdeObject, CurveAffine};
@@ -32,6 +35,7 @@ pub(crate) trait CurveRead: CurveAffine {
 }
 impl<C: CurveAffine> CurveRead for C {}
 
+/// Trait for serialising SerdeObjects
 pub trait SerdeCurveAffine: CurveAffine + SerdeObject {
     /// Reads an element from the buffer and parses it according to the `format`:
     /// - `Processed`: Reads a compressed curve element and decompress it
@@ -66,6 +70,7 @@ pub trait SerdeCurveAffine: CurveAffine + SerdeObject {
 }
 impl<C: CurveAffine + SerdeObject> SerdeCurveAffine for C {}
 
+/// Trait for implementing field SerdeObjects
 pub trait SerdePrimeField: PrimeField + SerdeObject {
     /// Reads a field element as bytes from the buffer according to the `format`:
     /// - `Processed`: Reads a field element in standard form, with endianness specified by the

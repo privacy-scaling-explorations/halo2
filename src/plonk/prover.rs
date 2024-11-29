@@ -630,7 +630,6 @@ where
                             ProverQuery {
                                 point: domain.rotate_omega(*x, at),
                                 poly: &instance.instance_polys[column.index()],
-                                blind: Blind::default(),
                             }
                         }))
                         .into_iter()
@@ -644,7 +643,6 @@ where
                         .map(move |&(column, at)| ProverQuery {
                             point: domain.rotate_omega(*x, at),
                             poly: &advice.advice_polys[column.index()],
-                            blind: advice.advice_blinds[column.index()],
                         }),
                 )
                 .chain(permutation.open(pk, x))
@@ -658,7 +656,6 @@ where
                 .map(|&(column, at)| ProverQuery {
                     point: domain.rotate_omega(*x, at),
                     poly: &pk.fixed_polys[column.index()],
-                    blind: Blind::default(),
                 }),
         )
         .chain(pk.permutation.open(x))

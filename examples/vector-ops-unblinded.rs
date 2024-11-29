@@ -3,24 +3,22 @@
 /// This is a simple example of how to use unblinded inputs to match up circuits that might be proved on different host machines.
 use std::marker::PhantomData;
 
-use ff::FromUniformBytes;
+use ff::{FromUniformBytes, WithSmallOrderMulGroup};
+use halo2_proofs::arithmetic::CurveExt;
+use halo2_proofs::helpers::SerdeCurveAffine;
+use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+use halo2_proofs::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::*,
-    poly::{
-        commitment::ParamsProver,
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsIPA},
-            multiopen::{ProverIPA, VerifierIPA},
-            strategy::AccumulatorStrategy,
-        },
-        Rotation, VerificationStrategy,
-    },
+    poly::{commitment::ParamsProver, Rotation, VerificationStrategy},
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
     },
 };
+use halo2curves::pairing::{Engine, MultiMillerLoop};
 use rand_core::OsRng;
 
 // ANCHOR: instructions
@@ -466,23 +464,26 @@ impl<F: Field> Circuit<F> for AddCircuit<F> {
 }
 // ANCHOR_END: circuit
 
-fn test_prover<C: CurveAffine>(
+fn test_prover<E: Engine + MultiMillerLoop>(
     k: u32,
-    circuit: impl Circuit<C::Scalar>,
+    circuit: impl Circuit<E::Fr>,
     expected: bool,
-    instances: Vec<C::Scalar>,
+    instances: Vec<E::Fr>,
 ) -> Vec<u8>
 where
-    C::Scalar: FromUniformBytes<64>,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
+    E::G1: CurveExt<AffineExt = E::G1Affine>,
+    E::G2Affine: SerdeCurveAffine,
+    E::Fr: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
 {
-    let params = ParamsIPA::<C>::new(k);
+    let params = ParamsKZG::<E>::new(k);
     let vk = keygen_vk(&params, &circuit).unwrap();
     let pk = keygen_pk(&params, vk, &circuit).unwrap();
 
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
+        create_proof::<KZGCommitmentScheme<E>, ProverGWC<E>, _, _, _, _>(
             &params,
             &pk,
             &[circuit],
@@ -499,14 +500,19 @@ where
         let strategy = AccumulatorStrategy::new(&params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _>(
+        verify_proof::<KZGCommitmentScheme<E>, VerifierGWC<E>, _, _, AccumulatorStrategy<E>>(
             &params,
             pk.get_vk(),
             strategy,
             &[&[&instances]],
             &mut transcript,
         )
-        .map(|strategy| strategy.finalize())
+        .map(|strategy| {
+            <AccumulatorStrategy<E> as VerificationStrategy<
+                KZGCommitmentScheme<E>,
+                VerifierGWC<E>,
+            >>::finalize(strategy)
+        })
         .unwrap_or_default()
     };
 
@@ -516,8 +522,7 @@ where
 }
 
 fn main() {
-    use halo2curves::pasta::Fp;
-
+    use halo2curves::bn256::Fr;
     const N: usize = 10;
     // ANCHOR: test-circuit
     // The number of rows in our circuit cannot exceed 2^k. Since our example
@@ -525,10 +530,10 @@ fn main() {
     let k = 7;
 
     // Prepare the inputs to the circuit!
-    let a = [Fp::from(2); N];
-    let b = [Fp::from(3); N];
-    let c_mul: Vec<Fp> = a.iter().zip(b).map(|(&a, b)| a * b).collect();
-    let c_add: Vec<Fp> = a.iter().zip(b).map(|(&a, b)| a + b).collect();
+    let a = [Fr::from(2); N];
+    let b = [Fr::from(3); N];
+    let c_mul: Vec<Fr> = a.iter().zip(b).map(|(&a, b)| a * b).collect();
+    let c_add: Vec<Fr> = a.iter().zip(b).map(|(&a, b)| a + b).collect();
 
     // Instantiate the mul circuit with the inputs.
     let mul_circuit = MulCircuit {
@@ -543,9 +548,9 @@ fn main() {
     };
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
-    let proof_1 = test_prover::<halo2curves::pasta::EqAffine>(k, mul_circuit, true, c_mul);
+    let proof_1 = test_prover::<halo2curves::bn256::Bn256>(k, mul_circuit, true, c_mul);
     // the commitments will be the first columns of the proof transcript so we can compare them easily
-    let proof_2 = test_prover::<halo2curves::pasta::EqAffine>(k, add_circuit, true, c_add);
+    let proof_2 = test_prover::<halo2curves::bn256::Bn256>(k, add_circuit, true, c_add);
 
     // the commitments will be the first columns of the proof transcript so we can compare them easily
     // here we compare the first 10 bytes of the commitments

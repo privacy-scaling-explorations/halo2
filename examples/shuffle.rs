@@ -1,23 +1,21 @@
-use ff::{BatchInvert, FromUniformBytes};
+use ff::{BatchInvert, FromUniformBytes, WithSmallOrderMulGroup};
+use halo2_proofs::arithmetic::CurveExt;
+use halo2_proofs::helpers::SerdeCurveAffine;
+use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+use halo2_proofs::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
 use halo2_proofs::{
-    arithmetic::{CurveAffine, Field},
+    arithmetic::Field,
     circuit::{floor_planner::V1, Layouter, Value},
     dev::{metadata, FailureLocation, MockProver, VerifyFailure},
-    halo2curves::pasta::EqAffine,
     plonk::*,
-    poly::{
-        commitment::ParamsProver,
-        ipa::{
-            commitment::{IPACommitmentScheme, ParamsIPA},
-            multiopen::{ProverIPA, VerifierIPA},
-            strategy::AccumulatorStrategy,
-        },
-        VerificationStrategy,
-    },
+    poly::{commitment::ParamsProver, VerificationStrategy},
     transcript::{
         Blake2bRead, Blake2bWrite, Challenge255, TranscriptReadBuffer, TranscriptWriterBuffer,
     },
 };
+use halo2curves::pairing::MultiMillerLoop;
+use halo2curves::{bn256, pairing::Engine};
 use rand_core::{OsRng, RngCore};
 use std::iter;
 
@@ -269,21 +267,24 @@ fn test_mock_prover<F: Ord + FromUniformBytes<64>, const W: usize, const H: usiz
     };
 }
 
-fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
+fn test_prover<E: Engine + MultiMillerLoop, const W: usize, const H: usize>(
     k: u32,
-    circuit: MyCircuit<C::Scalar, W, H>,
+    circuit: MyCircuit<E::Fr, W, H>,
     expected: bool,
 ) where
-    C::Scalar: FromUniformBytes<64>,
+    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
+    E::G1: CurveExt<AffineExt = E::G1Affine>,
+    E::G2Affine: SerdeCurveAffine,
+    E::Fr: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
 {
-    let params = ParamsIPA::<C>::new(k);
+    let params = ParamsKZG::<E>::new(k);
     let vk = keygen_vk(&params, &circuit).unwrap();
     let pk = keygen_pk(&params, vk, &circuit).unwrap();
 
     let proof = {
         let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
-        create_proof::<IPACommitmentScheme<C>, ProverIPA<C>, _, _, _, _>(
+        create_proof::<KZGCommitmentScheme<E>, ProverGWC<E>, _, _, _, _>(
             &params,
             &pk,
             &[circuit],
@@ -300,14 +301,19 @@ fn test_prover<C: CurveAffine, const W: usize, const H: usize>(
         let strategy = AccumulatorStrategy::new(&params);
         let mut transcript = Blake2bRead::<_, _, Challenge255<_>>::init(&proof[..]);
 
-        verify_proof::<IPACommitmentScheme<C>, VerifierIPA<C>, _, _, _>(
+        verify_proof::<KZGCommitmentScheme<E>, VerifierGWC<E>, _, _, _>(
             &params,
             pk.get_vk(),
             strategy,
             &[&[]],
             &mut transcript,
         )
-        .map(|strategy| strategy.finalize())
+        .map(|strategy| {
+            <AccumulatorStrategy<E> as VerificationStrategy<
+                KZGCommitmentScheme<E>,
+                VerifierGWC<E>,
+            >>::finalize(strategy)
+        })
         .unwrap_or_default()
     };
 
@@ -323,7 +329,7 @@ fn main() {
 
     {
         test_mock_prover(K, circuit.clone(), Ok(()));
-        test_prover::<EqAffine, W, H>(K, circuit.clone(), true);
+        test_prover::<bn256::Bn256, W, H>(K, circuit.clone(), true);
     }
 
     #[cfg(not(feature = "sanity-checks"))]
@@ -347,6 +353,6 @@ fn main() {
                 },
             )]),
         );
-        test_prover::<EqAffine, W, H>(K, circuit, false);
+        test_prover::<bn256::Bn256, W, H>(K, circuit, false);
     }
 }

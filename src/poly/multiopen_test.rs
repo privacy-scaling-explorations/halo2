@@ -11,86 +11,12 @@ mod test {
         EvaluationDomain,
     };
     use crate::transcript::{
-        Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge, Keccak256Read, Keccak256Write,
-        TranscriptReadBuffer, TranscriptWriterBuffer,
+        Blake2bRead, Blake2bWrite, Challenge255, EncodedChallenge, TranscriptReadBuffer,
+        TranscriptWriterBuffer,
     };
     use ff::WithSmallOrderMulGroup;
     use group::Curve;
     use rand_core::OsRng;
-
-    #[test]
-    fn test_roundtrip_ipa() {
-        use crate::poly::ipa::commitment::{IPACommitmentScheme, ParamsIPA};
-        use crate::poly::ipa::multiopen::{ProverIPA, VerifierIPA};
-        use crate::poly::ipa::strategy::AccumulatorStrategy;
-        use halo2curves::pasta::EqAffine;
-
-        const K: u32 = 4;
-
-        let params = ParamsIPA::<EqAffine>::new(K);
-
-        let proof = create_proof::<
-            IPACommitmentScheme<EqAffine>,
-            ProverIPA<_>,
-            _,
-            Blake2bWrite<_, _, Challenge255<_>>,
-        >(&params);
-
-        let verifier_params = params.verifier_params();
-
-        verify::<
-            IPACommitmentScheme<EqAffine>,
-            VerifierIPA<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
-
-        verify::<
-            IPACommitmentScheme<EqAffine>,
-            VerifierIPA<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
-    }
-
-    #[test]
-    fn test_roundtrip_ipa_keccak() {
-        use crate::poly::ipa::commitment::{IPACommitmentScheme, ParamsIPA};
-        use crate::poly::ipa::multiopen::{ProverIPA, VerifierIPA};
-        use crate::poly::ipa::strategy::AccumulatorStrategy;
-        use halo2curves::pasta::EqAffine;
-
-        const K: u32 = 4;
-
-        let params = ParamsIPA::<EqAffine>::new(K);
-
-        let proof = create_proof::<
-            IPACommitmentScheme<EqAffine>,
-            ProverIPA<_>,
-            _,
-            Keccak256Write<_, _, Challenge255<_>>,
-        >(&params);
-
-        let verifier_params = params.verifier_params();
-
-        verify::<
-            IPACommitmentScheme<EqAffine>,
-            VerifierIPA<_>,
-            _,
-            Keccak256Read<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
-
-        verify::<
-            IPACommitmentScheme<EqAffine>,
-            VerifierIPA<_>,
-            _,
-            Keccak256Read<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
-    }
 
     #[test]
     fn test_roundtrip_gwc() {
@@ -273,17 +199,14 @@ mod test {
             ProverQuery {
                 point: x.get_scalar(),
                 poly: &ax,
-                blind,
             },
             ProverQuery {
                 point: x.get_scalar(),
                 poly: &bx,
-                blind,
             },
             ProverQuery {
                 point: y.get_scalar(),
                 poly: &cx,
-                blind,
             },
         ]
         .to_vec();
