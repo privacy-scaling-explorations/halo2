@@ -503,26 +503,6 @@ pub fn lagrange_interpolate<F: Field>(points: &[F], evals: &[F]) -> Vec<F> {
     }
 }
 
-pub(crate) fn evaluate_vanishing_polynomial<F: Field>(roots: &[F], z: F) -> F {
-    fn evaluate<F: Field>(roots: &[F], z: F) -> F {
-        roots.iter().fold(F::ONE, |acc, point| (z - point) * acc)
-    }
-    let n = roots.len();
-    let num_threads = multicore::current_num_threads();
-    if n * 2 < num_threads {
-        evaluate(roots, z)
-    } else {
-        let chunk_size = (n + num_threads - 1) / num_threads;
-        let mut parts = vec![F::ONE; num_threads];
-        multicore::scope(|scope| {
-            for (out, roots) in parts.chunks_mut(1).zip(roots.chunks(chunk_size)) {
-                scope.spawn(move |_| out[0] = evaluate(roots, z));
-            }
-        });
-        parts.iter().fold(F::ONE, |acc, part| acc * part)
-    }
-}
-
 pub(crate) fn powers<F: Field>(base: F) -> impl Iterator<Item = F> {
     std::iter::successors(Some(F::ONE), move |power| Some(base * power))
 }

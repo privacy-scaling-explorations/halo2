@@ -2,7 +2,7 @@ use ff::{BatchInvert, FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_proofs::arithmetic::CurveExt;
 use halo2_proofs::helpers::SerdeCurveAffine;
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-use halo2_proofs::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+use halo2_proofs::poly::kzg::gwc::{ProverGWC, VerifierGWC};
 use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
 use halo2_proofs::{
     arithmetic::Field,

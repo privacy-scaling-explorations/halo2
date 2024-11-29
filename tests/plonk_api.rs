@@ -531,64 +531,28 @@ fn plonk_api() {
         assert!(strategy.finalize());
     }
 
-    fn test_plonk_api_gwc() {
-        use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-        use halo2_proofs::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
-        use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
-        use halo2curves::bn256::Bn256;
+    use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+    use halo2_proofs::poly::kzg::gwc::{ProverGWC, VerifierGWC};
+    use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
+    use halo2curves::bn256::Bn256;
 
-        type Scheme = KZGCommitmentScheme<Bn256>;
-        bad_keys!(Scheme);
+    type Scheme = KZGCommitmentScheme<Bn256>;
+    bad_keys!(Scheme);
 
-        let params = ParamsKZG::<Bn256>::new(K);
-        let rng = OsRng;
+    let params = ParamsKZG::<Bn256>::new(K);
+    let rng = OsRng;
 
-        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
+    let pk = keygen::<KZGCommitmentScheme<_>>(&params);
 
-        let proof = create_proof::<_, ProverGWC<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng, &params, &pk,
-        );
+    let proof = create_proof::<_, ProverGWC<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
+        rng, &params, &pk,
+    );
 
-        let verifier_params = params.verifier_params();
+    let verifier_params = params.verifier_params();
 
-        verify_proof::<
-            _,
-            VerifierGWC<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, pk.get_vk(), &proof[..]);
-    }
-
-    fn test_plonk_api_shplonk() {
-        use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-        use halo2_proofs::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
-        use halo2_proofs::poly::kzg::strategy::AccumulatorStrategy;
-        use halo2curves::bn256::Bn256;
-
-        type Scheme = KZGCommitmentScheme<Bn256>;
-        bad_keys!(Scheme);
-
-        let params = ParamsKZG::<Bn256>::new(K);
-        let rng = OsRng;
-
-        let pk = keygen::<KZGCommitmentScheme<_>>(&params);
-
-        let proof = create_proof::<_, ProverSHPLONK<_>, _, _, Blake2bWrite<_, _, Challenge255<_>>>(
-            rng, &params, &pk,
-        );
-
-        let verifier_params = params.verifier_params();
-
-        verify_proof::<
-            _,
-            VerifierSHPLONK<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, pk.get_vk(), &proof[..]);
-    }
-
-    test_plonk_api_gwc();
-    test_plonk_api_shplonk();
+    verify_proof::<_, VerifierGWC<_>, _, Blake2bRead<_, _, Challenge255<_>>, AccumulatorStrategy<_>>(
+        verifier_params,
+        pk.get_vk(),
+        &proof[..],
+    );
 }

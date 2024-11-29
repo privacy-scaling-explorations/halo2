@@ -93,45 +93,6 @@ where
     }
 }
 
-/// A projective point collector
-#[derive(Debug, Clone)]
-pub(crate) struct PreMSM<E: Engine>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
-    projectives_msms: Vec<MSMKZG<E>>,
-}
-
-impl<E: Engine + Debug> PreMSM<E>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
-    pub(crate) fn new() -> Self {
-        PreMSM {
-            projectives_msms: vec![],
-        }
-    }
-
-    pub(crate) fn normalize(self) -> MSMKZG<E> {
-        let (scalars, bases) = self
-            .projectives_msms
-            .into_iter()
-            .map(|msm| (msm.scalars, msm.bases))
-            .unzip::<_, _, Vec<_>, Vec<_>>();
-
-        MSMKZG {
-            scalars: scalars.into_iter().flatten().collect(),
-            bases: bases.into_iter().flatten().collect(),
-        }
-    }
-
-    pub(crate) fn add_msm(&mut self, other: MSMKZG<E>) {
-        self.projectives_msms.push(other);
-    }
-}
-
 impl<'params, E: MultiMillerLoop + Debug> From<&'params ParamsKZG<E>> for DualMSM<'params, E>
 where
     E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,

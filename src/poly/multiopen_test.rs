@@ -21,7 +21,7 @@ mod test {
     #[test]
     fn test_roundtrip_gwc() {
         use crate::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-        use crate::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+        use crate::poly::kzg::gwc::{ProverGWC, VerifierGWC};
         use crate::poly::kzg::strategy::AccumulatorStrategy;
         use halo2curves::bn256::Bn256;
 
@@ -43,43 +43,6 @@ mod test {
         verify::<
             KZGCommitmentScheme<Bn256>,
             VerifierGWC<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], true);
-    }
-
-    #[test]
-    fn test_roundtrip_shplonk() {
-        use crate::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-        use crate::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
-        use crate::poly::kzg::strategy::AccumulatorStrategy;
-        use halo2curves::bn256::Bn256;
-
-        const K: u32 = 4;
-
-        let params = ParamsKZG::<Bn256>::new(K);
-
-        let proof = create_proof::<
-            KZGCommitmentScheme<Bn256>,
-            ProverSHPLONK<_>,
-            _,
-            Blake2bWrite<_, _, Challenge255<_>>,
-        >(&params);
-
-        let verifier_params = params.verifier_params();
-
-        verify::<
-            KZGCommitmentScheme<Bn256>,
-            VerifierSHPLONK<_>,
-            _,
-            Blake2bRead<_, _, Challenge255<_>>,
-            AccumulatorStrategy<_>,
-        >(verifier_params, &proof[..], false);
-
-        verify::<
-            KZGCommitmentScheme<Bn256>,
-            VerifierSHPLONK<_>,
             _,
             Blake2bRead<_, _, Challenge255<_>>,
             AccumulatorStrategy<_>,

@@ -675,7 +675,7 @@ fn test_create_proof() {
         plonk::{keygen_pk, keygen_vk},
         poly::kzg::{
             commitment::{KZGCommitmentScheme, ParamsKZG},
-            multiopen::ProverSHPLONK,
+            gwc::ProverGWC,
         },
         transcript::{Blake2bWrite, Challenge255, TranscriptWriterBuffer},
     };
@@ -712,7 +712,7 @@ fn test_create_proof() {
     let mut transcript = Blake2bWrite::<_, _, Challenge255<_>>::init(vec![]);
 
     // Create proof with wrong number of instances
-    let proof = create_proof::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>(
+    let proof = create_proof::<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _, _>(
         &params,
         &pk,
         &[MyCircuit, MyCircuit],
@@ -723,7 +723,7 @@ fn test_create_proof() {
     assert!(matches!(proof.unwrap_err(), Error::InvalidInstances));
 
     // Create proof with correct number of instances
-    create_proof::<KZGCommitmentScheme<_>, ProverSHPLONK<_>, _, _, _, _>(
+    create_proof::<KZGCommitmentScheme<_>, ProverGWC<_>, _, _, _, _>(
         &params,
         &pk,
         &[MyCircuit, MyCircuit],

@@ -13,7 +13,7 @@ use halo2_proofs::{
     poly::{
         kzg::{
             commitment::{KZGCommitmentScheme, ParamsKZG},
-            multiopen::{ProverGWC, VerifierGWC},
+            gwc::{ProverGWC, VerifierGWC},
             strategy::SingleStrategy,
         },
         Rotation,

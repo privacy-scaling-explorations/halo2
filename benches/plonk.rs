@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 
 use criterion::{BenchmarkId, Criterion};
 use halo2_proofs::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
-use halo2_proofs::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+use halo2_proofs::poly::kzg::gwc::{ProverGWC, VerifierGWC};
 use halo2_proofs::poly::kzg::strategy::SingleStrategy;
 
 fn criterion_benchmark(c: &mut Criterion) {
