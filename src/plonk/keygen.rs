@@ -214,7 +214,7 @@ where
     ConcreteCircuit: Circuit<C::Scalar>,
     C::Scalar: FromUniformBytes<64>,
 {
-    keygen_vk_custom(params, circuit, true)
+    keygen_vk_custom(params, circuit)
 }
 
 /// Generate a `VerifyingKey` from an instance of `Circuit`.
@@ -223,7 +223,6 @@ where
 pub fn keygen_vk_custom<'params, C, P, ConcreteCircuit>(
     params: &P,
     circuit: &ConcreteCircuit,
-    compress_selectors: bool,
 ) -> Result<VerifyingKey<C>, Error>
 where
     C: CurveAffine,
@@ -259,13 +258,9 @@ where
     )?;
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
-    let (cs, selector_polys) = if compress_selectors {
-        cs.compress_selectors(assembly.selectors.clone())
-    } else {
-        // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
-        let selectors = std::mem::take(&mut assembly.selectors);
-        cs.directly_convert_selectors_to_fixed(selectors)
-    };
+    // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
+    let selectors = std::mem::take(&mut assembly.selectors);
+    let (cs, selector_polys) = cs.directly_convert_selectors_to_fixed(selectors);
     fixed.extend(
         selector_polys
             .into_iter()
@@ -287,7 +282,6 @@ where
         permutation_vk,
         cs,
         assembly.selectors,
-        compress_selectors,
     ))
 }
 
@@ -332,11 +326,7 @@ where
     )?;
 
     let mut fixed = batch_invert_assigned(assembly.fixed);
-    let (cs, selector_polys) = if vk.compress_selectors {
-        cs.compress_selectors(assembly.selectors)
-    } else {
-        cs.directly_convert_selectors_to_fixed(assembly.selectors)
-    };
+    let (cs, selector_polys) = cs.directly_convert_selectors_to_fixed(assembly.selectors);
     fixed.extend(
         selector_polys
             .into_iter()

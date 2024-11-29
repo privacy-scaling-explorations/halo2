@@ -55,8 +55,6 @@ pub struct VerifyingKey<C: CurveAffine> {
     /// The representative of this `VerifyingKey` in transcripts.
     transcript_repr: C::Scalar,
     selectors: Vec<Vec<bool>>,
-    /// Whether selector compression is turned on or not.
-    compress_selectors: bool,
 }
 
 // Current version of the VK
@@ -82,16 +80,12 @@ where
         assert!(*k <= C::Scalar::S);
         // k value fits in 1 byte
         writer.write_all(&[*k as u8])?;
-        writer.write_all(&[self.compress_selectors as u8])?;
         writer.write_all(&(self.fixed_commitments.len() as u32).to_le_bytes())?;
         for commitment in &self.fixed_commitments {
             commitment.write(writer, format)?;
         }
         self.permutation.write(writer, format)?;
 
-        if !self.compress_selectors {
-            assert!(self.selectors.is_empty());
-        }
         // write self.selectors
         for selector in &self.selectors {
             // since `selector` is filled with `bool`, we pack them 8 at a time into bytes and then write
@@ -139,15 +133,7 @@ where
                 ),
             ));
         }
-        let mut compress_selectors = [0u8; 1];
-        reader.read_exact(&mut compress_selectors)?;
-        if compress_selectors[0] != 0 && compress_selectors[0] != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "unexpected compress_selectors not boolean",
-            ));
-        }
-        let compress_selectors = compress_selectors[0] == 1;
+
         let (domain, cs, _) = keygen::create_domain::<C, ConcreteCircuit>(
             k as u32,
             #[cfg(feature = "circuit-params")]
@@ -163,27 +149,10 @@ where
 
         let permutation = permutation::VerifyingKey::read(reader, &cs.permutation, format)?;
 
-        let (cs, selectors) = if compress_selectors {
-            // read selectors
-            let selectors: Vec<Vec<bool>> = vec![vec![false; 1 << k]; cs.num_selectors]
-                .into_iter()
-                .map(|mut selector| {
-                    let mut selector_bytes = vec![0u8; (selector.len() + 7) / 8];
-                    reader.read_exact(&mut selector_bytes)?;
-                    for (bits, byte) in selector.chunks_mut(8).zip(selector_bytes) {
-                        crate::helpers::unpack(byte, bits);
-                    }
-                    Ok(selector)
-                })
-                .collect::<io::Result<_>>()?;
-            let (cs, _) = cs.compress_selectors(selectors.clone());
-            (cs, selectors)
-        } else {
-            // we still need to replace selectors with fixed Expressions in `cs`
-            let fake_selectors = vec![vec![]; cs.num_selectors];
-            let (cs, _) = cs.directly_convert_selectors_to_fixed(fake_selectors);
-            (cs, vec![])
-        };
+        let selectors = vec![];
+        // we still need to replace selectors with fixed Expressions in `cs`
+        let fake_selectors = vec![vec![]; cs.num_selectors];
+        let (cs, _) = cs.directly_convert_selectors_to_fixed(fake_selectors);
 
         Ok(Self::from_parts(
             domain,
@@ -191,7 +160,6 @@ where
             permutation,
             cs,
             selectors,
-            compress_selectors,
         ))
     }
 
@@ -238,7 +206,6 @@ impl<C: CurveAffine> VerifyingKey<C> {
         permutation: permutation::VerifyingKey<C>,
         cs: ConstraintSystem<C::Scalar>,
         selectors: Vec<Vec<bool>>,
-        compress_selectors: bool,
     ) -> Self
     where
         C::ScalarExt: FromUniformBytes<64>,
@@ -255,7 +222,6 @@ impl<C: CurveAffine> VerifyingKey<C> {
             // Temporary, this is not pinned.
             transcript_repr: C::Scalar::ZERO,
             selectors,
-            compress_selectors,
         };
 
         let mut hasher = Blake2bParams::new()

@@ -17,8 +17,6 @@ use std::{
     ops::{Neg, Sub},
 };
 
-mod compress_selectors;
-
 /// A column type
 pub trait ColumnType:
     'static + Sized + Copy + std::fmt::Debug + PartialEq + Eq + Into<Any>
@@ -1223,34 +1221,6 @@ impl<F: Field> Expression<F> {
             &|a, _| a,
         )
     }
-
-    /// Extracts a simple selector from this gate, if present
-    fn extract_simple_selector(&self) -> Option<Selector> {
-        let op = |a, b| match (a, b) {
-            (Some(a), None) | (None, Some(a)) => Some(a),
-            (Some(_), Some(_)) => panic!("two simple selectors cannot be in the same expression"),
-            _ => None,
-        };
-
-        self.evaluate(
-            &|_| None,
-            &|selector| {
-                if selector.is_simple() {
-                    Some(selector)
-                } else {
-                    None
-                }
-            },
-            &|_| None,
-            &|_| None,
-            &|_| None,
-            &|_| None,
-            &|a| a,
-            &op,
-            &op,
-            &|a, _| a,
-        )
-    }
 }
 
 impl<F: std::fmt::Debug> std::fmt::Debug for Expression<F> {
@@ -1563,11 +1533,6 @@ pub struct ConstraintSystem<F: Field> {
     /// Contains the phase for each challenge. Should have same length as num_challenges.
     pub(crate) challenge_phase: Vec<sealed::Phase>,
 
-    /// This is a cached vector that maps virtual selectors to the concrete
-    /// fixed column that they were compressed into. This is just used by dev
-    /// tooling right now.
-    pub(crate) selector_map: Vec<Column<Fixed>>,
-
     pub(crate) gates: Vec<Gate<F>>,
     pub(crate) advice_queries: Vec<(Column<Advice>, Rotation)>,
     // Contains an integer for each advice column
@@ -1664,7 +1629,6 @@ impl<F: Field> Default for ConstraintSystem<F> {
             unblinded_advice_columns: Vec::new(),
             advice_column_phase: Vec::new(),
             challenge_phase: Vec::new(),
-            selector_map: vec![],
             gates: vec![],
             fixed_queries: Vec::new(),
             advice_queries: Vec::new(),
@@ -1930,79 +1894,6 @@ impl<F: Field> ConstraintSystem<F> {
             queried_selectors,
             queried_cells,
         });
-    }
-
-    /// This will compress selectors together depending on their provided
-    /// assignments. This `ConstraintSystem` will then be modified to add new
-    /// fixed columns (representing the actual selectors) and will return the
-    /// polynomials for those columns. Finally, an internal map is updated to
-    /// find which fixed column corresponds with a given `Selector`.
-    ///
-    /// Do not call this twice. Yes, this should be a builder pattern instead.
-    pub fn compress_selectors(mut self, selectors: Vec<Vec<bool>>) -> (Self, Vec<Vec<F>>) {
-        // The number of provided selector assignments must be the number we
-        // counted for this constraint system.
-        assert_eq!(selectors.len(), self.num_selectors);
-
-        // Compute the maximal degree of every selector. We only consider the
-        // expressions in gates, as lookup arguments cannot support simple
-        // selectors. Selectors that are complex or do not appear in any gates
-        // will have degree zero.
-        let mut degrees = vec![0; selectors.len()];
-        for expr in self.gates.iter().flat_map(|gate| gate.polys.iter()) {
-            if let Some(selector) = expr.extract_simple_selector() {
-                degrees[selector.0] = max(degrees[selector.0], expr.degree());
-            }
-        }
-
-        // We will not increase the degree of the constraint system, so we limit
-        // ourselves to the largest existing degree constraint.
-        let max_degree = self.degree();
-
-        let mut new_columns = vec![];
-        let (polys, selector_assignment) = compress_selectors::process(
-            selectors
-                .into_iter()
-                .zip(degrees)
-                .enumerate()
-                .map(
-                    |(i, (activations, max_degree))| compress_selectors::SelectorDescription {
-                        selector: i,
-                        activations,
-                        max_degree,
-                    },
-                )
-                .collect(),
-            max_degree,
-            || {
-                let column = self.fixed_column();
-                new_columns.push(column);
-                Expression::Fixed(FixedQuery {
-                    index: Some(self.query_fixed_index(column, Rotation::cur())),
-                    column_index: column.index,
-                    rotation: Rotation::cur(),
-                })
-            },
-        );
-
-        let mut selector_map = vec![None; selector_assignment.len()];
-        let mut selector_replacements = vec![None; selector_assignment.len()];
-        for assignment in selector_assignment {
-            selector_replacements[assignment.selector] = Some(assignment.expression);
-            selector_map[assignment.selector] = Some(new_columns[assignment.combination_index]);
-        }
-
-        self.selector_map = selector_map
-            .into_iter()
-            .map(|a| a.unwrap())
-            .collect::<Vec<_>>();
-        let selector_replacements = selector_replacements
-            .into_iter()
-            .map(|a| a.unwrap())
-            .collect::<Vec<_>>();
-        self.replace_selectors_with_fixed(&selector_replacements);
-
-        (self, polys)
     }
 
     /// Does not combine selectors and directly replaces them everywhere with fixed columns.
