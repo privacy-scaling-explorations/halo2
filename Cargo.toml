@@ -23,25 +23,25 @@ keywords = ["halo", "proofs", "zkp", "zkSNARKs"]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs", "--html-in-header", "katex-header.html"]
 
-[[bench]]
-name = "commit_zk"
-harness = false
-
-[[bench]]
-name = "hashtocurve"
-harness = false
-
-[[bench]]
-name = "plonk"
-harness = false
-
-[[bench]]
-name = "dev_lookup"
-harness = false
-
-[[bench]]
-name = "fft"
-harness = false
+#[[bench]]
+#name = "commit_zk"
+#harness = false
+#
+#[[bench]]
+#name = "hashtocurve"
+#harness = false
+#
+#[[bench]]
+#name = "plonk"
+#harness = false
+#
+#[[bench]]
+#name = "dev_lookup"
+#harness = false
+#
+#[[bench]]
+#name = "fft"
+#harness = false
 
 [dependencies]
 backtrace = { version = "0.3", optional = true }
