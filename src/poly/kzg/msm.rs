@@ -1,10 +1,8 @@
 use std::fmt::Debug;
 
-use super::commitment::ParamsKZG;
-use crate::{
-    arithmetic::{best_multiexp, parallelize},
-    poly::commitment::MSM,
-};
+use super::params::ParamsKZG;
+use crate::arithmetic::MSM;
+use crate::arithmetic::{best_multiexp, parallelize};
 use group::{Curve, Group};
 use halo2curves::{
     pairing::{Engine, MillerLoopResult, MultiMillerLoop},
@@ -13,20 +11,12 @@ use halo2curves::{
 
 /// A multiscalar multiplication in the polynomial commitment scheme
 #[derive(Clone, Default, Debug)]
-pub struct MSMKZG<E: Engine>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+pub struct MSMKZG<E: Engine> {
     pub(crate) scalars: Vec<E::Fr>,
     pub(crate) bases: Vec<E::G1>,
 }
 
-impl<E: Engine> MSMKZG<E>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+impl<E: Engine> MSMKZG<E> {
     /// Create an empty MSM instance
     pub fn new() -> Self {
         MSMKZG {
@@ -48,11 +38,7 @@ where
     }
 }
 
-impl<E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<E>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+impl<E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<E> {
     fn append_term(&mut self, scalar: E::Fr, point: E::G1) {
         self.scalars.push(scalar);
         self.bases.push(point);
@@ -105,21 +91,13 @@ where
 
 /// Two channel MSM accumulator
 #[derive(Debug, Clone)]
-pub struct DualMSM<'a, E: Engine>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+pub struct DualMSM<'a, E: Engine> {
     pub(crate) params: &'a ParamsKZG<E>,
     pub(crate) left: MSMKZG<E>,
     pub(crate) right: MSMKZG<E>,
 }
 
-impl<'a, E: MultiMillerLoop + Debug> DualMSM<'a, E>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+impl<'a, E: MultiMillerLoop + Debug> DualMSM<'a, E> {
     /// Create a new two channel MSM accumulator instance
     pub fn new(params: &'a ParamsKZG<E>) -> Self {
         Self {

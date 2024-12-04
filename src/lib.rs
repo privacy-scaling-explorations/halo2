@@ -9,13 +9,15 @@
 #![deny(unsafe_code)]
 
 pub mod arithmetic;
-pub mod circuit;
+// pub mod circuit;
 pub use halo2curves;
 mod multicore;
-pub mod plonk;
+// pub mod plonk;
 pub mod poly;
 pub mod transcript;
 
-pub mod dev;
+pub mod rational;
+
+// pub mod dev;
 pub mod helpers;
 pub use helpers::SerdeFormat;

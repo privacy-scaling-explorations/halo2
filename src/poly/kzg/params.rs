@@ -1,16 +1,13 @@
 use crate::arithmetic::{best_multiexp, g_to_lagrange, parallelize};
 use crate::helpers::SerdeCurveAffine;
-use crate::poly::commitment::{Blind, CommitmentScheme, Params, ParamsProver, ParamsVerifier};
-use crate::poly::{Coeff, LagrangeCoeff, Polynomial};
+use crate::poly::{Blind, LagrangeCoeff, Polynomial};
 use crate::SerdeFormat;
 
 use ff::{Field, PrimeField};
 use group::{prime::PrimeCurveAffine, Curve, Group};
 use halo2curves::pairing::Engine;
-use halo2curves::CurveExt;
 use rand_core::{OsRng, RngCore};
 use std::fmt::Debug;
-use std::marker::PhantomData;
 
 use std::io;
 
@@ -27,38 +24,7 @@ pub struct ParamsKZG<E: Engine> {
     pub(crate) s_g2: E::G2Affine,
 }
 
-/// Umbrella commitment scheme construction for all KZG variants
-#[derive(Debug)]
-pub struct KZGCommitmentScheme<E: Engine> {
-    _marker: PhantomData<E>,
-}
-
-impl<E: Engine + Debug> CommitmentScheme for KZGCommitmentScheme<E>
-where
-    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-    E::G2Affine: SerdeCurveAffine,
-{
-    type Scalar = E::Fr;
-    type Curve = E::G1Affine;
-
-    type ParamsProver = ParamsKZG<E>;
-    type ParamsVerifier = ParamsVerifierKZG<E>;
-
-    fn new_params(k: u32) -> Self::ParamsProver {
-        ParamsKZG::new(k)
-    }
-
-    fn read_params<R: io::Read>(reader: &mut R) -> io::Result<Self::ParamsProver> {
-        ParamsKZG::read(reader)
-    }
-}
-
-impl<E: Engine + Debug> ParamsKZG<E>
-where
-    E::G1Affine: SerdeCurveAffine,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
+impl<E: Engine + Debug> ParamsKZG<E> {
     /// Initializes parameters for the curve, draws toxic secret from given rng.
     /// MUST NOT be used in production.
     pub fn setup<R: RngCore>(k: u32, rng: R) -> Self {
@@ -166,6 +132,7 @@ where
     /// Writes parameters to buffer
     pub fn write_custom<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
+        E::G1Affine: SerdeCurveAffine,
         E::G2Affine: SerdeCurveAffine,
     {
         writer.write_all(&self.k.to_le_bytes())?;
@@ -183,6 +150,7 @@ where
     /// Reads params from a buffer.
     pub fn read_custom<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self>
     where
+        E::G1Affine: SerdeCurveAffine,
         E::G2Affine: SerdeCurveAffine,
     {
         let mut k = [0u8; 4];
@@ -270,25 +238,25 @@ where
 // TODO: see the issue at https://github.com/appliedzkp/halo2/issues/45
 // So we probably need much smaller verifier key. However for new bases in g1 should be in verifier keys.
 /// KZG multi-open verification parameters
-pub type ParamsVerifierKZG<C> = ParamsKZG<C>;
+pub type ParamsVerifierKZG<E> = ParamsKZG<E>;
 
-impl<'params, E: Engine + Debug> Params<'params, E::G1Affine> for ParamsKZG<E>
+impl<'params, E: Engine + Debug> ParamsKZG<E>
 where
-    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
+    E::G1Affine: SerdeCurveAffine,
     E::G2Affine: SerdeCurveAffine,
 {
-    type MSM = MSMKZG<E>;
-
-    fn k(&self) -> u32 {
+    /// TODO
+    pub fn k(&self) -> u32 {
         self.k
     }
 
-    fn n(&self) -> u64 {
+    /// TODO
+    pub fn n(&self) -> u64 {
         self.n
     }
 
-    fn downsize(&mut self, k: u32) {
+    /// TODO
+    pub fn downsize(&mut self, k: u32) {
         assert!(k <= self.k);
 
         self.k = k;
@@ -298,11 +266,17 @@ where
         self.g_lagrange = g_to_lagrange(self.g.iter().map(|g| g.to_curve()).collect(), k);
     }
 
-    fn empty_msm(&'params self) -> MSMKZG<E> {
+    /// TODO
+    pub fn empty_msm(&'params self) -> MSMKZG<E> {
         MSMKZG::new()
     }
 
-    fn commit_lagrange(&self, poly: &Polynomial<E::Fr, LagrangeCoeff>, _: Blind<E::Fr>) -> E::G1 {
+    /// TODO
+    pub fn commit_lagrange(
+        &self,
+        poly: &Polynomial<E::Fr, LagrangeCoeff>,
+        _: Blind<E::Fr>,
+    ) -> E::G1 {
         let mut scalars = Vec::with_capacity(poly.len());
         scalars.extend(poly.iter());
         let bases = &self.g_lagrange;
@@ -312,60 +286,41 @@ where
     }
 
     /// Writes params to a buffer.
-    fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
+    pub fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         self.write_custom(writer, SerdeFormat::RawBytes)
     }
 
     /// Reads params from a buffer.
-    fn read<R: io::Read>(reader: &mut R) -> io::Result<Self> {
+    pub fn read<R: io::Read>(reader: &mut R) -> io::Result<Self> {
         Self::read_custom(reader, SerdeFormat::RawBytes)
     }
 }
 
-impl<'params, E: Engine + Debug> ParamsVerifier<'params, E::G1Affine> for ParamsKZG<E>
-where
-    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-    E::G2Affine: SerdeCurveAffine,
-{
-}
-
-impl<'params, E: Engine + Debug> ParamsProver<'params, E::G1Affine> for ParamsKZG<E>
-where
-    E::G1Affine: SerdeCurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-    E::G2Affine: SerdeCurveAffine,
-{
-    type ParamsVerifier = ParamsVerifierKZG<E>;
-
-    fn verifier_params(&'params self) -> &'params Self::ParamsVerifier {
+impl<'params, E: Engine + Debug> ParamsKZG<E> {
+    /// TODO
+    pub fn verifier_params(&'params self) -> &'params ParamsVerifierKZG<E> {
         self
     }
 
-    fn new(k: u32) -> Self {
+    /// TODO
+    pub fn new(k: u32) -> Self {
         Self::setup(k, OsRng)
     }
 
-    fn commit(&self, poly: &Polynomial<E::Fr, Coeff>, _: Blind<E::Fr>) -> E::G1 {
-        let mut scalars = Vec::with_capacity(poly.len());
-        scalars.extend(poly.iter());
-        let bases = &self.g;
-        let size = scalars.len();
-        assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size])
-    }
-
-    fn get_g(&self) -> &[E::G1Affine] {
+    /// TODO
+    pub fn get_g(&self) -> &[E::G1Affine] {
         &self.g
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::poly::commitment::ParamsProver;
-    use crate::poly::commitment::{Blind, Params};
-    use crate::poly::kzg::commitment::ParamsKZG;
+    use crate::poly::commitment::PolynomialCommitmentScheme;
+    use crate::poly::kzg::params::ParamsKZG;
+    use crate::poly::kzg::KZGCommitmentScheme;
+    use crate::poly::Blind;
     use ff::Field;
+    use halo2curves::pairing::Engine;
 
     #[test]
     fn test_commit_lagrange() {
@@ -388,21 +343,23 @@ mod test {
         let b = domain.lagrange_to_coeff(a.clone());
 
         let alpha = Blind(Fr::random(OsRng));
+        let tmp = params.commit_lagrange(&a, alpha);
+        let cs = KZGCommitmentScheme::new(params);
+        let commitment: <Bn256 as Engine>::G1 = cs.commit(&b, alpha).into();
 
-        assert_eq!(params.commit(&b, alpha), params.commit_lagrange(&a, alpha));
+        assert_eq!(commitment, tmp);
     }
 
     #[test]
     fn test_parameter_serialisation_roundtrip() {
         const K: u32 = 4;
 
-        use super::super::commitment::Params;
         use crate::halo2curves::bn256::Bn256;
 
         let params0 = ParamsKZG::<Bn256>::new(K);
         let mut data = vec![];
-        <ParamsKZG<_> as Params<_>>::write(&params0, &mut data).unwrap();
-        let params1: ParamsKZG<Bn256> = Params::read::<_>(&mut &data[..]).unwrap();
+        ParamsKZG::write(&params0, &mut data).unwrap();
+        let params1 = ParamsKZG::<Bn256>::read::<_>(&mut &data[..]).unwrap();
 
         assert_eq!(params0.k, params1.k);
         assert_eq!(params0.n, params1.n);

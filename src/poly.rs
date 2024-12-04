@@ -4,30 +4,32 @@
 
 use crate::arithmetic::parallelize;
 use crate::helpers::SerdePrimeField;
-use crate::plonk::Assigned;
+// use crate::plonk::Assigned;
 use crate::SerdeFormat;
 
-use group::ff::{BatchInvert, Field};
+use group::ff::Field;
+use rand_core::RngCore;
 use std::fmt::Debug;
 use std::io;
 use std::marker::PhantomData;
-use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, RangeFrom, RangeFull, Sub};
+use std::ops::{
+    Add, AddAssign, Deref, DerefMut, Index, IndexMut, Mul, MulAssign, RangeFrom, RangeFull, Sub,
+};
 
-/// Generic commitment scheme structures
-pub mod commitment;
+// /// Generic commitment scheme structures
+// pub mod commitment;
 mod domain;
 mod query;
-mod strategy;
+// mod strategy;
 
 /// KZG commitment scheme
 pub mod kzg;
 
-#[cfg(test)]
-mod multiopen_test;
+pub mod commitment;
 
 pub use domain::*;
 pub use query::{ProverQuery, VerifierQuery};
-pub use strategy::{Guard, VerificationStrategy};
+// pub use strategy::{Guard, VerificationStrategy};
 
 /// This is an error that could occur during proving or circuit synthesis.
 // TODO: these errors need to be cleaned up
@@ -172,52 +174,52 @@ impl<F: SerdePrimeField, B> Polynomial<F, B> {
     }
 }
 
-pub(crate) fn batch_invert_assigned<F: Field>(
-    assigned: Vec<Polynomial<Assigned<F>, LagrangeCoeff>>,
-) -> Vec<Polynomial<F, LagrangeCoeff>> {
-    let mut assigned_denominators: Vec<_> = assigned
-        .iter()
-        .map(|f| {
-            f.iter()
-                .map(|value| value.denominator())
-                .collect::<Vec<_>>()
-        })
-        .collect();
-
-    assigned_denominators
-        .iter_mut()
-        .flat_map(|f| {
-            f.iter_mut()
-                // If the denominator is trivial, we can skip it, reducing the
-                // size of the batch inversion.
-                .filter_map(|d| d.as_mut())
-        })
-        .batch_invert();
-
-    assigned
-        .iter()
-        .zip(assigned_denominators)
-        .map(|(poly, inv_denoms)| poly.invert(inv_denoms.into_iter().map(|d| d.unwrap_or(F::ONE))))
-        .collect()
-}
-
-impl<F: Field> Polynomial<Assigned<F>, LagrangeCoeff> {
-    pub(crate) fn invert(
-        &self,
-        inv_denoms: impl Iterator<Item = F> + ExactSizeIterator,
-    ) -> Polynomial<F, LagrangeCoeff> {
-        assert_eq!(inv_denoms.len(), self.values.len());
-        Polynomial {
-            values: self
-                .values
-                .iter()
-                .zip(inv_denoms)
-                .map(|(a, inv_den)| a.numerator() * inv_den)
-                .collect(),
-            _marker: self._marker,
-        }
-    }
-}
+// pub(crate) fn batch_invert_assigned<F: Field>(
+//     assigned: Vec<Polynomial<Assigned<F>, LagrangeCoeff>>,
+// ) -> Vec<Polynomial<F, LagrangeCoeff>> {
+//     let mut assigned_denominators: Vec<_> = assigned
+//         .iter()
+//         .map(|f| {
+//             f.iter()
+//                 .map(|value| value.denominator())
+//                 .collect::<Vec<_>>()
+//         })
+//         .collect();
+//
+//     assigned_denominators
+//         .iter_mut()
+//         .flat_map(|f| {
+//             f.iter_mut()
+//                 // If the denominator is trivial, we can skip it, reducing the
+//                 // size of the batch inversion.
+//                 .filter_map(|d| d.as_mut())
+//         })
+//         .batch_invert();
+//
+//     assigned
+//         .iter()
+//         .zip(assigned_denominators)
+//         .map(|(poly, inv_denoms)| poly.invert(inv_denoms.into_iter().map(|d| d.unwrap_or(F::ONE))))
+//         .collect()
+// }
+//
+// impl<F: Field> Polynomial<Assigned<F>, LagrangeCoeff> {
+//     pub(crate) fn invert(
+//         &self,
+//         inv_denoms: impl Iterator<Item = F> + ExactSizeIterator,
+//     ) -> Polynomial<F, LagrangeCoeff> {
+//         assert_eq!(inv_denoms.len(), self.values.len());
+//         Polynomial {
+//             values: self
+//                 .values
+//                 .iter()
+//                 .zip(inv_denoms)
+//                 .map(|(a, inv_den)| a.numerator() * inv_den)
+//                 .collect(),
+//             _marker: self._marker,
+//         }
+//     }
+// }
 
 impl<'a, F: Field, B: Basis> Add<&'a Polynomial<F, B>> for Polynomial<F, B> {
     type Output = Polynomial<F, B>;
@@ -317,5 +319,62 @@ impl Rotation {
     /// The next location in the evaluation domain
     pub fn next() -> Rotation {
         Rotation(1)
+    }
+}
+
+/// Wrapper type around a blinding factor.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Blind<F>(pub F);
+
+impl<F: Field> Default for Blind<F> {
+    fn default() -> Self {
+        Blind(F::ONE)
+    }
+}
+
+impl<F: Field> Blind<F> {
+    /// Given `rng` creates new blinding scalar
+    pub fn new<R: RngCore>(rng: &mut R) -> Self {
+        Blind(F::random(rng))
+    }
+}
+
+impl<F: Field> Add for Blind<F> {
+    type Output = Self;
+
+    fn add(self, rhs: Blind<F>) -> Self {
+        Blind(self.0 + rhs.0)
+    }
+}
+
+impl<F: Field> Mul for Blind<F> {
+    type Output = Self;
+
+    fn mul(self, rhs: Blind<F>) -> Self {
+        Blind(self.0 * rhs.0)
+    }
+}
+
+impl<F: Field> AddAssign for Blind<F> {
+    fn add_assign(&mut self, rhs: Blind<F>) {
+        self.0 += rhs.0;
+    }
+}
+
+impl<F: Field> MulAssign for Blind<F> {
+    fn mul_assign(&mut self, rhs: Blind<F>) {
+        self.0 *= rhs.0;
+    }
+}
+
+impl<F: Field> AddAssign<F> for Blind<F> {
+    fn add_assign(&mut self, rhs: F) {
+        self.0 += rhs;
+    }
+}
+
+impl<F: Field> MulAssign<F> for Blind<F> {
+    fn mul_assign(&mut self, rhs: F) {
+        self.0 *= rhs;
     }
 }

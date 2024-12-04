@@ -3,10 +3,12 @@
 
 use super::multicore;
 pub use ff::Field;
+use group::prime::PrimeCurveAffine;
 use group::{
     ff::{BatchInvert, PrimeField},
     Curve, Group, GroupOpsOwned, ScalarMulOwned,
 };
+use std::fmt::Debug;
 
 pub use halo2curves::{CurveAffine, CurveExt};
 
@@ -25,7 +27,7 @@ where
 {
 }
 
-fn multiexp_serial<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut C::Curve) {
+fn multiexp_serial<C: PrimeCurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut C::Curve) {
     let coeffs: Vec<_> = coeffs.iter().map(|a| a.to_repr()).collect();
 
     let c = if bases.len() < 4 {
@@ -64,17 +66,17 @@ fn multiexp_serial<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C], acc: &mut 
         }
 
         #[derive(Clone, Copy)]
-        enum Bucket<C: CurveAffine> {
+        enum Bucket<C: PrimeCurveAffine> {
             None,
             Affine(C),
             Projective(C::Curve),
         }
 
-        impl<C: CurveAffine> Bucket<C> {
+        impl<C: PrimeCurveAffine> Bucket<C> {
             fn add_assign(&mut self, other: &C) {
                 *self = match *self {
                     Bucket::None => Bucket::Affine(*other),
-                    Bucket::Affine(a) => Bucket::Projective(a + *other),
+                    Bucket::Affine(a) => Bucket::Projective(a.to_curve() + other.to_curve()),
                     Bucket::Projective(mut a) => {
                         a += *other;
                         Bucket::Projective(a)
@@ -144,7 +146,7 @@ pub fn small_multiexp<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C]) -> C::C
 /// This function will panic if coeffs and bases have a different length.
 ///
 /// This will use multithreading if beneficial.
-pub fn best_multiexp<C: CurveAffine>(coeffs: &[C::Scalar], bases: &[C]) -> C::Curve {
+pub fn best_multiexp<C: PrimeCurveAffine>(coeffs: &[C::Scalar], bases: &[C]) -> C::Curve {
     assert_eq!(coeffs.len(), bases.len());
 
     let num_threads = multicore::current_num_threads();
@@ -289,7 +291,7 @@ pub fn recursive_butterfly_arithmetic<Scalar: Field, G: FftGroup<Scalar>>(
 }
 
 /// Convert coefficient bases group elements to lagrange basis by inverse FFT.
-pub fn g_to_lagrange<C: CurveAffine>(g_projective: Vec<C::Curve>, k: u32) -> Vec<C> {
+pub fn g_to_lagrange<C: PrimeCurveAffine>(g_projective: Vec<C::Curve>, k: u32) -> Vec<C> {
     let n_inv = C::Scalar::TWO_INV.pow_vartime([k as u64, 0, 0, 0]);
     let mut omega_inv = C::Scalar::ROOT_OF_UNITY_INV;
     for _ in k..C::Scalar::S {
@@ -505,6 +507,32 @@ pub fn lagrange_interpolate<F: Field>(points: &[F], evals: &[F]) -> Vec<F> {
 
 pub(crate) fn powers<F: Field>(base: F) -> impl Iterator<Item = F> {
     std::iter::successors(Some(F::ONE), move |power| Some(base * power))
+}
+
+/// Multi scalar multiplication engine
+pub trait MSM<C: PrimeCurveAffine>: Clone + Debug + Send + Sync {
+    /// Add arbitrary term (the scalar and the point)
+    fn append_term(&mut self, scalar: C::Scalar, point: C::Curve);
+
+    /// Add another multiexp into this one
+    fn add_msm(&mut self, other: &Self)
+    where
+        Self: Sized;
+
+    /// Scale all scalars in the MSM by some scaling factor
+    fn scale(&mut self, factor: C::Scalar);
+
+    /// Perform multiexp and check that it results in zero
+    fn check(&self) -> bool;
+
+    /// Perform multiexp and return the result
+    fn eval(&self) -> C::Curve;
+
+    /// Return base points
+    fn bases(&self) -> Vec<C::Curve>;
+
+    /// Scalars
+    fn scalars(&self) -> Vec<C::Scalar>;
 }
 
 #[cfg(test)]

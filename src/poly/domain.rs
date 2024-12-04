@@ -3,7 +3,7 @@
 
 use crate::{
     arithmetic::{best_fft, parallelize},
-    plonk::Assigned,
+    rational::Rational,
 };
 
 use super::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, Rotation};
@@ -186,7 +186,7 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
 
     /// Returns an empty (zero) polynomial in the Lagrange coefficient basis, with
     /// deferred inversions.
-    pub fn empty_lagrange_assigned(&self) -> Polynomial<Assigned<F>, LagrangeCoeff> {
+    pub fn empty_lagrange_rational(&self) -> Polynomial<Rational<F>, LagrangeCoeff> {
         Polynomial {
             values: vec![F::ZERO.into(); self.n as usize],
             _marker: PhantomData,

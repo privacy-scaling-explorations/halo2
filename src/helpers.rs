@@ -3,7 +3,8 @@
 
 use crate::poly::Polynomial;
 use ff::PrimeField;
-use halo2curves::{serde::SerdeObject, CurveAffine};
+use group::prime::PrimeCurveAffine;
+use halo2curves::serde::SerdeObject;
 use std::io;
 
 /// This enum specifies how various types are serialized and deserialized.
@@ -23,7 +24,7 @@ pub enum SerdeFormat {
 }
 
 // Keep this trait for compatibility with IPA serialization
-pub(crate) trait CurveRead: CurveAffine {
+pub(crate) trait CurveRead: PrimeCurveAffine {
     /// Reads a compressed element from the buffer and attempts to parse it
     /// using `from_bytes`.
     fn read<R: io::Read>(reader: &mut R) -> io::Result<Self> {
@@ -33,10 +34,10 @@ pub(crate) trait CurveRead: CurveAffine {
             .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid point encoding in proof"))
     }
 }
-impl<C: CurveAffine> CurveRead for C {}
+impl<C: PrimeCurveAffine> CurveRead for C {}
 
 /// Trait for serialising SerdeObjects
-pub trait SerdeCurveAffine: CurveAffine + SerdeObject {
+pub trait SerdeCurveAffine: PrimeCurveAffine + SerdeObject + Default {
     /// Reads an element from the buffer and parses it according to the `format`:
     /// - `Processed`: Reads a compressed curve element and decompress it
     /// - `RawBytes`: Reads an uncompressed curve element with coordinates in Montgomery form.
@@ -68,7 +69,7 @@ pub trait SerdeCurveAffine: CurveAffine + SerdeObject {
         }
     }
 }
-impl<C: CurveAffine + SerdeObject> SerdeCurveAffine for C {}
+impl<C: PrimeCurveAffine + SerdeObject + Default> SerdeCurveAffine for C {}
 
 /// Trait for implementing field SerdeObjects
 pub trait SerdePrimeField: PrimeField + SerdeObject {
