@@ -6,21 +6,19 @@
 //! [plonk]: https://eprint.iacr.org/2019/953
 
 use blake2b_simd::Params as Blake2bParams;
-use group::ff::{Field, FromUniformBytes, PrimeField};
+use group::ff::FromUniformBytes;
 
-use crate::arithmetic::CurveAffine;
 use crate::helpers::{
-    polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdeCurveAffine,
+    byte_length, polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
     SerdePrimeField,
 };
 use crate::poly::{
     Coeff, EvaluationDomain, ExtendedLagrangeCoeff, LagrangeCoeff, PinnedEvaluationDomain,
     Polynomial,
 };
-use crate::transcript::{ChallengeScalar, EncodedChallenge, Transcript};
+use crate::transcript::{Hashable, Transcript};
 use crate::SerdeFormat;
 
-mod assigned;
 mod circuit;
 mod error;
 mod evaluation;
@@ -32,37 +30,41 @@ mod vanishing;
 mod prover;
 mod verifier;
 
-pub use assigned::*;
 pub use circuit::*;
 pub use error::*;
 pub use keygen::*;
 pub use prover::*;
 pub use verifier::*;
 
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use evaluation::Evaluator;
+use ff::{PrimeField, WithSmallOrderMulGroup};
+use halo2curves::serde::SerdeObject;
 use std::io;
 
 /// This is a verifying key which allows for the verification of proofs for a
 /// particular circuit.
 #[derive(Clone, Debug)]
-pub struct VerifyingKey<C: CurveAffine> {
-    domain: EvaluationDomain<C::Scalar>,
-    fixed_commitments: Vec<C>,
-    permutation: permutation::VerifyingKey<C>,
-    cs: ConstraintSystem<C::Scalar>,
+pub struct VerifyingKey<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    domain: EvaluationDomain<F>,
+    fixed_commitments: Vec<CS::Commitment>,
+    permutation: permutation::VerifyingKey<F, CS>,
+    cs: ConstraintSystem<F>,
     /// Cached maximum degree of `cs` (which doesn't change after construction).
     cs_degree: usize,
     /// The representative of this `VerifyingKey` in transcripts.
-    transcript_repr: C::Scalar,
+    transcript_repr: F,
     selectors: Vec<Vec<bool>>,
 }
 
 // Current version of the VK
 const VERSION: u8 = 0x03;
 
-impl<C: SerdeCurveAffine> VerifyingKey<C>
+impl<F, CS> VerifyingKey<F, CS>
 where
-    C::Scalar: SerdePrimeField + FromUniformBytes<64>,
+    F: WithSmallOrderMulGroup<3> + SerdePrimeField + FromUniformBytes<64> + SerdeObject,
+    CS: PolynomialCommitmentScheme<F>,
+    CS::Commitment: SerdeObject,
 {
     /// Writes a verifying key to a buffer.
     ///
@@ -77,12 +79,13 @@ where
         // Version byte that will be checked on read.
         writer.write_all(&[VERSION])?;
         let k = &self.domain.k();
-        assert!(*k <= C::Scalar::S);
+        assert!(*k <= F::S);
         // k value fits in 1 byte
         writer.write_all(&[*k as u8])?;
         writer.write_all(&(self.fixed_commitments.len() as u32).to_le_bytes())?;
         for commitment in &self.fixed_commitments {
-            commitment.write(writer, format)?;
+            // TODO: writting raw here - do we maybe want a wrapper like we had?
+            commitment.write_raw(writer)?;
         }
         self.permutation.write(writer, format)?;
 
@@ -106,7 +109,7 @@ where
     /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
     /// does not perform any checks
-    pub fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
+    pub fn read<R: io::Read, ConcreteCircuit: Circuit<F>>(
         reader: &mut R,
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
@@ -123,18 +126,14 @@ where
         let mut k = [0u8; 1];
         reader.read_exact(&mut k)?;
         let k = u8::from_le_bytes(k);
-        if k as u32 > C::Scalar::S {
+        if k as u32 > F::S {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!(
-                    "circuit size value (k): {} exceeds maxium: {}",
-                    k,
-                    C::Scalar::S
-                ),
+                format!("circuit size value (k): {} exceeds maxium: {}", k, F::S),
             ));
         }
 
-        let (domain, cs, _) = keygen::create_domain::<C, ConcreteCircuit>(
+        let (domain, cs, _) = keygen::create_domain::<F, ConcreteCircuit>(
             k as u32,
             #[cfg(feature = "circuit-params")]
             params,
@@ -144,7 +143,8 @@ where
         let num_fixed_columns = u32::from_le_bytes(num_fixed_columns);
 
         let fixed_commitments: Vec<_> = (0..num_fixed_columns)
-            .map(|_| C::read(reader, format))
+            // TODO: Fix FORMAT - wrapper like before?
+            .map(|_| CS::Commitment::read_raw(reader))
             .collect::<Result<_, _>>()?;
 
         let permutation = permutation::VerifyingKey::read(reader, &cs.permutation, format)?;
@@ -171,7 +171,7 @@ where
     }
 
     /// Reads a verification key from a slice of bytes using [`Self::read`].
-    pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
+    pub fn from_bytes<ConcreteCircuit: Circuit<F>>(
         mut bytes: &[u8],
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
@@ -185,12 +185,9 @@ where
     }
 }
 
-impl<C: CurveAffine> VerifyingKey<C> {
-    fn bytes_length(&self, format: SerdeFormat) -> usize
-    where
-        C: SerdeCurveAffine,
-    {
-        10 + (self.fixed_commitments.len() * C::byte_length(format))
+impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> VerifyingKey<F, CS> {
+    fn bytes_length(&self, format: SerdeFormat) -> usize {
+        10 + (self.fixed_commitments.len() * byte_length::<CS::Commitment>(format))
             + self.permutation.bytes_length(format)
             + self.selectors.len()
                 * (self
@@ -201,14 +198,14 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     fn from_parts(
-        domain: EvaluationDomain<C::Scalar>,
-        fixed_commitments: Vec<C>,
-        permutation: permutation::VerifyingKey<C>,
-        cs: ConstraintSystem<C::Scalar>,
+        domain: EvaluationDomain<F>,
+        fixed_commitments: Vec<CS::Commitment>,
+        permutation: permutation::VerifyingKey<F, CS>,
+        cs: ConstraintSystem<F>,
         selectors: Vec<Vec<bool>>,
     ) -> Self
     where
-        C::ScalarExt: FromUniformBytes<64>,
+        F: FromUniformBytes<64>,
     {
         // Compute cached values.
         let cs_degree = cs.degree();
@@ -220,7 +217,7 @@ impl<C: CurveAffine> VerifyingKey<C> {
             cs,
             cs_degree,
             // Temporary, this is not pinned.
-            transcript_repr: C::Scalar::ZERO,
+            transcript_repr: F::ZERO,
             selectors,
         };
 
@@ -235,27 +232,25 @@ impl<C: CurveAffine> VerifyingKey<C> {
         hasher.update(s.as_bytes());
 
         // Hash in final Blake2bState
-        vk.transcript_repr = C::Scalar::from_uniform_bytes(hasher.finalize().as_array());
+        vk.transcript_repr = F::from_uniform_bytes(hasher.finalize().as_array());
 
         vk
     }
 
     /// Hashes a verification key into a transcript.
-    pub fn hash_into<E: EncodedChallenge<C>, T: Transcript<C, E>>(
-        &self,
-        transcript: &mut T,
-    ) -> io::Result<()> {
-        transcript.common_scalar(self.transcript_repr)?;
+    pub fn hash_into<T: Transcript>(&self, transcript: &mut T) -> io::Result<()>
+    where
+        F: Hashable<T::Hash>,
+    {
+        transcript.common(&self.transcript_repr)?;
 
         Ok(())
     }
 
     /// Obtains a pinned representation of this verification key that contains
     /// the minimal information necessary to reconstruct the verification key.
-    pub fn pinned(&self) -> PinnedVerificationKey<'_, C> {
+    pub fn pinned(&self) -> PinnedVerificationKey<'_, F, CS> {
         PinnedVerificationKey {
-            base_modulus: C::Base::MODULUS,
-            scalar_modulus: C::Scalar::MODULUS,
             domain: self.domain.pinned(),
             fixed_commitments: &self.fixed_commitments,
             permutation: &self.permutation,
@@ -264,22 +259,22 @@ impl<C: CurveAffine> VerifyingKey<C> {
     }
 
     /// Returns commitments of fixed polynomials
-    pub fn fixed_commitments(&self) -> &Vec<C> {
+    pub fn fixed_commitments(&self) -> &Vec<CS::Commitment> {
         &self.fixed_commitments
     }
 
     /// Returns `VerifyingKey` of permutation
-    pub fn permutation(&self) -> &permutation::VerifyingKey<C> {
+    pub fn permutation(&self) -> &permutation::VerifyingKey<F, CS> {
         &self.permutation
     }
 
     /// Returns `ConstraintSystem`
-    pub fn cs(&self) -> &ConstraintSystem<C::Scalar> {
+    pub fn cs(&self) -> &ConstraintSystem<F> {
         &self.cs
     }
 
     /// Returns representative of this `VerifyingKey` in transcripts
-    pub fn transcript_repr(&self) -> C::Scalar {
+    pub fn transcript_repr(&self) -> F {
         self.transcript_repr
     }
 }
@@ -288,44 +283,39 @@ impl<C: CurveAffine> VerifyingKey<C> {
 /// its active contents.
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct PinnedVerificationKey<'a, C: CurveAffine> {
-    base_modulus: &'static str,
-    scalar_modulus: &'static str,
-    domain: PinnedEvaluationDomain<'a, C::Scalar>,
-    cs: PinnedConstraintSystem<'a, C::Scalar>,
-    fixed_commitments: &'a Vec<C>,
-    permutation: &'a permutation::VerifyingKey<C>,
+pub struct PinnedVerificationKey<'a, F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    domain: PinnedEvaluationDomain<'a, F>,
+    cs: PinnedConstraintSystem<'a, F>,
+    fixed_commitments: &'a Vec<CS::Commitment>,
+    permutation: &'a permutation::VerifyingKey<F, CS>,
 }
 /// This is a proving key which allows for the creation of proofs for a
 /// particular circuit.
 #[derive(Clone, Debug)]
-pub struct ProvingKey<C: CurveAffine> {
-    vk: VerifyingKey<C>,
-    l0: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
-    l_last: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
-    l_active_row: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
-    fixed_values: Vec<Polynomial<C::Scalar, LagrangeCoeff>>,
-    fixed_polys: Vec<Polynomial<C::Scalar, Coeff>>,
-    fixed_cosets: Vec<Polynomial<C::Scalar, ExtendedLagrangeCoeff>>,
-    permutation: permutation::ProvingKey<C>,
-    ev: Evaluator<C>,
+pub struct ProvingKey<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    vk: VerifyingKey<F, CS>,
+    l0: Polynomial<F, ExtendedLagrangeCoeff>,
+    l_last: Polynomial<F, ExtendedLagrangeCoeff>,
+    l_active_row: Polynomial<F, ExtendedLagrangeCoeff>,
+    fixed_values: Vec<Polynomial<F, LagrangeCoeff>>,
+    fixed_polys: Vec<Polynomial<F, Coeff>>,
+    fixed_cosets: Vec<Polynomial<F, ExtendedLagrangeCoeff>>,
+    permutation: permutation::ProvingKey<F>,
+    ev: Evaluator<F>,
 }
 
-impl<C: CurveAffine> ProvingKey<C>
+impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> ProvingKey<F, CS>
 where
-    C::Scalar: FromUniformBytes<64>,
+    F: FromUniformBytes<64>,
 {
     /// Get the underlying [`VerifyingKey`].
-    pub fn get_vk(&self) -> &VerifyingKey<C> {
+    pub fn get_vk(&self) -> &VerifyingKey<F, CS> {
         &self.vk
     }
 
     /// Gets the total number of bytes in the serialization of `self`
-    fn bytes_length(&self, format: SerdeFormat) -> usize
-    where
-        C: SerdeCurveAffine,
-    {
-        let scalar_len = C::Scalar::default().to_repr().as_ref().len();
+    fn bytes_length(&self, format: SerdeFormat) -> usize {
+        let scalar_len = F::default().to_repr().as_ref().len();
         self.vk.bytes_length(format)
             + 12
             + scalar_len * (self.l0.len() + self.l_last.len() + self.l_active_row.len())
@@ -336,9 +326,9 @@ where
     }
 }
 
-impl<C: SerdeCurveAffine> ProvingKey<C>
+impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> ProvingKey<F, CS>
 where
-    C::Scalar: SerdePrimeField + FromUniformBytes<64>,
+    F: SerdePrimeField + FromUniformBytes<64>,
 {
     /// Writes a proving key to a buffer.
     ///
@@ -373,12 +363,12 @@ where
     /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
     /// does not perform any checks
-    pub fn read<R: io::Read, ConcreteCircuit: Circuit<C::Scalar>>(
+    pub fn read<R: io::Read, ConcreteCircuit: Circuit<F>>(
         reader: &mut R,
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
     ) -> io::Result<Self> {
-        let vk = VerifyingKey::<C>::read::<R, ConcreteCircuit>(
+        let vk = VerifyingKey::<F, CS>::read::<R, ConcreteCircuit>(
             reader,
             format,
             #[cfg(feature = "circuit-params")]
@@ -413,7 +403,7 @@ where
     }
 
     /// Reads a proving key from a slice of bytes using [`Self::read`].
-    pub fn from_bytes<ConcreteCircuit: Circuit<C::Scalar>>(
+    pub fn from_bytes<ConcreteCircuit: Circuit<F>>(
         mut bytes: &[u8],
         format: SerdeFormat,
         #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
@@ -427,29 +417,9 @@ where
     }
 }
 
-impl<C: CurveAffine> VerifyingKey<C> {
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> VerifyingKey<F, CS> {
     /// Get the underlying [`EvaluationDomain`].
-    pub fn get_domain(&self) -> &EvaluationDomain<C::Scalar> {
+    pub fn get_domain(&self) -> &EvaluationDomain<F> {
         &self.domain
     }
 }
-
-#[derive(Clone, Copy, Debug)]
-struct Theta;
-type ChallengeTheta<F> = ChallengeScalar<F, Theta>;
-
-#[derive(Clone, Copy, Debug)]
-struct Beta;
-type ChallengeBeta<F> = ChallengeScalar<F, Beta>;
-
-#[derive(Clone, Copy, Debug)]
-struct Gamma;
-type ChallengeGamma<F> = ChallengeScalar<F, Gamma>;
-
-#[derive(Clone, Copy, Debug)]
-struct Y;
-type ChallengeY<F> = ChallengeScalar<F, Y>;
-
-#[derive(Clone, Copy, Debug)]
-struct X;
-type ChallengeX<F> = ChallengeScalar<F, X>;

@@ -1,15 +1,13 @@
 //! Contains utilities for performing polynomial arithmetic over an evaluation
 //! domain that is of a suitable size for the application.
 
-use crate::{
-    arithmetic::{best_fft, parallelize},
-    rational::Rational,
-};
+use crate::arithmetic::{best_fft, parallelize};
 
 use super::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, Rotation};
 use ff::WithSmallOrderMulGroup;
 use group::ff::{BatchInvert, Field};
 
+use crate::rational::Rational;
 use std::marker::PhantomData;
 
 /// This structure contains precomputed constants and other details needed for
@@ -24,7 +22,7 @@ pub struct EvaluationDomain<F: Field> {
     omega_inv: F,
     extended_omega: F,
     extended_omega_inv: F,
-    g_coset: F,
+    pub(crate) g_coset: F,
     g_coset_inv: F,
     quotient_poly_degree: u64,
     ifft_divisor: F,
@@ -77,8 +75,6 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         let omega = omega;
         let mut omega_inv = omega; // Inversion computed later
 
-        // We use zeta here because we know it generates a coset, and it's available
-        // already.
         // The coset evaluation domain is:
         // zeta {1, extended_omega, extended_omega^2, ..., extended_omega^{(2^extended_k) - 1}}
         let g_coset = F::ZETA;
@@ -88,7 +84,7 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
         {
             // Compute the evaluations of t(X) = X^n - 1 in the coset evaluation domain.
             // We don't have to compute all of them, because it will repeat.
-            let orig = F::ZETA.pow_vartime([n, 0, 0, 0]);
+            let orig = g_coset.pow_vartime([n, 0, 0, 0]);
             let step = extended_omega.pow_vartime([n, 0, 0, 0]);
             let mut cur = orig;
             loop {

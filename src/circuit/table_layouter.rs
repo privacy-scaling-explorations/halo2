@@ -7,7 +7,8 @@ use std::{
 
 use ff::Field;
 
-use crate::plonk::{Assigned, Assignment, Error, TableColumn, TableError};
+use crate::plonk::{Assignment, Error, TableColumn, TableError};
+use crate::rational::Rational;
 
 use super::Value;
 
@@ -25,7 +26,7 @@ pub trait TableLayouter<F: Field>: std::fmt::Debug {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: TableColumn,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<(), Error>;
 }
 
@@ -36,7 +37,7 @@ pub trait TableLayouter<F: Field>: std::fmt::Debug {
 ///   assigned.
 /// - The inner `Value` tracks whether the underlying `Assignment` is evaluating
 ///   witnesses or not.
-type DefaultTableValue<F> = Option<Value<Assigned<F>>>;
+type DefaultTableValue<F> = Option<Value<Rational<F>>>;
 
 /// A table layouter that can be used to assign values to a table.
 pub struct SimpleTableLayouter<'r, 'a, F: Field, CS: Assignment<F> + 'a> {
@@ -74,7 +75,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + 'a> TableLayouter<F>
         annotation: &'v (dyn Fn() -> String + 'v),
         column: TableColumn,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<(), Error> {
         if self.used_columns.contains(&column) {
             return Err(Error::TableError(TableError::UsedColumn(column)));

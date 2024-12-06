@@ -1,51 +1,40 @@
-use super::super::{
-    circuit::Expression, ChallengeBeta, ChallengeGamma, ChallengeTheta, ChallengeX, Error,
-    ProvingKey,
-};
+use super::super::{circuit::Expression, Error, ProvingKey};
 use super::Argument;
 use crate::plonk::evaluation::evaluate;
+use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize, CurveAffine},
-    poly::{
-        commitment::{Blind, Params},
-        Coeff, EvaluationDomain, LagrangeCoeff, Polynomial, ProverQuery, Rotation,
-    },
-    transcript::{EncodedChallenge, TranscriptWrite},
+    arithmetic::{eval_polynomial, parallelize},
+    poly::{Coeff, EvaluationDomain, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
 };
-use ff::WithSmallOrderMulGroup;
-use group::{
-    ff::{BatchInvert, Field},
-    Curve,
-};
-use rand_core::RngCore;
-use std::{
-    collections::BTreeMap,
-    iter,
-    ops::{Mul, MulAssign},
-};
+use ff::{PrimeField, WithSmallOrderMulGroup};
+use group::ff::BatchInvert;
+use halo2curves::serde::SerdeObject;
+use rand_core::{CryptoRng, RngCore};
+use std::{collections::BTreeMap, iter};
 
 #[derive(Debug)]
-pub(in crate::plonk) struct Permuted<C: CurveAffine> {
-    compressed_input_expression: Polynomial<C::Scalar, LagrangeCoeff>,
-    permuted_input_expression: Polynomial<C::Scalar, LagrangeCoeff>,
-    permuted_input_poly: Polynomial<C::Scalar, Coeff>,
-    compressed_table_expression: Polynomial<C::Scalar, LagrangeCoeff>,
-    permuted_table_expression: Polynomial<C::Scalar, LagrangeCoeff>,
-    permuted_table_poly: Polynomial<C::Scalar, Coeff>,
+pub(in crate::plonk) struct Permuted<F: PrimeField> {
+    compressed_input_expression: Polynomial<F, LagrangeCoeff>,
+    permuted_input_expression: Polynomial<F, LagrangeCoeff>,
+    permuted_input_poly: Polynomial<F, Coeff>,
+    compressed_table_expression: Polynomial<F, LagrangeCoeff>,
+    permuted_table_expression: Polynomial<F, LagrangeCoeff>,
+    permuted_table_poly: Polynomial<F, Coeff>,
 }
 
 #[derive(Debug)]
-pub(in crate::plonk) struct Committed<C: CurveAffine> {
-    pub(in crate::plonk) permuted_input_poly: Polynomial<C::Scalar, Coeff>,
-    pub(in crate::plonk) permuted_table_poly: Polynomial<C::Scalar, Coeff>,
-    pub(in crate::plonk) product_poly: Polynomial<C::Scalar, Coeff>,
+pub(in crate::plonk) struct Committed<F: PrimeField> {
+    pub(in crate::plonk) permuted_input_poly: Polynomial<F, Coeff>,
+    pub(in crate::plonk) permuted_table_poly: Polynomial<F, Coeff>,
+    pub(in crate::plonk) product_poly: Polynomial<F, Coeff>,
 }
 
-pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
-    constructed: Committed<C>,
+pub(in crate::plonk) struct Evaluated<F: PrimeField> {
+    constructed: Committed<F>,
 }
 
-impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
+impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
     /// Given a Lookup with input expressions [A_0, A_1, ..., A_{m-1}] and table expressions
     /// [S_0, S_1, ..., S_{m-1}], this method
     /// - constructs A_compressed = \theta^{m-1} A_0 + theta^{m-2} A_1 + ... + \theta A_{m-2} + A_{m-1}
@@ -59,30 +48,27 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
     pub(in crate::plonk) fn commit_permuted<
         'a,
         'params: 'a,
-        C,
-        P: Params<'params, C>,
-        E: EncodedChallenge<C>,
+        CS: PolynomialCommitmentScheme<F>,
         R: RngCore,
-        T: TranscriptWrite<C, E>,
+        T: Transcript,
     >(
         &self,
-        pk: &ProvingKey<C>,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
-        theta: ChallengeTheta<C>,
-        advice_values: &'a [Polynomial<C::Scalar, LagrangeCoeff>],
-        fixed_values: &'a [Polynomial<C::Scalar, LagrangeCoeff>],
-        instance_values: &'a [Polynomial<C::Scalar, LagrangeCoeff>],
-        challenges: &'a [C::Scalar],
+        pk: &ProvingKey<F, CS>,
+        params: &'params CS::Parameters,
+        domain: &EvaluationDomain<F>,
+        theta: F,
+        advice_values: &'a [Polynomial<F, LagrangeCoeff>],
+        fixed_values: &'a [Polynomial<F, LagrangeCoeff>],
+        instance_values: &'a [Polynomial<F, LagrangeCoeff>],
+        challenges: &'a [F],
         mut rng: R,
         transcript: &mut T,
-    ) -> Result<Permuted<C>, Error>
+    ) -> Result<Permuted<F>, Error>
     where
-        C: CurveAffine<ScalarExt = F>,
-        C::Curve: Mul<F, Output = C::Curve> + MulAssign<F>,
+        CS::Commitment: Hashable<T::Hash>,
     {
         // Closure to get values of expressions and compress them
-        let compress_expressions = |expressions: &[Expression<C::Scalar>]| {
+        let compress_expressions = |expressions: &[Expression<F>]| {
             let compressed_expression = expressions
                 .iter()
                 .map(|expression| {
@@ -97,7 +83,7 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
                     ))
                 })
                 .fold(domain.empty_lagrange(), |acc, expression| {
-                    acc * *theta + &expression
+                    acc * theta + &expression
                 });
             compressed_expression
         };
@@ -119,10 +105,9 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
         )?;
 
         // Closure to construct commitment to vector of values
-        let mut commit_values = |values: &Polynomial<C::Scalar, LagrangeCoeff>| {
+        let commit_values = |values: &Polynomial<F, LagrangeCoeff>| {
             let poly = pk.vk.domain.lagrange_to_coeff(values.clone());
-            let blind = Blind(C::Scalar::random(&mut rng));
-            let commitment = params.commit_lagrange(values, blind).to_affine();
+            let commitment = params.commit_lagrange(values);
             (poly, commitment)
         };
 
@@ -135,10 +120,10 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
             commit_values(&permuted_table_expression);
 
         // Hash permuted input commitment
-        transcript.write_point(permuted_input_commitment)?;
+        transcript.write(&permuted_input_commitment)?;
 
         // Hash permuted table commitment
-        transcript.write_point(permuted_table_commitment)?;
+        transcript.write(&permuted_table_commitment)?;
 
         Ok(Permuted {
             compressed_input_expression,
@@ -151,27 +136,24 @@ impl<F: WithSmallOrderMulGroup<3>> Argument<F> {
     }
 }
 
-impl<C: CurveAffine> Permuted<C> {
+impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
     /// Given a Lookup with input expressions, table expressions, and the permuted
     /// input expression and permuted table expression, this method constructs the
     /// grand product polynomial over the lookup. The grand product polynomial
     /// is used to populate the Product<C> struct. The Product<C> struct is
     /// added to the Lookup and finally returned by the method.
-    pub(in crate::plonk) fn commit_product<
-        'params,
-        P: Params<'params, C>,
-        E: EncodedChallenge<C>,
-        R: RngCore,
-        T: TranscriptWrite<C, E>,
-    >(
+    pub(in crate::plonk) fn commit_product<CS: PolynomialCommitmentScheme<F>, T: Transcript>(
         self,
-        pk: &ProvingKey<C>,
-        params: &P,
-        beta: ChallengeBeta<C>,
-        gamma: ChallengeGamma<C>,
-        mut rng: R,
+        pk: &ProvingKey<F, CS>,
+        params: &CS::Parameters,
+        beta: F,
+        gamma: F,
+        mut rng: impl RngCore + CryptoRng,
         transcript: &mut T,
-    ) -> Result<Committed<C>, Error> {
+    ) -> Result<Committed<F>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash>,
+    {
         let blinding_factors = pk.vk.cs.blinding_factors();
         // Goal is to compute the products of fractions
         //
@@ -184,7 +166,7 @@ impl<C: CurveAffine> Permuted<C> {
         // s_j(X) is the jth table expression in this lookup,
         // s'(X) is the compression of the permuted table expressions,
         // and i is the ith row of the expression.
-        let mut lookup_product = vec![C::Scalar::ZERO; params.n() as usize];
+        let mut lookup_product = vec![F::ZERO; params.n() as usize];
         // Denominator uses the permuted input expression and permuted table expression
         parallelize(&mut lookup_product, |lookup_product, start| {
             for ((lookup_product, permuted_input_value), permuted_table_value) in lookup_product
@@ -192,7 +174,7 @@ impl<C: CurveAffine> Permuted<C> {
                 .zip(self.permuted_input_expression[start..].iter())
                 .zip(self.permuted_table_expression[start..].iter())
             {
-                *lookup_product = (*beta + permuted_input_value) * &(*gamma + permuted_table_value);
+                *lookup_product = (beta + permuted_input_value) * &(gamma + permuted_table_value);
             }
         });
 
@@ -207,8 +189,8 @@ impl<C: CurveAffine> Permuted<C> {
             for (i, product) in product.iter_mut().enumerate() {
                 let i = i + start;
 
-                *product *= &(self.compressed_input_expression[i] + &*beta);
-                *product *= &(self.compressed_table_expression[i] + &*gamma);
+                *product *= &(self.compressed_input_expression[i] + &beta);
+                *product *= &(self.compressed_table_expression[i] + &gamma);
             }
         });
 
@@ -227,9 +209,9 @@ impl<C: CurveAffine> Permuted<C> {
 
         // Compute the evaluations of the lookup product polynomial
         // over our domain, starting with z[0] = 1
-        let z = iter::once(C::Scalar::ONE)
+        let z = iter::once(F::ONE)
             .chain(lookup_product)
-            .scan(C::Scalar::ONE, |state, cur| {
+            .scan(F::ONE, |state, cur| {
                 *state *= &cur;
                 Some(*state)
             })
@@ -237,7 +219,7 @@ impl<C: CurveAffine> Permuted<C> {
             // be a boolean (and ideally 1, else soundness is broken)
             .take(params.n() as usize - blinding_factors)
             // Chain random blinding factors.
-            .chain((0..blinding_factors).map(|_| C::Scalar::random(&mut rng)))
+            .chain((0..blinding_factors).map(|_| F::random(&mut rng)))
             .collect::<Vec<_>>();
         assert_eq!(z.len(), params.n() as usize);
         let z = pk.vk.domain.lagrange_from_vec(z);
@@ -250,7 +232,7 @@ impl<C: CurveAffine> Permuted<C> {
             let u = (params.n() as usize) - (blinding_factors + 1);
 
             // l_0(X) * (1 - z(X)) = 0
-            assert_eq!(z[0], C::Scalar::ONE);
+            assert_eq!(z[0], F::ONE);
 
             // z(\omega X) (a'(X) + \beta) (s'(X) + \gamma)
             // - z(X) (\theta^{m-1} a_0(X) + ... + a_{m-1}(X) + \beta) (\theta^{m-1} s_0(X) + ... + s_{m-1}(X) + \gamma)
@@ -277,17 +259,16 @@ impl<C: CurveAffine> Permuted<C> {
             // l_last(X) * (z(X)^2 - z(X)) = 0
             // Assertion will fail only when soundness is broken, in which
             // case this z[u] value will be zero. (bad!)
-            assert_eq!(z[u], C::Scalar::ONE);
+            assert_eq!(z[u], F::ONE);
         }
 
-        let product_blind = Blind(C::Scalar::random(rng));
-        let product_commitment = params.commit_lagrange(&z, product_blind).to_affine();
+        let product_commitment = params.commit_lagrange(&z);
         let z = pk.vk.domain.lagrange_to_coeff(z);
 
         // Hash product commitment
-        transcript.write_point(product_commitment)?;
+        transcript.write(&product_commitment)?;
 
-        Ok(Committed::<C> {
+        Ok(Committed::<F> {
             permuted_input_poly: self.permuted_input_poly,
             permuted_table_poly: self.permuted_table_poly,
             product_poly: z,
@@ -295,22 +276,25 @@ impl<C: CurveAffine> Permuted<C> {
     }
 }
 
-impl<C: CurveAffine> Committed<C> {
-    pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
+impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
+    pub(in crate::plonk) fn evaluate<T: Transcript, CS: PolynomialCommitmentScheme<F>>(
         self,
-        pk: &ProvingKey<C>,
-        x: ChallengeX<C>,
+        pk: &ProvingKey<F, CS>,
+        x: F,
         transcript: &mut T,
-    ) -> Result<Evaluated<C>, Error> {
+    ) -> Result<Evaluated<F>, Error>
+    where
+        F: Hashable<T::Hash> + SerdeObject,
+    {
         let domain = &pk.vk.domain;
-        let x_inv = domain.rotate_omega(*x, Rotation::prev());
-        let x_next = domain.rotate_omega(*x, Rotation::next());
+        let x_inv = domain.rotate_omega(x, Rotation::prev());
+        let x_next = domain.rotate_omega(x, Rotation::next());
 
-        let product_eval = eval_polynomial(&self.product_poly, *x);
+        let product_eval = eval_polynomial(&self.product_poly, x);
         let product_next_eval = eval_polynomial(&self.product_poly, x_next);
-        let permuted_input_eval = eval_polynomial(&self.permuted_input_poly, *x);
+        let permuted_input_eval = eval_polynomial(&self.permuted_input_poly, x);
         let permuted_input_inv_eval = eval_polynomial(&self.permuted_input_poly, x_inv);
-        let permuted_table_eval = eval_polynomial(&self.permuted_table_poly, *x);
+        let permuted_table_eval = eval_polynomial(&self.permuted_table_poly, x);
 
         // Hash each advice evaluation
         for eval in iter::empty()
@@ -320,36 +304,36 @@ impl<C: CurveAffine> Committed<C> {
             .chain(Some(permuted_input_inv_eval))
             .chain(Some(permuted_table_eval))
         {
-            transcript.write_scalar(eval)?;
+            transcript.write(&eval)?;
         }
 
         Ok(Evaluated { constructed: self })
     }
 }
 
-impl<C: CurveAffine> Evaluated<C> {
-    pub(in crate::plonk) fn open<'a>(
+impl<F: WithSmallOrderMulGroup<3>> Evaluated<F> {
+    pub(in crate::plonk) fn open<'a, CS: PolynomialCommitmentScheme<F>>(
         &'a self,
-        pk: &'a ProvingKey<C>,
-        x: ChallengeX<C>,
-    ) -> impl Iterator<Item = ProverQuery<'a, C>> + Clone {
-        let x_inv = pk.vk.domain.rotate_omega(*x, Rotation::prev());
-        let x_next = pk.vk.domain.rotate_omega(*x, Rotation::next());
+        pk: &'a ProvingKey<F, CS>,
+        x: F,
+    ) -> impl Iterator<Item = ProverQuery<'a, F>> + Clone {
+        let x_inv = pk.vk.domain.rotate_omega(x, Rotation::prev());
+        let x_next = pk.vk.domain.rotate_omega(x, Rotation::next());
 
         iter::empty()
             // Open lookup product commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                point: x,
                 poly: &self.constructed.product_poly,
             }))
             // Open lookup input commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                point: x,
                 poly: &self.constructed.permuted_input_poly,
             }))
             // Open lookup table commitments at x
             .chain(Some(ProverQuery {
-                point: *x,
+                point: x,
                 poly: &self.constructed.permuted_table_poly,
             }))
             // Open lookup input commitments at x_inv
@@ -373,32 +357,37 @@ type ExpressionPair<F> = (Polynomial<F, LagrangeCoeff>, Polynomial<F, LagrangeCo
 /// - the first row in a sequence of like values in A' is the row
 ///   that has the corresponding value in S'.
 /// This method returns (A', S') if no errors are encountered.
-fn permute_expression_pair<'params, C: CurveAffine, P: Params<'params, C>, R: RngCore>(
-    pk: &ProvingKey<C>,
-    params: &P,
-    domain: &EvaluationDomain<C::Scalar>,
+fn permute_expression_pair<
+    F: WithSmallOrderMulGroup<3> + Ord,
+    CS: PolynomialCommitmentScheme<F>,
+    R: RngCore,
+>(
+    pk: &ProvingKey<F, CS>,
+    params: &CS::Parameters,
+    domain: &EvaluationDomain<F>,
     mut rng: R,
-    input_expression: &Polynomial<C::Scalar, LagrangeCoeff>,
-    table_expression: &Polynomial<C::Scalar, LagrangeCoeff>,
-) -> Result<ExpressionPair<C::Scalar>, Error> {
+    input_expression: &Polynomial<F, LagrangeCoeff>,
+    table_expression: &Polynomial<F, LagrangeCoeff>,
+) -> Result<ExpressionPair<F>, Error> {
     let blinding_factors = pk.vk.cs.blinding_factors();
     let usable_rows = params.n() as usize - (blinding_factors + 1);
 
-    let mut permuted_input_expression: Vec<C::Scalar> = input_expression.to_vec();
+    let mut permuted_input_expression: Vec<F> = input_expression.to_vec();
     permuted_input_expression.truncate(usable_rows);
 
     // Sort input lookup expression values
     permuted_input_expression.sort();
 
     // A BTreeMap of each unique element in the table expression and its count
-    let mut leftover_table_map: BTreeMap<C::Scalar, u32> = table_expression
-        .iter()
-        .take(usable_rows)
-        .fold(BTreeMap::new(), |mut acc, coeff| {
-            *acc.entry(*coeff).or_insert(0) += 1;
-            acc
-        });
-    let mut permuted_table_coeffs = vec![C::Scalar::ZERO; usable_rows];
+    let mut leftover_table_map: BTreeMap<F, u32> =
+        table_expression
+            .iter()
+            .take(usable_rows)
+            .fold(BTreeMap::new(), |mut acc, coeff| {
+                *acc.entry(*coeff).or_insert(0) += 1;
+                acc
+            });
+    let mut permuted_table_coeffs = vec![F::ZERO; usable_rows];
 
     let mut repeated_input_rows = permuted_input_expression
         .iter()
@@ -432,9 +421,8 @@ fn permute_expression_pair<'params, C: CurveAffine, P: Params<'params, C>, R: Rn
     }
     assert!(repeated_input_rows.is_empty());
 
-    permuted_input_expression
-        .extend((0..(blinding_factors + 1)).map(|_| C::Scalar::random(&mut rng)));
-    permuted_table_coeffs.extend((0..(blinding_factors + 1)).map(|_| C::Scalar::random(&mut rng)));
+    permuted_input_expression.extend((0..(blinding_factors + 1)).map(|_| F::random(&mut rng)));
+    permuted_table_coeffs.extend((0..(blinding_factors + 1)).map(|_| F::random(&mut rng)));
     assert_eq!(permuted_input_expression.len(), params.n() as usize);
     assert_eq!(permuted_table_coeffs.len(), params.n() as usize);
 

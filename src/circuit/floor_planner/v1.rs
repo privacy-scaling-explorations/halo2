@@ -2,6 +2,7 @@ use std::fmt;
 
 use ff::Field;
 
+use crate::rational::Rational;
 use crate::{
     circuit::{
         layouter::{RegionColumn, RegionLayouter, RegionShape, SyncDeps, TableLayouter},
@@ -9,8 +10,8 @@ use crate::{
         Cell, Layouter, Region, RegionIndex, RegionStart, Table, Value,
     },
     plonk::{
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, Error, Fixed, FloorPlanner,
-        Instance, Selector, TableColumn,
+        Advice, Any, Assignment, Challenge, Circuit, Column, Error, Fixed, FloorPlanner, Instance,
+        Selector, TableColumn,
     },
 };
 
@@ -32,7 +33,7 @@ struct V1Plan<'a, F: Field, CS: Assignment<F> + 'a> {
     /// Stores the starting row for each region.
     regions: Vec<RegionStart>,
     /// Stores the constants to be assigned, and the cells to which they are copied.
-    constants: Vec<(Assigned<F>, Cell)>,
+    constants: Vec<(Rational<F>, Cell)>,
     /// Stores the table fixed columns.
     table_columns: Vec<TableColumn>,
 }
@@ -386,7 +387,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Reg
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         self.plan.cs.assign_advice(
             annotation,
@@ -407,7 +408,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Reg
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        constant: Assigned<F>,
+        constant: Rational<F>,
     ) -> Result<Cell, Error> {
         let advice =
             self.assign_advice(annotation, column, offset, &mut || Value::known(constant))?;
@@ -451,7 +452,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Reg
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Fixed>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         self.plan.cs.assign_fixed(
             annotation,
@@ -467,7 +468,7 @@ impl<'r, 'a, F: Field, CS: Assignment<F> + SyncDeps> RegionLayouter<F> for V1Reg
         })
     }
 
-    fn constrain_constant(&mut self, cell: Cell, constant: Assigned<F>) -> Result<(), Error> {
+    fn constrain_constant(&mut self, cell: Cell, constant: Rational<F>) -> Result<(), Error> {
         self.plan.constants.push((constant, cell));
         Ok(())
     }

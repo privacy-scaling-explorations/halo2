@@ -3,7 +3,8 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use group::ff::Field;
 
-use crate::plonk::{Assigned, Error};
+use crate::plonk::Error;
+use crate::rational::Rational;
 
 /// A value that might exist within a circuit.
 ///
@@ -498,19 +499,19 @@ where
 }
 
 //
-// Assigned<Field>
+// Rational<Field>
 //
 
-impl<F: Field> From<Value<F>> for Value<Assigned<F>> {
+impl<F: Field> From<Value<F>> for Value<Rational<F>> {
     fn from(value: Value<F>) -> Self {
         Self {
-            inner: value.inner.map(Assigned::from),
+            inner: value.inner.map(Rational::from),
         }
     }
 }
 
-impl<F: Field> Add<Value<F>> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Add<Value<F>> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn add(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -519,16 +520,16 @@ impl<F: Field> Add<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<F> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Add<F> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn add(self, rhs: F) -> Self::Output {
         self + Value::known(rhs)
     }
 }
 
-impl<F: Field> Add<Value<F>> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Add<Value<F>> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn add(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -537,16 +538,16 @@ impl<F: Field> Add<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Add<F> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Add<F> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn add(self, rhs: F) -> Self::Output {
         self + Value::known(rhs)
     }
 }
 
-impl<F: Field> Sub<Value<F>> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Sub<Value<F>> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn sub(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -555,16 +556,16 @@ impl<F: Field> Sub<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<F> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Sub<F> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn sub(self, rhs: F) -> Self::Output {
         self - Value::known(rhs)
     }
 }
 
-impl<F: Field> Sub<Value<F>> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Sub<Value<F>> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn sub(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -573,16 +574,16 @@ impl<F: Field> Sub<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Sub<F> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Sub<F> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn sub(self, rhs: F) -> Self::Output {
         self - Value::known(rhs)
     }
 }
 
-impl<F: Field> Mul<Value<F>> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Mul<Value<F>> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn mul(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -591,16 +592,16 @@ impl<F: Field> Mul<Value<F>> for Value<Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<F> for Value<Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Mul<F> for Value<Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn mul(self, rhs: F) -> Self::Output {
         self * Value::known(rhs)
     }
 }
 
-impl<F: Field> Mul<Value<F>> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Mul<Value<F>> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn mul(self, rhs: Value<F>) -> Self::Output {
         Value {
@@ -609,8 +610,8 @@ impl<F: Field> Mul<Value<F>> for Value<&Assigned<F>> {
     }
 }
 
-impl<F: Field> Mul<F> for Value<&Assigned<F>> {
-    type Output = Value<Assigned<F>>;
+impl<F: Field> Mul<F> for Value<&Rational<F>> {
+    type Output = Value<Rational<F>>;
 
     fn mul(self, rhs: F) -> Self::Output {
         self * Value::known(rhs)
@@ -619,9 +620,9 @@ impl<F: Field> Mul<F> for Value<&Assigned<F>> {
 
 impl<V> Value<V> {
     /// Returns the field element corresponding to this value.
-    pub fn to_field<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn to_field<F: Field>(&self) -> Value<Rational<F>>
     where
-        for<'v> Assigned<F>: From<&'v V>,
+        for<'v> Rational<F>: From<&'v V>,
     {
         Value {
             inner: self.inner.as_ref().map(|v| v.into()),
@@ -629,9 +630,9 @@ impl<V> Value<V> {
     }
 
     /// Returns the field element corresponding to this value.
-    pub fn into_field<F: Field>(self) -> Value<Assigned<F>>
+    pub fn into_field<F: Field>(self) -> Value<Rational<F>>
     where
-        V: Into<Assigned<F>>,
+        V: Into<Rational<F>>,
     {
         Value {
             inner: self.inner.map(|v| v.into()),
@@ -642,18 +643,19 @@ impl<V> Value<V> {
     ///
     /// # Examples
     ///
-    /// If you have a `Value<F: Field>`, convert it to `Value<Assigned<F>>` first:
+    /// If you have a `Value<F: Field>`, convert it to `Value<Rational<F>>` first:
     /// ```
     /// # use halo2curves::pasta::pallas::Base as F;
-    /// use halo2_proofs::{circuit::Value, plonk::Assigned};
+    /// use halo2_proofs::{circuit::Value};
+    /// use halo2_proofs::rational::Rational;
     ///
     /// let v = Value::known(F::from(2));
-    /// let v: Value<Assigned<F>> = v.into();
+    /// let v: Value<Rational<F>> = v.into();
     /// v.double();
     /// ```
-    pub fn double<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn double<F: Field>(&self) -> Value<Rational<F>>
     where
-        V: Borrow<Assigned<F>>,
+        V: Borrow<Rational<F>>,
     {
         Value {
             inner: self.inner.as_ref().map(|v| v.borrow().double()),
@@ -661,9 +663,9 @@ impl<V> Value<V> {
     }
 
     /// Squares this field element.
-    pub fn square<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn square<F: Field>(&self) -> Value<Rational<F>>
     where
-        V: Borrow<Assigned<F>>,
+        V: Borrow<Rational<F>>,
     {
         Value {
             inner: self.inner.as_ref().map(|v| v.borrow().square()),
@@ -671,9 +673,9 @@ impl<V> Value<V> {
     }
 
     /// Cubes this field element.
-    pub fn cube<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn cube<F: Field>(&self) -> Value<Rational<F>>
     where
-        V: Borrow<Assigned<F>>,
+        V: Borrow<Rational<F>>,
     {
         Value {
             inner: self.inner.as_ref().map(|v| v.borrow().cube()),
@@ -681,9 +683,9 @@ impl<V> Value<V> {
     }
 
     /// Inverts this assigned value (taking the inverse of zero to be zero).
-    pub fn invert<F: Field>(&self) -> Value<Assigned<F>>
+    pub fn invert<F: Field>(&self) -> Value<Rational<F>>
     where
-        V: Borrow<Assigned<F>>,
+        V: Borrow<Rational<F>>,
     {
         Value {
             inner: self.inner.as_ref().map(|v| v.borrow().invert()),
@@ -691,7 +693,7 @@ impl<V> Value<V> {
     }
 }
 
-impl<F: Field> Value<Assigned<F>> {
+impl<F: Field> Value<Rational<F>> {
     /// Evaluates this value directly, performing an unbatched inversion if necessary.
     ///
     /// If the denominator is zero, the returned value is zero.

@@ -3,14 +3,15 @@ use std::{fmt, marker::PhantomData};
 use ff::Field;
 use tracing::{debug, debug_span, span::EnteredSpan};
 
+use crate::rational::Rational;
 use crate::{
     circuit::{
         layouter::{RegionLayouter, SyncDeps},
         AssignedCell, Cell, Layouter, Region, Table, Value,
     },
     plonk::{
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
-        Fixed, FloorPlanner, Instance, Selector,
+        Advice, Any, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
+        FloorPlanner, Instance, Selector,
     },
 };
 
@@ -258,7 +259,7 @@ impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         let _guard =
             debug_span!("assign_advice", name = annotation(), column = ?column, offset = offset)
@@ -274,7 +275,7 @@ impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        constant: Assigned<F>,
+        constant: Rational<F>,
     ) -> Result<Cell, Error> {
         let _guard = debug_span!("assign_advice_from_constant",
             name = annotation(),
@@ -329,7 +330,7 @@ impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Fixed>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         let _guard =
             debug_span!("assign_fixed", name = annotation(), column = ?column, offset = offset)
@@ -340,7 +341,7 @@ impl<'r, F: Field> RegionLayouter<F> for TracingRegion<'r, F> {
             .map(debug_value_and_return_cell)
     }
 
-    fn constrain_constant(&mut self, cell: Cell, constant: Assigned<F>) -> Result<(), Error> {
+    fn constrain_constant(&mut self, cell: Cell, constant: Rational<F>) -> Result<(), Error> {
         debug!(target: "constrain_constant", cell = ?cell, constant = ?constant);
         self.0.constrain_constant(cell, constant)
     }
@@ -424,7 +425,7 @@ impl<'cs, F: Field, CS: Assignment<F>> Assignment<F> for TracingAssignment<'cs, 
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -446,7 +447,7 @@ impl<'cs, F: Field, CS: Assignment<F>> Assignment<F> for TracingAssignment<'cs, 
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -481,7 +482,7 @@ impl<'cs, F: Field, CS: Assignment<F>> Assignment<F> for TracingAssignment<'cs, 
         &mut self,
         column: Column<Fixed>,
         row: usize,
-        to: Value<Assigned<F>>,
+        to: Value<Rational<F>>,
     ) -> Result<(), Error> {
         let _guard = debug_span!("positioned").entered();
         debug!(target: "fill_from_row", column = ?column, row = row);

@@ -1,6 +1,7 @@
-use super::{lookup, permutation, Assigned, Error};
+use super::{lookup, permutation, Error};
 use crate::circuit::layouter::SyncDeps;
 use crate::dev::metadata;
+use crate::rational::Rational;
 use crate::{
     circuit::{Layouter, Region, Value},
     poly::Rotation,
@@ -663,7 +664,7 @@ pub trait Assignment<F: Field> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>;
 
@@ -677,7 +678,7 @@ pub trait Assignment<F: Field> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>;
 
@@ -695,7 +696,7 @@ pub trait Assignment<F: Field> {
         &mut self,
         column: Column<Fixed>,
         row: usize,
-        to: Value<Assigned<F>>,
+        to: Value<Rational<F>>,
     ) -> Result<(), Error>;
 
     /// Queries the value of the given challenge.

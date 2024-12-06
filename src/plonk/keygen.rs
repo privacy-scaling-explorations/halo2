@@ -2,8 +2,7 @@
 
 use std::ops::Range;
 
-use ff::{Field, FromUniformBytes};
-use group::Curve;
+use ff::{Field, FromUniformBytes, WithSmallOrderMulGroup};
 
 use super::{
     circuit::{
@@ -11,29 +10,30 @@ use super::{
         Selector,
     },
     evaluation::Evaluator,
-    permutation, Assigned, Challenge, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
+    permutation, Challenge, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
 };
+use crate::circuit::Value;
+use crate::poly::batch_invert_rational;
+use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::rational::Rational;
 use crate::{
-    arithmetic::{parallelize, CurveAffine},
-    circuit::Value,
-    poly::{
-        batch_invert_assigned,
-        commitment::{Blind, Params},
-        EvaluationDomain,
-    },
+    arithmetic::parallelize,
+    // circuit::Value,
+    poly::EvaluationDomain,
 };
+// use crate::poly::kzg::commitment::{ParamsKZG, ParamsVerifierKZG};
 
-pub(crate) fn create_domain<C, ConcreteCircuit>(
+pub(crate) fn create_domain<F, ConcreteCircuit>(
     k: u32,
     #[cfg(feature = "circuit-params")] params: ConcreteCircuit::Params,
 ) -> (
-    EvaluationDomain<C::Scalar>,
-    ConstraintSystem<C::Scalar>,
+    EvaluationDomain<F>,
+    ConstraintSystem<F>,
     ConcreteCircuit::Config,
 )
 where
-    C: CurveAffine,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: WithSmallOrderMulGroup<3>,
+    ConcreteCircuit: Circuit<F>,
 {
     let mut cs = ConstraintSystem::default();
     #[cfg(feature = "circuit-params")]
@@ -52,7 +52,7 @@ where
 #[derive(Debug)]
 struct Assembly<F: Field> {
     k: u32,
-    fixed: Vec<Polynomial<Assigned<F>, LagrangeCoeff>>,
+    fixed: Vec<Polynomial<Rational<F>, LagrangeCoeff>>,
     permutation: permutation::keygen::Assembly,
     selectors: Vec<Vec<bool>>,
     // A range of available rows for assignment and copies.
@@ -105,7 +105,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -122,7 +122,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -158,7 +158,7 @@ impl<F: Field> Assignment<F> for Assembly<F> {
         &mut self,
         column: Column<Fixed>,
         from_row: usize,
-        to: Value<Assigned<F>>,
+        to: Value<Rational<F>>,
     ) -> Result<(), Error> {
         if !self.usable_rows.contains(&from_row) {
             return Err(Error::not_enough_rows_available(self.k));
@@ -204,33 +204,16 @@ impl<F: Field> Assignment<F> for Assembly<F> {
 
 /// Generate a `VerifyingKey` from an instance of `Circuit`.
 /// By default, selector compression is turned **off**.
-pub fn keygen_vk<'params, C, P, ConcreteCircuit>(
-    params: &P,
+pub fn keygen_vk<F, CS, ConcreteCircuit>(
+    params: &CS::VerifierParameters,
     circuit: &ConcreteCircuit,
-) -> Result<VerifyingKey<C>, Error>
+) -> Result<VerifyingKey<F, CS>, Error>
 where
-    C: CurveAffine,
-    P: Params<'params, C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
-    C::Scalar: FromUniformBytes<64>,
+    F: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
+    CS: PolynomialCommitmentScheme<F>,
+    ConcreteCircuit: Circuit<F>,
 {
-    keygen_vk_custom(params, circuit)
-}
-
-/// Generate a `VerifyingKey` from an instance of `Circuit`.
-///
-/// The selector compression optimization is turned on only if `compress_selectors` is `true`.
-pub fn keygen_vk_custom<'params, C, P, ConcreteCircuit>(
-    params: &P,
-    circuit: &ConcreteCircuit,
-) -> Result<VerifyingKey<C>, Error>
-where
-    C: CurveAffine,
-    P: Params<'params, C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
-    C::Scalar: FromUniformBytes<64>,
-{
-    let (domain, cs, config) = create_domain::<C, ConcreteCircuit>(
+    let (domain, cs, config) = create_domain::<F, ConcreteCircuit>(
         params.k(),
         #[cfg(feature = "circuit-params")]
         circuit.params(),
@@ -240,9 +223,9 @@ where
         return Err(Error::not_enough_rows_available(params.k()));
     }
 
-    let mut assembly: Assembly<C::Scalar> = Assembly {
+    let mut assembly: Assembly<F> = Assembly {
         k: params.k(),
-        fixed: vec![domain.empty_lagrange_assigned(); cs.num_fixed_columns],
+        fixed: vec![domain.empty_lagrange_rational(); cs.num_fixed_columns],
         permutation: permutation::keygen::Assembly::new(params.n() as usize, &cs.permutation),
         selectors: vec![vec![false; params.n() as usize]; cs.num_selectors],
         usable_rows: 0..params.n() as usize - (cs.blinding_factors() + 1),
@@ -257,7 +240,7 @@ where
         cs.constants.clone(),
     )?;
 
-    let mut fixed = batch_invert_assigned(assembly.fixed);
+    let mut fixed = batch_invert_rational(assembly.fixed);
     // After this, the ConstraintSystem should not have any selectors: `verify` does not need them, and `keygen_pk` regenerates `cs` from scratch anyways.
     let selectors = std::mem::take(&mut assembly.selectors);
     let (cs, selector_polys) = cs.directly_convert_selectors_to_fixed(selectors);
@@ -273,7 +256,7 @@ where
 
     let fixed_commitments = fixed
         .iter()
-        .map(|poly| params.commit_lagrange(poly, Blind::default()).to_affine())
+        .map(|poly| params.commit_lagrange(poly))
         .collect();
 
     Ok(VerifyingKey::from_parts(
@@ -286,15 +269,15 @@ where
 }
 
 /// Generate a `ProvingKey` from a `VerifyingKey` and an instance of `Circuit`.
-pub fn keygen_pk<'params, C, P, ConcreteCircuit>(
-    params: &P,
-    vk: VerifyingKey<C>,
+pub fn keygen_pk<F, CS, ConcreteCircuit>(
+    params: &CS::Parameters,
+    vk: VerifyingKey<F, CS>,
     circuit: &ConcreteCircuit,
-) -> Result<ProvingKey<C>, Error>
+) -> Result<ProvingKey<F, CS>, Error>
 where
-    C: CurveAffine,
-    P: Params<'params, C>,
-    ConcreteCircuit: Circuit<C::Scalar>,
+    F: WithSmallOrderMulGroup<3>,
+    CS: PolynomialCommitmentScheme<F>,
+    ConcreteCircuit: Circuit<F>,
 {
     let mut cs = ConstraintSystem::default();
     #[cfg(feature = "circuit-params")]
@@ -308,9 +291,9 @@ where
         return Err(Error::not_enough_rows_available(params.k()));
     }
 
-    let mut assembly: Assembly<C::Scalar> = Assembly {
+    let mut assembly: Assembly<F> = Assembly {
         k: params.k(),
-        fixed: vec![vk.domain.empty_lagrange_assigned(); cs.num_fixed_columns],
+        fixed: vec![vk.domain.empty_lagrange_rational(); cs.num_fixed_columns],
         permutation: permutation::keygen::Assembly::new(params.n() as usize, &cs.permutation),
         selectors: vec![vec![false; params.n() as usize]; cs.num_selectors],
         usable_rows: 0..params.n() as usize - (cs.blinding_factors() + 1),
@@ -325,7 +308,7 @@ where
         cs.constants.clone(),
     )?;
 
-    let mut fixed = batch_invert_assigned(assembly.fixed);
+    let mut fixed = batch_invert_rational(assembly.fixed);
     let (cs, selector_polys) = cs.directly_convert_selectors_to_fixed(assembly.selectors);
     fixed.extend(
         selector_polys
@@ -343,14 +326,15 @@ where
         .map(|poly| vk.domain.coeff_to_extended(poly.clone()))
         .collect();
 
-    let permutation_pk = assembly
-        .permutation
-        .build_pk(params, &vk.domain, &cs.permutation);
+    let permutation_pk =
+        assembly
+            .permutation
+            .build_pk::<F, CS>(params, &vk.domain, &cs.permutation);
 
     // Compute l_0(X)
     // TODO: this can be done more efficiently
     let mut l0 = vk.domain.empty_lagrange();
-    l0[0] = C::Scalar::ONE;
+    l0[0] = F::ONE;
     let l0 = vk.domain.lagrange_to_coeff(l0);
     let l0 = vk.domain.coeff_to_extended(l0);
 
@@ -358,7 +342,7 @@ where
     // and 0 otherwise over the domain.
     let mut l_blind = vk.domain.empty_lagrange();
     for evaluation in l_blind[..].iter_mut().rev().take(cs.blinding_factors()) {
-        *evaluation = C::Scalar::ONE;
+        *evaluation = F::ONE;
     }
     let l_blind = vk.domain.lagrange_to_coeff(l_blind);
     let l_blind = vk.domain.coeff_to_extended(l_blind);
@@ -366,12 +350,12 @@ where
     // Compute l_last(X) which evaluates to 1 on the first inactive row (just
     // before the blinding factors) and 0 otherwise over the domain
     let mut l_last = vk.domain.empty_lagrange();
-    l_last[params.n() as usize - cs.blinding_factors() - 1] = C::Scalar::ONE;
+    l_last[params.n() as usize - cs.blinding_factors() - 1] = F::ONE;
     let l_last = vk.domain.lagrange_to_coeff(l_last);
     let l_last = vk.domain.coeff_to_extended(l_last);
 
     // Compute l_active_row(X)
-    let one = C::Scalar::ONE;
+    let one = F::ONE;
     let mut l_active_row = vk.domain.empty_extended();
     parallelize(&mut l_active_row, |values, start| {
         for (i, value) in values.iter_mut().enumerate() {

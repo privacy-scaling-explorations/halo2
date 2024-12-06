@@ -1,14 +1,14 @@
+//! Module that implements a rational value. A rational value is stored as a fraction,
+//! so the backend can use batch inversion.
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use group::ff::Field;
 
-/// A value assigned to a cell within a circuit.
+/// A rational value.
 ///
-/// Stored as a fraction, so the backend can use batch inversion.
-///
-/// A denominator of zero maps to an assigned value of zero.
+/// A denominator of zero maps to a value of zero.
 #[derive(Clone, Copy, Debug)]
-pub enum Assigned<F> {
+pub enum Rational<F> {
     /// The field element zero.
     Zero,
     /// A value that does not require inversion to evaluate.
@@ -17,31 +17,31 @@ pub enum Assigned<F> {
     Rational(F, F),
 }
 
-impl<F: Field> From<&Assigned<F>> for Assigned<F> {
-    fn from(val: &Assigned<F>) -> Self {
+impl<F: Field> From<&Rational<F>> for Rational<F> {
+    fn from(val: &Rational<F>) -> Self {
         *val
     }
 }
 
-impl<F: Field> From<&F> for Assigned<F> {
+impl<F: Field> From<&F> for Rational<F> {
     fn from(numerator: &F) -> Self {
-        Assigned::Trivial(*numerator)
+        Rational::Trivial(*numerator)
     }
 }
 
-impl<F: Field> From<F> for Assigned<F> {
+impl<F: Field> From<F> for Rational<F> {
     fn from(numerator: F) -> Self {
-        Assigned::Trivial(numerator)
+        Rational::Trivial(numerator)
     }
 }
 
-impl<F: Field> From<(F, F)> for Assigned<F> {
+impl<F: Field> From<(F, F)> for Rational<F> {
     fn from((numerator, denominator): (F, F)) -> Self {
-        Assigned::Rational(numerator, denominator)
+        Rational::Rational(numerator, denominator)
     }
 }
 
-impl<F: Field> PartialEq for Assigned<F> {
+impl<F: Field> PartialEq for Rational<F> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             // At least one side is directly zero.
@@ -69,10 +69,10 @@ impl<F: Field> PartialEq for Assigned<F> {
     }
 }
 
-impl<F: Field> Eq for Assigned<F> {}
+impl<F: Field> Eq for Rational<F> {}
 
-impl<F: Field> Neg for Assigned<F> {
-    type Output = Assigned<F>;
+impl<F: Field> Neg for Rational<F> {
+    type Output = Rational<F>;
     fn neg(self) -> Self::Output {
         match self {
             Self::Zero => Self::Zero,
@@ -82,16 +82,16 @@ impl<F: Field> Neg for Assigned<F> {
     }
 }
 
-impl<F: Field> Neg for &Assigned<F> {
-    type Output = Assigned<F>;
+impl<F: Field> Neg for &Rational<F> {
+    type Output = Rational<F>;
     fn neg(self) -> Self::Output {
         -*self
     }
 }
 
-impl<F: Field> Add for Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: Assigned<F>) -> Assigned<F> {
+impl<F: Field> Add for Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: Rational<F>) -> Rational<F> {
         match (self, rhs) {
             // One side is directly zero.
             (Self::Zero, _) => rhs,
@@ -121,110 +121,110 @@ impl<F: Field> Add for Assigned<F> {
     }
 }
 
-impl<F: Field> Add<F> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Add<F> for Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: F) -> Rational<F> {
         self + Self::Trivial(rhs)
     }
 }
 
-impl<F: Field> Add<F> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Add<F> for &Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: F) -> Rational<F> {
         *self + rhs
     }
 }
 
-impl<F: Field> Add<&Assigned<F>> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: &Self) -> Assigned<F> {
+impl<F: Field> Add<&Rational<F>> for Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: &Self) -> Rational<F> {
         self + *rhs
     }
 }
 
-impl<F: Field> Add<Assigned<F>> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: Assigned<F>) -> Assigned<F> {
+impl<F: Field> Add<Rational<F>> for &Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: Rational<F>) -> Rational<F> {
         *self + rhs
     }
 }
 
-impl<F: Field> Add<&Assigned<F>> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn add(self, rhs: &Assigned<F>) -> Assigned<F> {
+impl<F: Field> Add<&Rational<F>> for &Rational<F> {
+    type Output = Rational<F>;
+    fn add(self, rhs: &Rational<F>) -> Rational<F> {
         *self + *rhs
     }
 }
 
-impl<F: Field> AddAssign for Assigned<F> {
+impl<F: Field> AddAssign for Rational<F> {
     fn add_assign(&mut self, rhs: Self) {
         *self = *self + rhs;
     }
 }
 
-impl<F: Field> AddAssign<&Assigned<F>> for Assigned<F> {
+impl<F: Field> AddAssign<&Rational<F>> for Rational<F> {
     fn add_assign(&mut self, rhs: &Self) {
         *self = *self + rhs;
     }
 }
 
-impl<F: Field> Sub for Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: Assigned<F>) -> Assigned<F> {
+impl<F: Field> Sub for Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: Rational<F>) -> Rational<F> {
         self + (-rhs)
     }
 }
 
-impl<F: Field> Sub<F> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Sub<F> for Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: F) -> Rational<F> {
         self + (-rhs)
     }
 }
 
-impl<F: Field> Sub<F> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Sub<F> for &Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: F) -> Rational<F> {
         *self - rhs
     }
 }
 
-impl<F: Field> Sub<&Assigned<F>> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: &Self) -> Assigned<F> {
+impl<F: Field> Sub<&Rational<F>> for Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: &Self) -> Rational<F> {
         self - *rhs
     }
 }
 
-impl<F: Field> Sub<Assigned<F>> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: Assigned<F>) -> Assigned<F> {
+impl<F: Field> Sub<Rational<F>> for &Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: Rational<F>) -> Rational<F> {
         *self - rhs
     }
 }
 
-impl<F: Field> Sub<&Assigned<F>> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn sub(self, rhs: &Assigned<F>) -> Assigned<F> {
+impl<F: Field> Sub<&Rational<F>> for &Rational<F> {
+    type Output = Rational<F>;
+    fn sub(self, rhs: &Rational<F>) -> Rational<F> {
         *self - *rhs
     }
 }
 
-impl<F: Field> SubAssign for Assigned<F> {
+impl<F: Field> SubAssign for Rational<F> {
     fn sub_assign(&mut self, rhs: Self) {
         *self = *self - rhs;
     }
 }
 
-impl<F: Field> SubAssign<&Assigned<F>> for Assigned<F> {
+impl<F: Field> SubAssign<&Rational<F>> for Rational<F> {
     fn sub_assign(&mut self, rhs: &Self) {
         *self = *self - rhs;
     }
 }
 
-impl<F: Field> Mul for Assigned<F> {
-    type Output = Assigned<F>;
-    fn mul(self, rhs: Assigned<F>) -> Assigned<F> {
+impl<F: Field> Mul for Rational<F> {
+    type Output = Rational<F>;
+    fn mul(self, rhs: Rational<F>) -> Rational<F> {
         match (self, rhs) {
             (Self::Zero, _) | (_, Self::Zero) => Self::Zero,
             (Self::Trivial(lhs), Self::Trivial(rhs)) => Self::Trivial(lhs * rhs),
@@ -243,40 +243,40 @@ impl<F: Field> Mul for Assigned<F> {
     }
 }
 
-impl<F: Field> Mul<F> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn mul(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Mul<F> for Rational<F> {
+    type Output = Rational<F>;
+    fn mul(self, rhs: F) -> Rational<F> {
         self * Self::Trivial(rhs)
     }
 }
 
-impl<F: Field> Mul<F> for &Assigned<F> {
-    type Output = Assigned<F>;
-    fn mul(self, rhs: F) -> Assigned<F> {
+impl<F: Field> Mul<F> for &Rational<F> {
+    type Output = Rational<F>;
+    fn mul(self, rhs: F) -> Rational<F> {
         *self * rhs
     }
 }
 
-impl<F: Field> Mul<&Assigned<F>> for Assigned<F> {
-    type Output = Assigned<F>;
-    fn mul(self, rhs: &Assigned<F>) -> Assigned<F> {
+impl<F: Field> Mul<&Rational<F>> for Rational<F> {
+    type Output = Rational<F>;
+    fn mul(self, rhs: &Rational<F>) -> Rational<F> {
         self * *rhs
     }
 }
 
-impl<F: Field> MulAssign for Assigned<F> {
+impl<F: Field> MulAssign for Rational<F> {
     fn mul_assign(&mut self, rhs: Self) {
         *self = *self * rhs;
     }
 }
 
-impl<F: Field> MulAssign<&Assigned<F>> for Assigned<F> {
+impl<F: Field> MulAssign<&Rational<F>> for Rational<F> {
     fn mul_assign(&mut self, rhs: &Self) {
         *self = *self * rhs;
     }
 }
 
-impl<F: Field> Assigned<F> {
+impl<F: Field> Rational<F> {
     /// Returns the numerator.
     pub fn numerator(&self) -> F {
         match self {
@@ -369,14 +369,14 @@ impl<F: Field> Assigned<F> {
 mod tests {
     use halo2curves::pasta::Fp;
 
-    use super::Assigned;
+    use super::Rational;
     // We use (numerator, denominator) in the comments below to denote a rational.
     #[test]
     fn add_trivial_to_inv0_rational() {
         // a = 2
         // b = (1,0)
-        let a = Assigned::Trivial(Fp::from(2));
-        let b = Assigned::Rational(Fp::one(), Fp::zero());
+        let a = Rational::Trivial(Fp::from(2));
+        let b = Rational::Rational(Fp::one(), Fp::zero());
 
         // 2 + (1,0) = 2 + 0 = 2
         // This fails if addition is implemented using normal rules for rationals.
@@ -388,8 +388,8 @@ mod tests {
     fn add_rational_to_inv0_rational() {
         // a = (1,2)
         // b = (1,0)
-        let a = Assigned::Rational(Fp::one(), Fp::from(2));
-        let b = Assigned::Rational(Fp::one(), Fp::zero());
+        let a = Rational::Rational(Fp::one(), Fp::from(2));
+        let b = Rational::Rational(Fp::one(), Fp::zero());
 
         // (1,2) + (1,0) = (1,2) + 0 = (1,2)
         // This fails if addition is implemented using normal rules for rationals.
@@ -401,8 +401,8 @@ mod tests {
     fn sub_trivial_from_inv0_rational() {
         // a = 2
         // b = (1,0)
-        let a = Assigned::Trivial(Fp::from(2));
-        let b = Assigned::Rational(Fp::one(), Fp::zero());
+        let a = Rational::Trivial(Fp::from(2));
+        let b = Rational::Rational(Fp::one(), Fp::zero());
 
         // (1,0) - 2 = 0 - 2 = -2
         // This fails if subtraction is implemented using normal rules for rationals.
@@ -416,8 +416,8 @@ mod tests {
     fn sub_rational_from_inv0_rational() {
         // a = (1,2)
         // b = (1,0)
-        let a = Assigned::Rational(Fp::one(), Fp::from(2));
-        let b = Assigned::Rational(Fp::one(), Fp::zero());
+        let a = Rational::Rational(Fp::one(), Fp::from(2));
+        let b = Rational::Rational(Fp::one(), Fp::zero());
 
         // (1,0) - (1,2) = 0 - (1,2) = -(1,2)
         // This fails if subtraction is implemented using normal rules for rationals.
@@ -431,8 +431,8 @@ mod tests {
     fn mul_rational_by_inv0_rational() {
         // a = (1,2)
         // b = (1,0)
-        let a = Assigned::Rational(Fp::one(), Fp::from(2));
-        let b = Assigned::Rational(Fp::one(), Fp::zero());
+        let a = Rational::Rational(Fp::one(), Fp::from(2));
+        let b = Rational::Rational(Fp::one(), Fp::zero());
 
         // (1,2) * (1,0) = (1,2) * 0 = 0
         assert_eq!((a * b).evaluate(), Fp::zero());
@@ -449,11 +449,10 @@ mod proptests {
         ops::{Add, Mul, Neg, Sub},
     };
 
+    use crate::rational::Rational;
     use group::ff::Field;
     use halo2curves::pasta::Fp;
     use proptest::{collection::vec, prelude::*, sample::select};
-
-    use super::Assigned;
 
     trait UnaryOperand: Neg<Output = Self> {
         fn double(&self) -> Self;
@@ -480,7 +479,7 @@ mod proptests {
         }
     }
 
-    impl<F: Field> UnaryOperand for Assigned<F> {
+    impl<F: Field> UnaryOperand for Rational<F> {
         fn double(&self) -> Self {
             self.double()
         }
@@ -529,7 +528,7 @@ mod proptests {
 
     trait BinaryOperand: Sized + Add<Output = Self> + Sub<Output = Self> + Mul<Output = Self> {}
     impl<F: Field> BinaryOperand for F {}
-    impl<F: Field> BinaryOperand for Assigned<F> {}
+    impl<F: Field> BinaryOperand for Rational<F> {}
 
     #[derive(Clone, Debug)]
     enum BinaryOperator {
@@ -568,8 +567,8 @@ mod proptests {
     }
 
     prop_compose! {
-        fn arb_trivial()(element in arb_element()) -> Assigned<Fp> {
-            Assigned::Trivial(element)
+        fn arb_trivial()(element in arb_element()) -> Rational<Fp> {
+            Rational::Trivial(element)
         }
     }
 
@@ -581,8 +580,8 @@ mod proptests {
                 1 => Just(Fp::zero()),
                 2 => arb_element(),
             ],
-        ) -> Assigned<Fp> {
-            Assigned::Rational(numerator, denominator)
+        ) -> Rational<Fp> {
+            Rational::Rational(numerator, denominator)
         }
     }
 
@@ -605,7 +604,7 @@ mod proptests {
         )(
             values in vec(
                 prop_oneof![
-                    1 => Just(Assigned::Zero),
+                    1 => Just(Rational::Zero),
                     2 => arb_trivial(),
                     2 => arb_rational(),
                 ],
@@ -614,7 +613,7 @@ mod proptests {
                 // - we can apply every binary operator pairwise sequentially.
                 cmp::max(usize::from(num_unary > 0), num_binary + 1)),
             operations in arb_operators(num_unary, num_binary).prop_shuffle(),
-        ) -> (Vec<Assigned<Fp>>, Vec<Operator>) {
+        ) -> (Vec<Rational<Fp>>, Vec<Operator>) {
             (values, operations)
         }
     }

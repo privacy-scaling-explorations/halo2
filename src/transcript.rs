@@ -2,8 +2,7 @@
 //! transcripts.
 use blake2b_simd::{Params, State as Blake2bState};
 
-use ff::{FromUniformBytes, PrimeField};
-use group::prime::PrimeCurveAffine;
+use ff::FromUniformBytes;
 use group::GroupEncoding;
 use halo2curves::bn256::{Fr, G1Affine};
 use halo2curves::serde::SerdeObject;
@@ -60,9 +59,11 @@ pub trait Transcript {
     fn init() -> Self;
 
     /// Parses an existing transcript
+    /// // todo: call from_bytes?
     fn parse(bytes: &[u8]) -> Self;
 
-    /// Squeeze a challenge
+    /// Squeeze a challenge of type `T`
+    /// todo: clarify type `T` in this and other functions
     fn squeeze_challenge<T: Sampleable<Self::Hash>>(&mut self) -> T;
 
     /// Writing a commitment to the transcript without writing it to the proof,
@@ -152,6 +153,7 @@ impl TranscriptHash for Blake2bState {
         self.finalize().as_bytes().to_vec()
     }
 }
+
 ///////////////////////////////////////////////////
 /// Implementation of Hashable for BN with Blake //
 ///////////////////////////////////////////////////
@@ -177,18 +179,10 @@ impl Sampleable<Blake2bState> for Fr {
     }
 }
 
-pub(crate) fn read_n_points<C, T>(transcript: &mut T, n: usize) -> io::Result<Vec<C>>
+pub(crate) fn read_n<C, T>(transcript: &mut T, n: usize) -> io::Result<Vec<C>>
 where
     T: Transcript,
-    C: PrimeCurveAffine + Hashable<T::Hash> + SerdeObject,
-{
-    (0..n).map(|_| transcript.read()).collect()
-}
-
-pub(crate) fn read_n_scalars<F, T>(transcript: &mut T, n: usize) -> io::Result<Vec<F>>
-where
-    T: Transcript,
-    F: PrimeField + Hashable<T::Hash> + SerdeObject,
+    C: Hashable<T::Hash> + SerdeObject,
 {
     (0..n).map(|_| transcript.read()).collect()
 }

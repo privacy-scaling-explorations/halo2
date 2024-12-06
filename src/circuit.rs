@@ -4,9 +4,7 @@ use std::{fmt, marker::PhantomData};
 
 use ff::Field;
 
-use crate::plonk::{
-    Advice, Any, Assigned, Challenge, Column, Error, Fixed, Instance, Selector, TableColumn,
-};
+use crate::plonk::{Advice, Any, Challenge, Column, Error, Fixed, Instance, Selector, TableColumn};
 
 mod value;
 pub use value::Value;
@@ -17,6 +15,7 @@ pub use floor_planner::single_pass::SimpleFloorPlanner;
 pub mod layouter;
 mod table_layouter;
 
+use crate::rational::Rational;
 pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 
 /// A chip implements a set of instructions that can be used by gadgets.
@@ -119,15 +118,15 @@ impl<V, F: Field> AssignedCell<V, F> {
 
 impl<V, F: Field> AssignedCell<V, F>
 where
-    for<'v> Assigned<F>: From<&'v V>,
+    for<'v> Rational<F>: From<&'v V>,
 {
     /// Returns the field element value of the [`AssignedCell`].
-    pub fn value_field(&self) -> Value<Assigned<F>> {
+    pub fn value_field(&self) -> Value<Rational<F>> {
         self.value.to_field()
     }
 }
 
-impl<F: Field> AssignedCell<Assigned<F>, F> {
+impl<F: Field> AssignedCell<Rational<F>, F> {
     /// Evaluates this assigned cell's value directly, performing an unbatched inversion
     /// if necessary.
     ///
@@ -143,7 +142,7 @@ impl<F: Field> AssignedCell<Assigned<F>, F> {
 
 impl<V: Clone, F: Field> AssignedCell<V, F>
 where
-    for<'v> Assigned<F>: From<&'v V>,
+    for<'v> Rational<F>: From<&'v V>,
 {
     /// Copies the value to a given advice cell and constrains them to be equal.
     ///
@@ -232,7 +231,7 @@ impl<'r, F: Field> Region<'r, F> {
     ) -> Result<AssignedCell<VR, F>, Error>
     where
         V: FnMut() -> Value<VR> + 'v,
-        for<'vr> Assigned<F>: From<&'vr VR>,
+        for<'vr> Rational<F>: From<&'vr VR>,
         A: Fn() -> AR,
         AR: Into<String>,
     {
@@ -267,7 +266,7 @@ impl<'r, F: Field> Region<'r, F> {
         constant: VR,
     ) -> Result<AssignedCell<VR, F>, Error>
     where
-        for<'vr> Assigned<F>: From<&'vr VR>,
+        for<'vr> Rational<F>: From<&'vr VR>,
         A: Fn() -> AR,
         AR: Into<String>,
     {
@@ -341,7 +340,7 @@ impl<'r, F: Field> Region<'r, F> {
     ) -> Result<AssignedCell<VR, F>, Error>
     where
         V: FnMut() -> Value<VR> + 'v,
-        for<'vr> Assigned<F>: From<&'vr VR>,
+        for<'vr> Rational<F>: From<&'vr VR>,
         A: Fn() -> AR,
         AR: Into<String>,
     {
@@ -367,7 +366,7 @@ impl<'r, F: Field> Region<'r, F> {
     /// Returns an error if the cell is in a column where equality has not been enabled.
     pub fn constrain_constant<VR>(&mut self, cell: Cell, constant: VR) -> Result<(), Error>
     where
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
     {
         self.region.constrain_constant(cell, constant.into())
     }
@@ -408,7 +407,7 @@ impl<'r, F: Field> Table<'r, F> {
     ) -> Result<(), Error>
     where
         V: FnMut() -> Value<VR> + 'v,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: Fn() -> AR,
         AR: Into<String>,
     {

@@ -15,8 +15,8 @@ use crate::{
     plonk::{
         permutation,
         sealed::{self, SealedPhase},
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
-        Expression, FirstPhase, Fixed, FloorPlanner, Instance, Phase, Selector,
+        Advice, Any, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Expression,
+        FirstPhase, Fixed, FloorPlanner, Instance, Phase, Selector,
     },
 };
 
@@ -47,6 +47,7 @@ pub use tfp::TracingFloorPlanner;
 #[cfg(feature = "dev-graph")]
 mod graph;
 
+use crate::rational::Rational;
 #[cfg(feature = "dev-graph")]
 #[cfg_attr(docsrs, doc(cfg(feature = "dev-graph")))]
 pub use graph::{circuit_dot_graph, layout::CircuitLayout};
@@ -187,7 +188,7 @@ impl<F: Field> Mul<F> for Value<F> {
 ///     plonk::{Advice, Any, Circuit, Column, ConstraintSystem, Error, Selector},
 ///     poly::Rotation,
 /// };
-/// use ff::PrimeField;
+/// use ff::{PrimeField};
 /// use halo2curves::pasta::Fp;
 /// const K: u32 = 5;
 ///
@@ -449,7 +450,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> circuit::Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -501,7 +502,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> circuit::Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -563,7 +564,7 @@ impl<F: Field> Assignment<F> for MockProver<F> {
         &mut self,
         col: Column<Fixed>,
         from_row: usize,
-        to: circuit::Value<Assigned<F>>,
+        to: circuit::Value<Rational<F>>,
     ) -> Result<(), Error> {
         if !self.in_phase(FirstPhase) {
             return Ok(());
