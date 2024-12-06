@@ -89,7 +89,7 @@ impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Evaluated<F, CS> {
         expressions: impl Iterator<Item = F>,
         y: F,
         xn: F,
-    ) -> Evaluated<F, CS> {
+    ) -> Result<Evaluated<F, CS>, Error> {
         let committed_h_eval = self
             .h_evals
             .iter()
@@ -99,9 +99,11 @@ impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Evaluated<F, CS> {
         let expected_h_eval = expressions.fold(F::ZERO, |h_eval, v| h_eval * &y + &v);
         let expected_h_eval = expected_h_eval * ((xn - F::ONE).invert().unwrap());
 
-        assert_eq!(committed_h_eval, expected_h_eval);
+        if committed_h_eval != expected_h_eval {
+            return Err(Error::ConstraintSystemFailure);
+        }
 
-        self
+        Ok(self)
     }
 }
 

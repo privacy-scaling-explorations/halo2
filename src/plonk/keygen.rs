@@ -16,12 +16,7 @@ use crate::circuit::Value;
 use crate::poly::batch_invert_rational;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::rational::Rational;
-use crate::{
-    arithmetic::parallelize,
-    // circuit::Value,
-    poly::EvaluationDomain,
-};
-// use crate::poly::kzg::commitment::{ParamsKZG, ParamsVerifierKZG};
+use crate::{arithmetic::parallelize, poly::EvaluationDomain};
 
 pub(crate) fn create_domain<F, ConcreteCircuit>(
     k: u32,

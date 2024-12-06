@@ -262,7 +262,7 @@ where
                     ))
             });
 
-        vanishing.verify(expressions, y, xn)
+        vanishing.verify(expressions, y, xn)?
     };
 
     let queries = advice_commitments
