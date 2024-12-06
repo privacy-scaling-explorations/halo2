@@ -179,7 +179,7 @@ where
         ev,
     })
 }
-
+/// A map of whole queries used in the circuit
 struct QueriesMap {
     map: HashMap<(ColumnMid, Rotation), usize>,
     advice: Vec<(ColumnMid, Rotation)>,

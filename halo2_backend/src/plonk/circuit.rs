@@ -4,6 +4,7 @@ use halo2_middleware::expression::{Expression, Variable};
 use halo2_middleware::poly::Rotation;
 use halo2_middleware::{lookup, permutation::ArgumentMid, shuffle};
 
+/// Represent the index, column and rotation of a query, for backwards compatibility
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct QueryBack {
     /// Query index
@@ -14,6 +15,7 @@ pub struct QueryBack {
     pub(crate) rotation: Rotation,
 }
 
+/// Represent the `Query` and `Challenge`, for backwards compatibility
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VarBack {
     /// This is a generic column query
@@ -230,6 +232,7 @@ impl<F: Field> ConstraintSystemBack<F> {
     }
 }
 
+/// A minimum version of `Gates`, which contains the constraint polynomial identities used in circuit.
 struct PinnedGates<'a, F: Field>(&'a Vec<GateBack<F>>);
 
 impl<'a, F: Field> std::fmt::Debug for PinnedGates<'a, F> {
