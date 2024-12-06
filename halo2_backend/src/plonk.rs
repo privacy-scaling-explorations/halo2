@@ -383,35 +383,35 @@ impl<C: CurveAffine> VerifyingKey<C> {
 }
 
 /// Verifier challenge value, used to keep lookup columns linearly independent
-/// 
+///
 /// Ref: https://zcash.github.io/halo2/design/proving-system/circuit-commitments.html
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Theta;
 pub(crate) type ChallengeTheta<F> = ChallengeScalar<F, Theta>;
 
 /// Verifier challenge value, used to commit permutation polynomials
-/// 
+///
 /// Ref: https://zcash.github.io/halo2/design/proving-system/permutation.html
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Beta;
 pub(crate) type ChallengeBeta<F> = ChallengeScalar<F, Beta>;
 
 /// Verifier challenge value, used to commit permutation polynomials
-/// 
+///
 /// Ref: https://zcash.github.io/halo2/design/proving-system/permutation.html
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Gamma;
 pub(crate) type ChallengeGamma<F> = ChallengeScalar<F, Gamma>;
 
 /// Verifier challenge value, used to build quotient polynomial
-/// 
+///
 /// Ref: https://zcash.github.io/halo2/design/proving-system/vanishing.html
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Y;
 pub(crate) type ChallengeY<F> = ChallengeScalar<F, Y>;
 
 /// Verifier challenge value, used for multipoint opening argument
-/// 
+///
 /// Ref: https://zcash.github.io/halo2/design/proving-system/multipoint-opening.html
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct X;
