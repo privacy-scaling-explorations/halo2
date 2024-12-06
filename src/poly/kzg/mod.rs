@@ -13,7 +13,7 @@ use crate::poly::kzg::msm::{DualMSM, MSMKZG};
 use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
 use crate::poly::query::Query;
 use crate::poly::query::VerifierQuery;
-use crate::poly::{Blind, Coeff, Error, Polynomial, ProverQuery};
+use crate::poly::{Coeff, Error, Polynomial, ProverQuery};
 
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Sampleable, Transcript};
@@ -25,50 +25,47 @@ use halo2curves::serde::SerdeObject;
 #[derive(Clone, Debug)]
 /// KZG verifier
 pub struct KZGCommitmentScheme<E: Engine> {
-    params: ParamsKZG<E>,
+    _marker: PhantomData<E>,
 }
 
 impl<E: MultiMillerLoop> PolynomialCommitmentScheme<E::Fr> for KZGCommitmentScheme<E>
 where
     E::Fr: SerdeObject,
-    E::G1Affine: SerdeObject,
+    E::G1Affine: Default + SerdeObject,
 {
     type Parameters = ParamsKZG<E>;
     type VerifierParameters = ParamsVerifierKZG<E>;
     type Commitment = E::G1Affine;
 
+    /// Unsafe function - do not use in production
     fn setup(k: u32) -> ParamsKZG<E> {
         ParamsKZG::new(k)
     }
 
-    fn new(params: Self::Parameters) -> Self {
-        Self { params }
-    }
-
     fn commit(
-        &self,
+        params: &Self::Parameters,
         polynomial: &Polynomial<E::Fr, Coeff>,
-        _blind: Blind<E::Fr>,
     ) -> Self::Commitment {
         let mut scalars = Vec::with_capacity(polynomial.len());
         scalars.extend(polynomial.iter());
-        let bases = &self.params.g;
+        let bases = &params.g;
         let size = scalars.len();
         assert!(bases.len() >= size);
         best_multiexp(&scalars, &bases[0..size]).into()
     }
 
-    fn open<T: Transcript>(
-        &self,
-        prover_query: Vec<ProverQuery<E::Fr>>,
+    fn open<'com, T: Transcript, I>(
+        params: &Self::Parameters,
+        prover_query: I,
         transcript: &mut T,
     ) -> Result<(), Error>
     where
+        I: IntoIterator<Item = ProverQuery<'com, E::Fr>> + Clone,
         E::Fr: Sampleable<T::Hash>,
         E::G1Affine: Hashable<T::Hash>,
     {
         let v: E::Fr = transcript.squeeze_challenge();
-        let commitment_data = construct_intermediate_sets(prover_query.into_iter());
+        let commitment_data = construct_intermediate_sets(prover_query);
 
         for commitment_at_a_point in commitment_data.iter() {
             let z = commitment_at_a_point.point;
@@ -92,7 +89,7 @@ where
                 values: kate_division(&poly_batch.values, z),
                 _marker: PhantomData,
             };
-            let w = self.commit(&witness_poly, Blind::default());
+            let w = Self::commit(params, &witness_poly);
 
             transcript.write(&w).map_err(|_| Error::OpeningError)?;
         }
@@ -100,18 +97,19 @@ where
         Ok(())
     }
 
-    fn verify<T: Transcript>(
-        &self,
-        verifier_query: Vec<VerifierQuery<E::Fr, Self>>,
+    fn verify<T: Transcript, I>(
+        params: &Self::VerifierParameters,
+        verifier_query: I,
         transcript: &mut T,
     ) -> Result<(), Error>
     where
         E::Fr: Sampleable<T::Hash>,
         E::G1Affine: Hashable<T::Hash>,
+        I: IntoIterator<Item = VerifierQuery<E::Fr, KZGCommitmentScheme<E>>> + Clone,
     {
         let v: E::Fr = transcript.squeeze_challenge();
 
-        let commitment_data = construct_intermediate_sets(verifier_query.into_iter());
+        let commitment_data = construct_intermediate_sets(verifier_query);
 
         let w = (0..commitment_data.len())
             .map(|_| transcript.read().map_err(|_| Error::SamplingError))
@@ -159,13 +157,13 @@ where
             witness.append_term(power_of_u, wi.to_curve());
         }
 
-        let mut msm = DualMSM::new(&self.params);
+        let mut msm = DualMSM::new(params);
 
         msm.left.add_msm(&witness);
 
         msm.right.add_msm(&witness_with_aux);
         msm.right.add_msm(&commitment_multi);
-        let g0: E::G1 = self.params.g[0].to_curve();
+        let g0: E::G1 = params.g[0].to_curve();
         msm.right.append_term(eval_multi, -g0);
 
         if msm.check() {
@@ -214,39 +212,36 @@ where
 mod tests {
     use crate::arithmetic::eval_polynomial;
     use crate::poly::commitment::PolynomialCommitmentScheme;
+    use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
     use crate::poly::kzg::KZGCommitmentScheme;
     use crate::poly::{
         query::{ProverQuery, VerifierQuery},
-        Blind, Error, EvaluationDomain,
+        Error, EvaluationDomain,
     };
     use crate::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
     use blake2b_simd::State as Blake2bState;
-    use ff::WithSmallOrderMulGroup;
     use halo2curves::pairing::{Engine, MultiMillerLoop};
     use halo2curves::serde::SerdeObject;
     use halo2curves::CurveAffine;
-    use rand_core::OsRng;
 
     #[test]
     fn test_roundtrip_gwc() {
-        use crate::poly::kzg::params::ParamsKZG;
         use crate::poly::kzg::KZGCommitmentScheme;
         use halo2curves::bn256::Bn256;
 
         const K: u32 = 4;
 
-        let params = ParamsKZG::<Bn256>::new(K);
+        let params = KZGCommitmentScheme::<Bn256>::setup(K);
 
-        let kzg_prover = KZGCommitmentScheme::new(params);
-        let proof = create_proof::<_, CircuitTranscript<Blake2bState>>(&kzg_prover);
+        let proof = create_proof::<_, CircuitTranscript<Blake2bState>>(&params);
 
-        verify::<_, CircuitTranscript<Blake2bState>>(&kzg_prover, &proof[..], false);
+        verify::<_, CircuitTranscript<Blake2bState>>(&params, &proof[..], false);
 
-        verify::<Bn256, CircuitTranscript<Blake2bState>>(&kzg_prover, &proof[..], true);
+        verify::<Bn256, CircuitTranscript<Blake2bState>>(&params, &proof[..], true);
     }
 
     fn verify<E: MultiMillerLoop, T: Transcript>(
-        verifier: &KZGCommitmentScheme<E>,
+        verifier_params: &ParamsVerifierKZG<E>,
         proof: &[u8],
         should_fail: bool,
     ) where
@@ -284,8 +279,7 @@ mod tests {
             valid_queries
         };
 
-        let result = verifier
-            .verify(queries.collect::<Vec<_>>(), &mut transcript)
+        let result = KZGCommitmentScheme::verify(verifier_params, queries, &mut transcript)
             .map_err(|_| Error::OpeningError);
 
         if should_fail {
@@ -295,14 +289,12 @@ mod tests {
         }
     }
 
-    fn create_proof<E: MultiMillerLoop, T: Transcript>(
-        kzg_prover: &KZGCommitmentScheme<E>,
-    ) -> Vec<u8>
+    fn create_proof<E: MultiMillerLoop, T: Transcript>(kzg_params: &ParamsKZG<E>) -> Vec<u8>
     where
-        E::Fr: WithSmallOrderMulGroup<3> + SerdeObject + Hashable<T::Hash> + Sampleable<T::Hash>,
-        E::G1Affine: SerdeObject + Hashable<T::Hash>,
+        E::Fr: SerdeObject + Hashable<T::Hash> + Sampleable<T::Hash>,
+        E::G1Affine: SerdeObject + Hashable<T::Hash> + Default,
     {
-        let domain = EvaluationDomain::new(1, kzg_prover.params.k);
+        let domain = EvaluationDomain::new(1, kzg_params.k);
 
         let mut ax = domain.empty_coeff();
         for (i, a) in ax.iter_mut().enumerate() {
@@ -321,11 +313,9 @@ mod tests {
 
         let mut transcript = T::init();
 
-        let blind = Blind::new(&mut OsRng);
-
-        let a = kzg_prover.commit(&ax, blind);
-        let b = kzg_prover.commit(&bx, blind);
-        let c = kzg_prover.commit(&cx, blind);
+        let a = KZGCommitmentScheme::commit(kzg_params, &ax);
+        let b = KZGCommitmentScheme::commit(kzg_params, &bx);
+        let c = KZGCommitmentScheme::commit(kzg_params, &cx);
 
         transcript.write(&a).unwrap();
         transcript.write(&b).unwrap();
@@ -356,9 +346,9 @@ mod tests {
                 poly: &cx,
             },
         ]
-        .to_vec();
+        .into_iter();
 
-        kzg_prover.open(queries, &mut transcript).unwrap();
+        KZGCommitmentScheme::open(kzg_params, queries, &mut transcript).unwrap();
 
         transcript.finalize()
     }

@@ -1,66 +1,63 @@
 use ff::PrimeField;
-use group::{
-    ff::{BatchInvert, Field},
-    Curve,
-};
+use group::ff::BatchInvert;
+use halo2curves::serde::SerdeObject;
 use rand_core::RngCore;
 use std::iter::{self, ExactSizeIterator};
 
-use super::super::{circuit::Any, ChallengeBeta, ChallengeGamma, ChallengeX};
+use super::super::circuit::Any;
 use super::{Argument, ProvingKey};
+use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize, CurveAffine},
+    arithmetic::{eval_polynomial, parallelize},
     plonk::{self, Error},
-    poly::{
-        commitment::{Blind, Params},
-        Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation,
-    },
-    transcript::{EncodedChallenge, TranscriptWrite},
+    poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
 };
 
-pub(crate) struct CommittedSet<C: CurveAffine> {
-    pub(crate) permutation_product_poly: Polynomial<C::Scalar, Coeff>,
-    pub(crate) permutation_product_coset: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
+pub(crate) struct CommittedSet<F: PrimeField> {
+    pub(crate) permutation_product_poly: Polynomial<F, Coeff>,
+    pub(crate) permutation_product_coset: Polynomial<F, ExtendedLagrangeCoeff>,
 }
 
-pub(crate) struct Committed<C: CurveAffine> {
-    pub(crate) sets: Vec<CommittedSet<C>>,
+pub(crate) struct Committed<F: PrimeField> {
+    pub(crate) sets: Vec<CommittedSet<F>>,
 }
 
-pub struct ConstructedSet<C: CurveAffine> {
-    permutation_product_poly: Polynomial<C::Scalar, Coeff>,
+pub struct ConstructedSet<F: PrimeField> {
+    permutation_product_poly: Polynomial<F, Coeff>,
 }
 
-pub(crate) struct Constructed<C: CurveAffine> {
-    sets: Vec<ConstructedSet<C>>,
+pub(crate) struct Constructed<F: PrimeField> {
+    sets: Vec<ConstructedSet<F>>,
 }
 
-pub(crate) struct Evaluated<C: CurveAffine> {
-    constructed: Constructed<C>,
+pub(crate) struct Evaluated<F: PrimeField> {
+    constructed: Constructed<F>,
 }
 
 impl Argument {
     #[allow(clippy::too_many_arguments)]
     pub(in crate::plonk) fn commit<
-        'params,
-        C: CurveAffine,
-        P: Params<'params, C>,
-        E: EncodedChallenge<C>,
+        F: PrimeField,
+        CS: PolynomialCommitmentScheme<F>,
         R: RngCore,
-        T: TranscriptWrite<C, E>,
+        T: Transcript,
     >(
         &self,
-        params: &P,
-        pk: &plonk::ProvingKey<C>,
-        pkey: &ProvingKey<C>,
-        advice: &[Polynomial<C::Scalar, LagrangeCoeff>],
-        fixed: &[Polynomial<C::Scalar, LagrangeCoeff>],
-        instance: &[Polynomial<C::Scalar, LagrangeCoeff>],
-        beta: ChallengeBeta<C>,
-        gamma: ChallengeGamma<C>,
+        params: &CS::Parameters,
+        pk: &plonk::ProvingKey<F, CS>,
+        pkey: &ProvingKey<F>,
+        advice: &[Polynomial<F, LagrangeCoeff>],
+        fixed: &[Polynomial<F, LagrangeCoeff>],
+        instance: &[Polynomial<F, LagrangeCoeff>],
+        beta: F,
+        gamma: F,
         mut rng: R,
         transcript: &mut T,
-    ) -> Result<Committed<C>, Error> {
+    ) -> Result<Committed<F>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash>,
+    {
         let domain = &pk.vk.domain;
 
         // How many columns can be included in a single permutation polynomial?
@@ -72,10 +69,10 @@ impl Argument {
         let blinding_factors = pk.vk.cs.blinding_factors();
 
         // Each column gets its own delta power.
-        let mut deltaomega = C::Scalar::ONE;
+        let mut deltaomega = F::ONE;
 
         // Track the "last" value from the previous column set
-        let mut last_z = C::Scalar::ONE;
+        let mut last_z = F::ONE;
 
         let mut sets = vec![];
 
@@ -92,7 +89,7 @@ impl Argument {
             // where p_j(X) is the jth column in this permutation,
             // and i is the ith row of the column.
 
-            let mut modified_values = vec![C::Scalar::ONE; params.n() as usize];
+            let mut modified_values = vec![F::ONE; params.n() as usize];
 
             // Iterate over each column of the permutation
             for (&column, permuted_column_values) in columns.iter().zip(permutations.iter()) {
@@ -107,7 +104,7 @@ impl Argument {
                         .zip(values[column.index()][start..].iter())
                         .zip(permuted_column_values[start..].iter())
                     {
-                        *modified_values *= &(*beta * permuted_value + &*gamma + value);
+                        *modified_values *= &(beta * permuted_value + &gamma + value);
                     }
                 });
             }
@@ -131,11 +128,11 @@ impl Argument {
                         .zip(values[column.index()][start..].iter())
                     {
                         // Multiply by p_j(\omega^i) + \delta^j \omega^i \beta
-                        *modified_values *= &(deltaomega * &*beta + &*gamma + value);
+                        *modified_values *= &(deltaomega * &beta + &gamma + value);
                         deltaomega *= &omega;
                     }
                 });
-                deltaomega *= &<C::Scalar as PrimeField>::DELTA;
+                deltaomega *= &F::DELTA;
             }
 
             // The modified_values vector is a vector of products of fractions
@@ -159,24 +156,19 @@ impl Argument {
             let mut z = domain.lagrange_from_vec(z);
             // Set blinding factors
             for z in &mut z[params.n() as usize - blinding_factors..] {
-                *z = C::Scalar::random(&mut rng);
+                *z = F::random(&mut rng);
             }
             // Set new last_z
             last_z = z[params.n() as usize - (blinding_factors + 1)];
 
-            let blind = Blind(C::Scalar::random(&mut rng));
-
-            let permutation_product_commitment_projective = params.commit_lagrange(&z, blind);
+            let permutation_product_commitment = params.commit_lagrange(&z);
             let z = domain.lagrange_to_coeff(z);
             let permutation_product_poly = z.clone();
 
             let permutation_product_coset = domain.coeff_to_extended(z.clone());
 
-            let permutation_product_commitment =
-                permutation_product_commitment_projective.to_affine();
-
             // Hash the permutation product commitment
-            transcript.write_point(permutation_product_commitment)?;
+            transcript.write(&permutation_product_commitment)?;
 
             sets.push(CommittedSet {
                 permutation_product_poly,
@@ -188,8 +180,8 @@ impl Argument {
     }
 }
 
-impl<C: CurveAffine> Committed<C> {
-    pub(in crate::plonk) fn construct(self) -> Constructed<C> {
+impl<F: PrimeField> Committed<F> {
+    pub(in crate::plonk) fn construct(self) -> Constructed<F> {
         Constructed {
             sets: self
                 .sets
@@ -202,37 +194,41 @@ impl<C: CurveAffine> Committed<C> {
     }
 }
 
-impl<C: CurveAffine> super::ProvingKey<C> {
-    pub(in crate::plonk) fn open(
-        &self,
-        x: ChallengeX<C>,
-    ) -> impl Iterator<Item = ProverQuery<'_, C>> + Clone {
+impl<F: PrimeField> super::ProvingKey<F> {
+    pub(in crate::plonk) fn open(&self, x: F) -> impl Iterator<Item = ProverQuery<'_, F>> + Clone {
         self.polys
             .iter()
-            .map(move |poly| ProverQuery { point: *x, poly })
+            .map(move |poly| ProverQuery { point: x, poly })
     }
 
-    pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
+    pub(in crate::plonk) fn evaluate<T: Transcript>(
         &self,
-        x: ChallengeX<C>,
+        x: F,
         transcript: &mut T,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        F: Hashable<T::Hash> + SerdeObject,
+    {
         // Hash permutation evals
-        for eval in self.polys.iter().map(|poly| eval_polynomial(poly, *x)) {
-            transcript.write_scalar(eval)?;
+        for eval in self.polys.iter().map(|poly| eval_polynomial(poly, x)) {
+            transcript.write(&eval)?;
         }
 
         Ok(())
     }
 }
 
-impl<C: CurveAffine> Constructed<C> {
-    pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
+impl<F: PrimeField> Constructed<F> {
+    // TODO: I don't quite like the PCS in the function
+    pub(in crate::plonk) fn evaluate<T: Transcript, CS: PolynomialCommitmentScheme<F>>(
         self,
-        pk: &plonk::ProvingKey<C>,
-        x: ChallengeX<C>,
+        pk: &plonk::ProvingKey<F, CS>,
+        x: F,
         transcript: &mut T,
-    ) -> Result<Evaluated<C>, Error> {
+    ) -> Result<Evaluated<F>, Error>
+    where
+        F: Hashable<T::Hash> + SerdeObject,
+    {
         let domain = &pk.vk.domain;
         let blinding_factors = pk.vk.cs.blinding_factors();
 
@@ -240,11 +236,11 @@ impl<C: CurveAffine> Constructed<C> {
             let mut sets = self.sets.iter();
 
             while let Some(set) = sets.next() {
-                let permutation_product_eval = eval_polynomial(&set.permutation_product_poly, *x);
+                let permutation_product_eval = eval_polynomial(&set.permutation_product_poly, x);
 
                 let permutation_product_next_eval = eval_polynomial(
                     &set.permutation_product_poly,
-                    domain.rotate_omega(*x, Rotation::next()),
+                    domain.rotate_omega(x, Rotation::next()),
                 );
 
                 // Hash permutation product evals
@@ -252,7 +248,7 @@ impl<C: CurveAffine> Constructed<C> {
                     .chain(Some(&permutation_product_eval))
                     .chain(Some(&permutation_product_next_eval))
                 {
-                    transcript.write_scalar(*eval)?;
+                    transcript.write(eval)?;
                 }
 
                 // If we have any remaining sets to process, evaluate this set at omega^u
@@ -261,10 +257,10 @@ impl<C: CurveAffine> Constructed<C> {
                 if sets.len() > 0 {
                     let permutation_product_last_eval = eval_polynomial(
                         &set.permutation_product_poly,
-                        domain.rotate_omega(*x, Rotation(-((blinding_factors + 1) as i32))),
+                        domain.rotate_omega(x, Rotation(-((blinding_factors + 1) as i32))),
                     );
 
-                    transcript.write_scalar(permutation_product_last_eval)?;
+                    transcript.write(&permutation_product_last_eval)?;
                 }
             }
         }
@@ -273,25 +269,26 @@ impl<C: CurveAffine> Constructed<C> {
     }
 }
 
-impl<C: CurveAffine> Evaluated<C> {
-    pub(in crate::plonk) fn open<'a>(
+impl<F: PrimeField> Evaluated<F> {
+    // todo: ditto - I don't like the PCS here
+    pub(in crate::plonk) fn open<'a, CS: PolynomialCommitmentScheme<F>>(
         &'a self,
-        pk: &'a plonk::ProvingKey<C>,
-        x: ChallengeX<C>,
-    ) -> impl Iterator<Item = ProverQuery<'a, C>> + Clone {
+        pk: &'a plonk::ProvingKey<F, CS>,
+        x: F,
+    ) -> impl Iterator<Item = ProverQuery<'a, F>> + Clone {
         let blinding_factors = pk.vk.cs.blinding_factors();
-        let x_next = pk.vk.domain.rotate_omega(*x, Rotation::next());
+        let x_next = pk.vk.domain.rotate_omega(x, Rotation::next());
         let x_last = pk
             .vk
             .domain
-            .rotate_omega(*x, Rotation(-((blinding_factors + 1) as i32)));
+            .rotate_omega(x, Rotation(-((blinding_factors + 1) as i32)));
 
         iter::empty()
             .chain(self.constructed.sets.iter().flat_map(move |set| {
                 iter::empty()
                     // Open permutation product commitments at x and \omega x
                     .chain(Some(ProverQuery {
-                        point: *x,
+                        point: x,
                         poly: &set.permutation_product_poly,
                     }))
                     .chain(Some(ProverQuery {

@@ -1,14 +1,17 @@
 use crate::arithmetic::{best_multiexp, g_to_lagrange, parallelize};
 use crate::helpers::SerdeCurveAffine;
-use crate::poly::{Blind, LagrangeCoeff, Polynomial};
+use crate::poly::{LagrangeCoeff, Polynomial};
 use crate::SerdeFormat;
 
 use ff::{Field, PrimeField};
 use group::{prime::PrimeCurveAffine, Curve, Group};
-use halo2curves::pairing::Engine;
+use halo2curves::pairing::{Engine, MultiMillerLoop};
 use rand_core::{OsRng, RngCore};
 use std::fmt::Debug;
 
+use crate::poly::commitment::Params;
+use crate::poly::kzg::KZGCommitmentScheme;
+use halo2curves::serde::SerdeObject;
 use std::io;
 
 use super::msm::MSMKZG;
@@ -22,6 +25,29 @@ pub struct ParamsKZG<E: Engine> {
     pub(crate) g_lagrange: Vec<E::G1Affine>,
     pub(crate) g2: E::G2Affine,
     pub(crate) s_g2: E::G2Affine,
+}
+
+impl<E: MultiMillerLoop> Params<E::Fr, KZGCommitmentScheme<E>> for ParamsKZG<E>
+where
+    E::Fr: SerdeObject,
+    E::G1Affine: Default + SerdeObject,
+{
+    fn k(&self) -> u32 {
+        self.k
+    }
+
+    fn n(&self) -> u64 {
+        self.n
+    }
+
+    fn commit_lagrange(&self, poly: &Polynomial<E::Fr, LagrangeCoeff>) -> E::G1Affine {
+        let mut scalars = Vec::with_capacity(poly.len());
+        scalars.extend(poly.iter());
+        let bases = &self.g_lagrange;
+        let size = scalars.len();
+        assert!(bases.len() >= size);
+        best_multiexp(&scalars, &bases[0..size]).into()
+    }
 }
 
 impl<E: Engine + Debug> ParamsKZG<E> {
@@ -271,20 +297,6 @@ where
         MSMKZG::new()
     }
 
-    /// TODO
-    pub fn commit_lagrange(
-        &self,
-        poly: &Polynomial<E::Fr, LagrangeCoeff>,
-        _: Blind<E::Fr>,
-    ) -> E::G1 {
-        let mut scalars = Vec::with_capacity(poly.len());
-        scalars.extend(poly.iter());
-        let bases = &self.g_lagrange;
-        let size = scalars.len();
-        assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size])
-    }
-
     /// Writes params to a buffer.
     pub fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         self.write_custom(writer, SerdeFormat::RawBytes)
@@ -302,7 +314,7 @@ impl<'params, E: Engine + Debug> ParamsKZG<E> {
         self
     }
 
-    /// TODO
+    /// UNSAFE function - do not use in production
     pub fn new(k: u32) -> Self {
         Self::setup(k, OsRng)
     }
@@ -315,18 +327,13 @@ impl<'params, E: Engine + Debug> ParamsKZG<E> {
 
 #[cfg(test)]
 mod test {
-    use crate::poly::commitment::PolynomialCommitmentScheme;
+    use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
     use crate::poly::kzg::params::ParamsKZG;
     use crate::poly::kzg::KZGCommitmentScheme;
-    use crate::poly::Blind;
-    use ff::Field;
-    use halo2curves::pairing::Engine;
 
     #[test]
     fn test_commit_lagrange() {
         const K: u32 = 6;
-
-        use rand_core::OsRng;
 
         use crate::poly::EvaluationDomain;
         use halo2curves::bn256::{Bn256, Fr};
@@ -342,10 +349,8 @@ mod test {
 
         let b = domain.lagrange_to_coeff(a.clone());
 
-        let alpha = Blind(Fr::random(OsRng));
-        let tmp = params.commit_lagrange(&a, alpha);
-        let cs = KZGCommitmentScheme::new(params);
-        let commitment: <Bn256 as Engine>::G1 = cs.commit(&b, alpha).into();
+        let tmp = params.commit_lagrange(&a);
+        let commitment = KZGCommitmentScheme::commit(&params, &b);
 
         assert_eq!(commitment, tmp);
     }

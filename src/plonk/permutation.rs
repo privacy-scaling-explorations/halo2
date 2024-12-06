@@ -2,10 +2,8 @@
 
 use super::circuit::{Any, Column};
 use crate::{
-    arithmetic::CurveAffine,
     helpers::{
-        polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
-        SerdeCurveAffine, SerdePrimeField,
+        polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdePrimeField,
     },
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
     SerdeFormat,
@@ -17,6 +15,10 @@ pub(crate) mod verifier;
 
 pub use keygen::Assembly;
 
+use crate::helpers::byte_length;
+use crate::poly::commitment::PolynomialCommitmentScheme;
+use ff::PrimeField;
+use halo2curves::serde::SerdeObject;
 use std::io;
 
 /// A permutation argument.
@@ -83,22 +85,23 @@ impl Argument {
 
 /// The verifying key for a single permutation argument.
 #[derive(Clone, Debug)]
-pub struct VerifyingKey<C: CurveAffine> {
-    commitments: Vec<C>,
+pub struct VerifyingKey<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    commitments: Vec<CS::Commitment>,
 }
 
-impl<C: CurveAffine> VerifyingKey<C> {
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> VerifyingKey<F, CS> {
     /// Returns commitments of sigma polynomials
-    pub fn commitments(&self) -> &Vec<C> {
+    pub fn commitments(&self) -> &Vec<CS::Commitment> {
         &self.commitments
     }
 
-    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
+    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, _format: SerdeFormat) -> io::Result<()>
     where
-        C: SerdeCurveAffine,
+        CS::Commitment: SerdeObject,
     {
+        // todo: How to handle formats?
         for commitment in &self.commitments {
-            commitment.write(writer, format)?;
+            commitment.write_raw(writer)?;
         }
         Ok(())
     }
@@ -106,37 +109,34 @@ impl<C: CurveAffine> VerifyingKey<C> {
     pub(crate) fn read<R: io::Read>(
         reader: &mut R,
         argument: &Argument,
-        format: SerdeFormat,
+        _format: SerdeFormat,
     ) -> io::Result<Self>
     where
-        C: SerdeCurveAffine,
+        CS::Commitment: SerdeObject,
     {
         let commitments = (0..argument.columns.len())
-            .map(|_| C::read(reader, format))
+            .map(|_| CS::Commitment::read_raw(reader))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(VerifyingKey { commitments })
     }
 
     pub(crate) fn bytes_length(&self, format: SerdeFormat) -> usize
     where
-        C: SerdeCurveAffine,
+        CS::Commitment: SerdeObject,
     {
-        self.commitments.len() * C::byte_length(format)
+        self.commitments.len() * byte_length::<CS::Commitment>(format)
     }
 }
 
 /// The proving key for a single permutation argument.
 #[derive(Clone, Debug)]
-pub(crate) struct ProvingKey<C: CurveAffine> {
-    permutations: Vec<Polynomial<C::Scalar, LagrangeCoeff>>,
-    polys: Vec<Polynomial<C::Scalar, Coeff>>,
-    pub(super) cosets: Vec<Polynomial<C::Scalar, ExtendedLagrangeCoeff>>,
+pub(crate) struct ProvingKey<F: PrimeField> {
+    permutations: Vec<Polynomial<F, LagrangeCoeff>>,
+    polys: Vec<Polynomial<F, Coeff>>,
+    pub(super) cosets: Vec<Polynomial<F, ExtendedLagrangeCoeff>>,
 }
 
-impl<C: SerdeCurveAffine> ProvingKey<C>
-where
-    C::Scalar: SerdePrimeField,
-{
+impl<F: SerdePrimeField> ProvingKey<F> {
     /// Reads proving key for a single permutation argument from buffer using `Polynomial::read`.  
     pub(super) fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         let permutations = read_polynomial_vec(reader, format)?;
@@ -162,7 +162,7 @@ where
     }
 }
 
-impl<C: CurveAffine> ProvingKey<C> {
+impl<F: PrimeField> ProvingKey<F> {
     /// Gets the total number of bytes in the serialization of `self`
     pub(super) fn bytes_length(&self) -> usize {
         polynomial_slice_byte_length(&self.permutations)

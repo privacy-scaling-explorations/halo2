@@ -23,6 +23,14 @@ pub enum SerdeFormat {
     RawBytesUnchecked,
 }
 
+/// Byte length of an affine curve element according to `format`.
+pub fn byte_length<T: SerdeObject + Default>(format: SerdeFormat) -> usize {
+    match format {
+        SerdeFormat::Processed => T::default().to_raw_bytes().len(),
+        _ => T::default().to_raw_bytes().len() * 2,
+    }
+}
+
 // Keep this trait for compatibility with IPA serialization
 pub(crate) trait CurveRead: PrimeCurveAffine {
     /// Reads a compressed element from the buffer and attempts to parse it

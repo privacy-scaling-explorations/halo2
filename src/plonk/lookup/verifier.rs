@@ -1,47 +1,48 @@
 use std::iter;
 
-use super::super::{
-    circuit::Expression, ChallengeBeta, ChallengeGamma, ChallengeTheta, ChallengeX,
-};
+use super::super::circuit::Expression;
 use super::Argument;
+use crate::poly::commitment::PolynomialCommitmentScheme;
+use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::CurveAffine,
     plonk::{Error, VerifyingKey},
-    poly::{commitment::MSM, Rotation, VerifierQuery},
-    transcript::{EncodedChallenge, TranscriptRead},
+    poly::{Rotation, VerifierQuery},
 };
-use ff::Field;
+use ff::PrimeField;
+use halo2curves::serde::SerdeObject;
 
-pub struct PermutationCommitments<C: CurveAffine> {
-    permuted_input_commitment: C,
-    permuted_table_commitment: C,
+pub struct PermutationCommitments<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    permuted_input_commitment: CS::Commitment,
+    permuted_table_commitment: CS::Commitment,
 }
 
-pub struct Committed<C: CurveAffine> {
-    permuted: PermutationCommitments<C>,
-    product_commitment: C,
+pub struct Committed<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    permuted: PermutationCommitments<F, CS>,
+    product_commitment: CS::Commitment,
 }
 
-pub struct Evaluated<C: CurveAffine> {
-    committed: Committed<C>,
-    product_eval: C::Scalar,
-    product_next_eval: C::Scalar,
-    permuted_input_eval: C::Scalar,
-    permuted_input_inv_eval: C::Scalar,
-    permuted_table_eval: C::Scalar,
+pub struct Evaluated<F: PrimeField, CS: PolynomialCommitmentScheme<F>> {
+    committed: Committed<F, CS>,
+    product_eval: F,
+    product_next_eval: F,
+    permuted_input_eval: F,
+    permuted_input_inv_eval: F,
+    permuted_table_eval: F,
 }
 
-impl<F: Field> Argument<F> {
+impl<F: PrimeField> Argument<F> {
     pub(in crate::plonk) fn read_permuted_commitments<
-        C: CurveAffine,
-        E: EncodedChallenge<C>,
-        T: TranscriptRead<C, E>,
+        CS: PolynomialCommitmentScheme<F>,
+        T: Transcript,
     >(
         &self,
         transcript: &mut T,
-    ) -> Result<PermutationCommitments<C>, Error> {
-        let permuted_input_commitment = transcript.read_point()?;
-        let permuted_table_commitment = transcript.read_point()?;
+    ) -> Result<PermutationCommitments<F, CS>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash>,
+    {
+        let permuted_input_commitment = transcript.read()?;
+        let permuted_table_commitment = transcript.read()?;
 
         Ok(PermutationCommitments {
             permuted_input_commitment,
@@ -50,15 +51,15 @@ impl<F: Field> Argument<F> {
     }
 }
 
-impl<C: CurveAffine> PermutationCommitments<C> {
-    pub(in crate::plonk) fn read_product_commitment<
-        E: EncodedChallenge<C>,
-        T: TranscriptRead<C, E>,
-    >(
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> PermutationCommitments<F, CS> {
+    pub(in crate::plonk) fn read_product_commitment<T: Transcript>(
         self,
         transcript: &mut T,
-    ) -> Result<Committed<C>, Error> {
-        let product_commitment = transcript.read_point()?;
+    ) -> Result<Committed<F, CS>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash> + SerdeObject,
+    {
+        let product_commitment = transcript.read()?;
 
         Ok(Committed {
             permuted: self,
@@ -67,16 +68,19 @@ impl<C: CurveAffine> PermutationCommitments<C> {
     }
 }
 
-impl<C: CurveAffine> Committed<C> {
-    pub(crate) fn evaluate<E: EncodedChallenge<C>, T: TranscriptRead<C, E>>(
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Committed<F, CS> {
+    pub(crate) fn evaluate<T: Transcript>(
         self,
         transcript: &mut T,
-    ) -> Result<Evaluated<C>, Error> {
-        let product_eval = transcript.read_scalar()?;
-        let product_next_eval = transcript.read_scalar()?;
-        let permuted_input_eval = transcript.read_scalar()?;
-        let permuted_input_inv_eval = transcript.read_scalar()?;
-        let permuted_table_eval = transcript.read_scalar()?;
+    ) -> Result<Evaluated<F, CS>, Error>
+    where
+        F: Hashable<T::Hash> + SerdeObject,
+    {
+        let product_eval = transcript.read()?;
+        let product_next_eval = transcript.read()?;
+        let permuted_input_eval = transcript.read()?;
+        let permuted_input_inv_eval = transcript.read()?;
+        let permuted_table_eval = transcript.read()?;
 
         Ok(Evaluated {
             committed: self,
@@ -89,32 +93,32 @@ impl<C: CurveAffine> Committed<C> {
     }
 }
 
-impl<C: CurveAffine> Evaluated<C> {
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Evaluated<F, CS> {
     #[allow(clippy::too_many_arguments)]
     pub(in crate::plonk) fn expressions<'a>(
         &'a self,
-        l_0: C::Scalar,
-        l_last: C::Scalar,
-        l_blind: C::Scalar,
-        argument: &'a Argument<C::Scalar>,
-        theta: ChallengeTheta<C>,
-        beta: ChallengeBeta<C>,
-        gamma: ChallengeGamma<C>,
-        advice_evals: &[C::Scalar],
-        fixed_evals: &[C::Scalar],
-        instance_evals: &[C::Scalar],
-        challenges: &[C::Scalar],
-    ) -> impl Iterator<Item = C::Scalar> + 'a {
-        let active_rows = C::Scalar::ONE - (l_last + l_blind);
+        l_0: F,
+        l_last: F,
+        l_blind: F,
+        argument: &'a Argument<F>,
+        theta: F,
+        beta: F,
+        gamma: F,
+        advice_evals: &[F],
+        fixed_evals: &[F],
+        instance_evals: &[F],
+        challenges: &[F],
+    ) -> impl Iterator<Item = F> + 'a {
+        let active_rows = F::ONE - (l_last + l_blind);
 
         let product_expression = || {
             // z(\omega X) (a'(X) + \beta) (s'(X) + \gamma)
             // - z(X) (\theta^{m-1} a_0(X) + ... + a_{m-1}(X) + \beta) (\theta^{m-1} s_0(X) + ... + s_{m-1}(X) + \gamma)
             let left = self.product_next_eval
-                * &(self.permuted_input_eval + &*beta)
-                * &(self.permuted_table_eval + &*gamma);
+                * &(self.permuted_input_eval + &beta)
+                * &(self.permuted_table_eval + &gamma);
 
-            let compress_expressions = |expressions: &[Expression<C::Scalar>]| {
+            let compress_expressions = |expressions: &[Expression<F>]| {
                 expressions
                     .iter()
                     .map(|expression| {
@@ -131,11 +135,11 @@ impl<C: CurveAffine> Evaluated<C> {
                             &|a, scalar| a * &scalar,
                         )
                     })
-                    .fold(C::Scalar::ZERO, |acc, eval| acc * &*theta + &eval)
+                    .fold(F::ZERO, |acc, eval| acc * &theta + &eval)
             };
             let right = self.product_eval
-                * &(compress_expressions(&argument.input_expressions) + &*beta)
-                * &(compress_expressions(&argument.table_expressions) + &*gamma);
+                * &(compress_expressions(&argument.input_expressions) + &beta)
+                * &(compress_expressions(&argument.table_expressions) + &gamma);
 
             (left - &right) * &active_rows
         };
@@ -143,7 +147,7 @@ impl<C: CurveAffine> Evaluated<C> {
         std::iter::empty()
             .chain(
                 // l_0(X) * (1 - z(X)) = 0
-                Some(l_0 * &(C::Scalar::ONE - &self.product_eval)),
+                Some(l_0 * &(F::ONE - &self.product_eval)),
             )
             .chain(
                 // l_last(X) * (z(X)^2 - z(X)) = 0
@@ -168,43 +172,44 @@ impl<C: CurveAffine> Evaluated<C> {
             ))
     }
 
-    pub(in crate::plonk) fn queries<'r, M: MSM<C> + 'r>(
-        &'r self,
-        vk: &'r VerifyingKey<C>,
-        x: ChallengeX<C>,
-    ) -> impl Iterator<Item = VerifierQuery<'r, C, M>> + Clone {
-        let x_inv = vk.domain.rotate_omega(*x, Rotation::prev());
-        let x_next = vk.domain.rotate_omega(*x, Rotation::next());
+    // todo: Removing trick from MSMs here
+    pub(in crate::plonk) fn queries(
+        &self,
+        vk: &VerifyingKey<F, CS>,
+        x: F,
+    ) -> impl Iterator<Item = VerifierQuery<F, CS>> + Clone {
+        let x_inv = vk.domain.rotate_omega(x, Rotation::prev());
+        let x_next = vk.domain.rotate_omega(x, Rotation::next());
 
         iter::empty()
             // Open lookup product commitment at x
-            .chain(Some(VerifierQuery::new_commitment(
-                &self.committed.product_commitment,
-                *x,
+            .chain(Some(VerifierQuery::new(
+                x,
+                self.committed.product_commitment,
                 self.product_eval,
             )))
             // Open lookup input commitments at x
-            .chain(Some(VerifierQuery::new_commitment(
-                &self.committed.permuted.permuted_input_commitment,
-                *x,
+            .chain(Some(VerifierQuery::new(
+                x,
+                self.committed.permuted.permuted_input_commitment,
                 self.permuted_input_eval,
             )))
             // Open lookup table commitments at x
-            .chain(Some(VerifierQuery::new_commitment(
-                &self.committed.permuted.permuted_table_commitment,
-                *x,
+            .chain(Some(VerifierQuery::new(
+                x,
+                self.committed.permuted.permuted_table_commitment,
                 self.permuted_table_eval,
             )))
             // Open lookup input commitments at \omega^{-1} x
-            .chain(Some(VerifierQuery::new_commitment(
-                &self.committed.permuted.permuted_input_commitment,
+            .chain(Some(VerifierQuery::new(
                 x_inv,
+                self.committed.permuted.permuted_input_commitment,
                 self.permuted_input_inv_eval,
             )))
             // Open lookup product commitment at \omega x
-            .chain(Some(VerifierQuery::new_commitment(
-                &self.committed.product_commitment,
+            .chain(Some(VerifierQuery::new(
                 x_next,
+                self.committed.product_commitment,
                 self.product_next_eval,
             )))
     }

@@ -8,7 +8,8 @@ use ff::Field;
 
 pub use super::table_layouter::TableLayouter;
 use super::{Cell, RegionIndex, Value};
-use crate::plonk::{Advice, Any, Assigned, Column, Error, Fixed, Instance, Selector};
+use crate::plonk::{Advice, Any, Column, Error, Fixed, Instance, Selector};
+use crate::rational::Rational;
 
 /// Intermediate trait requirements for [`RegionLayouter`] when thread-safe regions are enabled.
 #[cfg(feature = "thread-safe-region")]
@@ -79,7 +80,7 @@ pub trait RegionLayouter<F: Field>: fmt::Debug + SyncDeps {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error>;
 
     /// Assigns a constant value to the column `advice` at `offset` within this region.
@@ -93,7 +94,7 @@ pub trait RegionLayouter<F: Field>: fmt::Debug + SyncDeps {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        constant: Assigned<F>,
+        constant: Rational<F>,
     ) -> Result<Cell, Error>;
 
     /// Assign the value of the instance column's cell at absolute location
@@ -120,13 +121,13 @@ pub trait RegionLayouter<F: Field>: fmt::Debug + SyncDeps {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Fixed>,
         offset: usize,
-        to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error>;
 
     /// Constrains a cell to have a constant value.
     ///
     /// Returns an error if the cell is in a column where equality has not been enabled.
-    fn constrain_constant(&mut self, cell: Cell, constant: Assigned<F>) -> Result<(), Error>;
+    fn constrain_constant(&mut self, cell: Cell, constant: Rational<F>) -> Result<(), Error>;
 
     /// Constraint two cells to have the same value.
     ///
@@ -226,7 +227,7 @@ impl<F: Field> RegionLayouter<F> for RegionShape {
         _: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        _to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        _to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         self.columns.insert(Column::<Any>::from(column).into());
         self.row_count = cmp::max(self.row_count, offset + 1);
@@ -243,7 +244,7 @@ impl<F: Field> RegionLayouter<F> for RegionShape {
         annotation: &'v (dyn Fn() -> String + 'v),
         column: Column<Advice>,
         offset: usize,
-        constant: Assigned<F>,
+        constant: Rational<F>,
     ) -> Result<Cell, Error> {
         // The rest is identical to witnessing an advice cell.
         self.assign_advice(annotation, column, offset, &mut || Value::known(constant))
@@ -283,7 +284,7 @@ impl<F: Field> RegionLayouter<F> for RegionShape {
         _: &'v (dyn Fn() -> String + 'v),
         column: Column<Fixed>,
         offset: usize,
-        _to: &'v mut (dyn FnMut() -> Value<Assigned<F>> + 'v),
+        _to: &'v mut (dyn FnMut() -> Value<Rational<F>> + 'v),
     ) -> Result<Cell, Error> {
         self.columns.insert(Column::<Any>::from(column).into());
         self.row_count = cmp::max(self.row_count, offset + 1);
@@ -303,7 +304,7 @@ impl<F: Field> RegionLayouter<F> for RegionShape {
         // Do nothing
     }
 
-    fn constrain_constant(&mut self, _cell: Cell, _constant: Assigned<F>) -> Result<(), Error> {
+    fn constrain_constant(&mut self, _cell: Cell, _constant: Rational<F>) -> Result<(), Error> {
         // Global constants don't affect the region shape.
         Ok(())
     }

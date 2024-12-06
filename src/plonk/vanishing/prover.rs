@@ -1,52 +1,48 @@
 use std::{collections::HashMap, iter};
 
-use ff::Field;
-use group::Curve;
+use ff::PrimeField;
+use halo2curves::serde::SerdeObject;
 use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 
 use super::Argument;
+use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize, CurveAffine},
+    arithmetic::{eval_polynomial, parallelize},
     multicore::current_num_threads,
-    plonk::{ChallengeX, Error},
-    poly::{
-        commitment::{Blind, ParamsProver},
-        Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery,
-    },
-    transcript::{EncodedChallenge, TranscriptWrite},
+    plonk::Error,
+    poly::{Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery},
 };
 
-pub(in crate::plonk) struct Committed<C: CurveAffine> {
-    random_poly: Polynomial<C::Scalar, Coeff>,
+pub(in crate::plonk) struct Committed<F: PrimeField> {
+    random_poly: Polynomial<F, Coeff>,
 }
 
-pub(in crate::plonk) struct Constructed<C: CurveAffine> {
-    h_pieces: Vec<Polynomial<C::Scalar, Coeff>>,
-    committed: Committed<C>,
+pub(in crate::plonk) struct Constructed<F: PrimeField> {
+    h_pieces: Vec<Polynomial<F, Coeff>>,
+    committed: Committed<F>,
 }
 
-pub(in crate::plonk) struct Evaluated<C: CurveAffine> {
-    h_poly: Polynomial<C::Scalar, Coeff>,
-    committed: Committed<C>,
+pub(in crate::plonk) struct Evaluated<F: PrimeField> {
+    h_pieces: Vec<Polynomial<F, Coeff>>,
+    committed: Committed<F>,
 }
 
-impl<C: CurveAffine> Argument<C> {
-    pub(in crate::plonk) fn commit<
-        'params,
-        P: ParamsProver<'params, C>,
-        E: EncodedChallenge<C>,
-        R: RngCore,
-        T: TranscriptWrite<C, E>,
-    >(
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
+impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Argument<F, CS> {
+    pub(in crate::plonk) fn commit<R: RngCore, T: Transcript>(
+        params: &CS::Parameters,
+        domain: &EvaluationDomain<F>,
         mut rng: R,
         transcript: &mut T,
-    ) -> Result<Committed<C>, Error> {
+    ) -> Result<Committed<F>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash> + SerdeObject,
+        F: Hashable<T::Hash> + SerdeObject,
+    {
         // Sample a random polynomial of degree n - 1
         let n = 1usize << domain.k() as usize;
-        let mut rand_vec = vec![C::Scalar::ZERO; n];
+        let mut rand_vec = vec![F::ZERO; n];
 
         let num_threads = current_num_threads();
         let chunk_size = n / num_threads;
@@ -69,39 +65,31 @@ impl<C: CurveAffine> Argument<C> {
 
         parallelize(&mut rand_vec, |chunk, offset| {
             let mut rng = thread_seeds[&offset].clone();
-            chunk
-                .iter_mut()
-                .for_each(|v| *v = C::Scalar::random(&mut rng));
+            chunk.iter_mut().for_each(|v| *v = F::random(&mut rng));
         });
 
-        let random_poly: Polynomial<C::Scalar, Coeff> = domain.coeff_from_vec(rand_vec);
-
-        // Sample a random blinding factor
-        let random_blind = Blind(C::Scalar::random(rng));
+        let random_poly: Polynomial<F, Coeff> = domain.coeff_from_vec(rand_vec);
 
         // Commit
-        let c = params.commit(&random_poly, random_blind).to_affine();
-        transcript.write_point(c)?;
+        let c = CS::commit(params, &random_poly);
+        transcript.write(&c)?;
 
         Ok(Committed { random_poly })
     }
 }
 
-impl<C: CurveAffine> Committed<C> {
-    pub(in crate::plonk) fn construct<
-        'params,
-        P: ParamsProver<'params, C>,
-        E: EncodedChallenge<C>,
-        R: RngCore,
-        T: TranscriptWrite<C, E>,
-    >(
+impl<F: PrimeField> Committed<F> {
+    pub(in crate::plonk) fn construct<CS: PolynomialCommitmentScheme<F>, T: Transcript>(
         self,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
-        h_poly: Polynomial<C::Scalar, ExtendedLagrangeCoeff>,
-        mut rng: R,
+        params: &CS::Parameters,
+        domain: &EvaluationDomain<F>,
+        h_poly: Polynomial<F, ExtendedLagrangeCoeff>,
         transcript: &mut T,
-    ) -> Result<Constructed<C>, Error> {
+    ) -> Result<Constructed<F>, Error>
+    where
+        CS::Commitment: Hashable<T::Hash> + SerdeObject,
+        F: Hashable<T::Hash> + SerdeObject,
+    {
         // Divide by t(X) = X^{params.n} - 1.
         let h_poly = domain.divide_by_vanishing_poly(h_poly);
 
@@ -114,24 +102,16 @@ impl<C: CurveAffine> Committed<C> {
             .map(|v| domain.coeff_from_vec(v.to_vec()))
             .collect::<Vec<_>>();
         drop(h_poly);
-        let h_blinds: Vec<_> = h_pieces
-            .iter()
-            .map(|_| Blind(C::Scalar::random(&mut rng)))
-            .collect();
 
         // Compute commitments to each h(X) piece
-        let h_commitments_projective: Vec<_> = h_pieces
+        let h_commitments: Vec<_> = h_pieces
             .iter()
-            .zip(h_blinds.iter())
-            .map(|(h_piece, blind)| params.commit(h_piece, *blind))
+            .map(|h_piece| CS::commit(params, h_piece))
             .collect();
-        let mut h_commitments = vec![C::identity(); h_commitments_projective.len()];
-        C::Curve::batch_normalize(&h_commitments_projective, &mut h_commitments);
-        let h_commitments = h_commitments;
 
         // Hash each h(X) piece
         for c in h_commitments.iter() {
-            transcript.write_point(*c)?;
+            transcript.write(c)?;
         }
 
         Ok(Constructed {
@@ -141,42 +121,47 @@ impl<C: CurveAffine> Committed<C> {
     }
 }
 
-impl<C: CurveAffine> Constructed<C> {
-    pub(in crate::plonk) fn evaluate<E: EncodedChallenge<C>, T: TranscriptWrite<C, E>>(
+impl<F: PrimeField> Constructed<F> {
+    pub(in crate::plonk) fn evaluate<T: Transcript>(
         self,
-        x: ChallengeX<C>,
-        xn: C::Scalar,
-        domain: &EvaluationDomain<C::Scalar>,
+        x: F,
+        _xn: F,
+        _domain: &EvaluationDomain<F>,
         transcript: &mut T,
-    ) -> Result<Evaluated<C>, Error> {
-        let h_poly = self
-            .h_pieces
+    ) -> Result<Evaluated<F>, Error>
+    where
+        F: Hashable<T::Hash> + SerdeObject,
+    {
+        self.h_pieces
             .iter()
             .rev()
-            .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval);
+            // .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval);
+            .try_for_each(|p| {
+                let random_eval = eval_polynomial(p, x);
+                transcript.write(&random_eval)
+            })?;
 
-        let random_eval = eval_polynomial(&self.committed.random_poly, *x);
-        transcript.write_scalar(random_eval)?;
+        let random_eval = eval_polynomial(&self.committed.random_poly, x);
+        transcript.write(&random_eval)?;
 
         Ok(Evaluated {
-            h_poly,
+            // h_poly,
+            h_pieces: self.h_pieces,
             committed: self.committed,
         })
     }
 }
 
-impl<C: CurveAffine> Evaluated<C> {
-    pub(in crate::plonk) fn open(
-        &self,
-        x: ChallengeX<C>,
-    ) -> impl Iterator<Item = ProverQuery<'_, C>> + Clone {
+impl<F: PrimeField> Evaluated<F> {
+    pub(in crate::plonk) fn open(&self, x: F) -> impl Iterator<Item = ProverQuery<'_, F>> + Clone {
         iter::empty()
+            .chain(
+                self.h_pieces
+                    .iter()
+                    .map(move |p| ProverQuery { point: x, poly: p }),
+            )
             .chain(Some(ProverQuery {
-                point: *x,
-                poly: &self.h_poly,
-            }))
-            .chain(Some(ProverQuery {
-                point: *x,
+                point: x,
                 poly: &self.committed.random_poly,
             }))
     }

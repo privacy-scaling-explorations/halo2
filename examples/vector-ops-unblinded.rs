@@ -5,7 +5,7 @@ fn main() {}
 // /// This is a simple example of how to use unblinded inputs to match up circuits that might be proved on different host machines.
 // use std::marker::PhantomData;
 //
-// use ff::{FromUniformBytes, WithSmallOrderMulGroup};
+// use ff::{FromUniformBytes};
 // use halo2_proofs::arithmetic::CurveExt;
 // use halo2_proofs::helpers::SerdeCurveAffine;
 // use halo2_proofs::poly::kzg::params::{KZGCommitmentScheme, ParamsKZG};

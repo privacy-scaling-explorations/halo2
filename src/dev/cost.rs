@@ -11,11 +11,12 @@ use std::{
 use ff::{Field, PrimeField};
 use group::prime::PrimeGroup;
 
+use crate::rational::Rational;
 use crate::{
     circuit::{layouter::RegionColumn, Value},
     plonk::{
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
-        Fixed, FloorPlanner, Instance, Selector,
+        Advice, Any, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
+        FloorPlanner, Instance, Selector,
     },
     poly::Rotation,
 };
@@ -205,7 +206,7 @@ impl<F: Field> Assignment<F> for Layout {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -222,7 +223,7 @@ impl<F: Field> Assignment<F> for Layout {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -245,7 +246,7 @@ impl<F: Field> Assignment<F> for Layout {
         &mut self,
         _: Column<Fixed>,
         _: usize,
-        _: Value<Assigned<F>>,
+        _: Value<Rational<F>>,
     ) -> Result<(), Error> {
         Ok(())
     }

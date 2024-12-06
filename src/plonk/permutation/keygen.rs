@@ -1,14 +1,10 @@
-use ff::{Field, PrimeField};
-use group::Curve;
+use ff::PrimeField;
 
 use super::{Argument, ProvingKey, VerifyingKey};
 use crate::{
-    arithmetic::{parallelize, CurveAffine},
+    arithmetic::parallelize,
     plonk::{Any, Column, Error},
-    poly::{
-        commitment::{Blind, Params},
-        EvaluationDomain,
-    },
+    poly::EvaluationDomain,
 };
 
 #[cfg(feature = "thread-safe-region")]
@@ -17,6 +13,7 @@ use crate::multicore::{IndexedParallelIterator, IntoParallelIterator, ParallelIt
 #[cfg(not(feature = "thread-safe-region"))]
 use crate::multicore::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
+use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 #[cfg(feature = "thread-safe-region")]
 use std::collections::{BTreeSet, HashMap};
 
@@ -113,22 +110,22 @@ impl Assembly {
         Ok(())
     }
 
-    pub(crate) fn build_vk<'params, C: CurveAffine, P: Params<'params, C>>(
+    pub(crate) fn build_vk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
         self,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
+        params: &CS::VerifierParameters,
+        domain: &EvaluationDomain<F>,
         p: &Argument,
-    ) -> VerifyingKey<C> {
+    ) -> VerifyingKey<F, CS> {
         build_vk(params, domain, p, |i, j| self.mapping[i][j])
     }
 
-    pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
+    pub(crate) fn build_pk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
         self,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
+        params: &CS::Parameters,
+        domain: &EvaluationDomain<F>,
         p: &Argument,
-    ) -> ProvingKey<C> {
-        build_pk(params, domain, p, |i, j| self.mapping[i][j])
+    ) -> ProvingKey<F> {
+        build_pk::<_, CS>(params, domain, p, |i, j| self.mapping[i][j])
     }
 
     /// Returns columns that participate in the permutation argument.
@@ -284,22 +281,22 @@ impl Assembly {
         }
     }
 
-    pub(crate) fn build_vk<'params, C: CurveAffine, P: Params<'params, C>>(
+    pub(crate) fn build_vk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
         &mut self,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
+        params: &CS::VerifierParameters,
+        domain: &EvaluationDomain<F>,
         p: &Argument,
-    ) -> VerifyingKey<C> {
+    ) -> VerifyingKey<F, CS> {
         self.build_ordered_mapping();
         build_vk(params, domain, p, |i, j| self.mapping_at_idx(i, j))
     }
 
-    pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
+    pub(crate) fn build_pk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
         &mut self,
-        params: &P,
-        domain: &EvaluationDomain<C::Scalar>,
+        params: &CS::Parameters,
+        domain: &EvaluationDomain<F>,
         p: &Argument,
-    ) -> ProvingKey<C> {
+    ) -> ProvingKey<F> {
         self.build_ordered_mapping();
         build_pk(params, domain, p, |i, j| self.mapping_at_idx(i, j))
     }
@@ -321,14 +318,14 @@ impl Assembly {
     }
 }
 
-pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
-    params: &P,
-    domain: &EvaluationDomain<C::Scalar>,
+pub(crate) fn build_pk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
+    params: &CS::Parameters,
+    domain: &EvaluationDomain<F>,
     p: &Argument,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
-) -> ProvingKey<C> {
+) -> ProvingKey<F> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-    let mut omega_powers = vec![C::Scalar::ZERO; params.n() as usize];
+    let mut omega_powers = vec![F::ZERO; params.n() as usize];
     {
         let omega = domain.get_omega();
         parallelize(&mut omega_powers, |o, start| {
@@ -344,12 +341,12 @@ pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
     let mut deltaomega = vec![omega_powers; p.columns.len()];
     {
         parallelize(&mut deltaomega, |o, start| {
-            let mut cur = C::Scalar::DELTA.pow_vartime([start as u64]);
+            let mut cur = F::DELTA.pow_vartime([start as u64]);
             for omega_powers in o.iter_mut() {
                 for v in omega_powers {
                     *v *= &cur;
                 }
-                cur *= &C::Scalar::DELTA;
+                cur *= &F::DELTA;
             }
         });
     }
@@ -397,14 +394,14 @@ pub(crate) fn build_pk<'params, C: CurveAffine, P: Params<'params, C>>(
     }
 }
 
-pub(crate) fn build_vk<'params, C: CurveAffine, P: Params<'params, C>>(
-    params: &P,
-    domain: &EvaluationDomain<C::Scalar>,
+pub(crate) fn build_vk<F: PrimeField, CS: PolynomialCommitmentScheme<F>>(
+    params: &CS::VerifierParameters,
+    domain: &EvaluationDomain<F>,
     p: &Argument,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
-) -> VerifyingKey<C> {
+) -> VerifyingKey<F, CS> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-    let mut omega_powers = vec![C::Scalar::ZERO; params.n() as usize];
+    let mut omega_powers = vec![F::ZERO; params.n() as usize];
     {
         let omega = domain.get_omega();
         parallelize(&mut omega_powers, |o, start| {
@@ -420,12 +417,12 @@ pub(crate) fn build_vk<'params, C: CurveAffine, P: Params<'params, C>>(
     let mut deltaomega = vec![omega_powers; p.columns.len()];
     {
         parallelize(&mut deltaomega, |o, start| {
-            let mut cur = C::Scalar::DELTA.pow_vartime([start as u64]);
+            let mut cur = F::DELTA.pow_vartime([start as u64]);
             for omega_powers in o.iter_mut() {
                 for v in omega_powers {
                     *v *= &cur;
                 }
-                cur *= &<C::Scalar as PrimeField>::DELTA;
+                cur *= &F::DELTA;
             }
         });
     }
@@ -449,11 +446,7 @@ pub(crate) fn build_vk<'params, C: CurveAffine, P: Params<'params, C>>(
     let mut commitments = Vec::with_capacity(p.columns.len());
     for permutation in &permutations {
         // Compute commitment to permutation polynomial
-        commitments.push(
-            params
-                .commit_lagrange(permutation, Blind::default())
-                .to_affine(),
-        );
+        commitments.push(params.commit_lagrange(permutation));
     }
 
     VerifyingKey { commitments }
