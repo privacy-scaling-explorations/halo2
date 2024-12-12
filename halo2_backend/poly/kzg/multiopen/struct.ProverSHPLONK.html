@@ -23,7 +23,7 @@
     E::G2Affine: <a class="trait" href="../../../helpers/trait.SerdeCurveAffine.html" title="trait halo2_backend::helpers::SerdeCurveAffine">SerdeCurveAffine</a>,</div></h3></section></summary><div class="docblock"><p>Create a multi-opening proof</p>
 </div><div class="impl-items"><details class="toggle method-toggle" open><summary><section id="method.create_proof_with_engine" class="method trait-impl"><a class="src rightside" href="../../../../src/halo2_backend/poly/kzg/multiopen/shplonk/prover.rs.html#119-303">source</a><a href="#method.create_proof_with_engine" class="anchor">§</a><h4 class="code-header">fn <a href="../../commitment/trait.Prover.html#tymethod.create_proof_with_engine" class="fn">create_proof_with_engine</a>&lt;'com, Ch: <a class="trait" href="../../../transcript/trait.EncodedChallenge.html" title="trait halo2_backend::transcript::EncodedChallenge">EncodedChallenge</a>&lt;E::G1Affine&gt;, T: <a class="trait" href="../../../transcript/trait.TranscriptWrite.html" title="trait halo2_backend::transcript::TranscriptWrite">TranscriptWrite</a>&lt;E::G1Affine, Ch&gt;, R, I&gt;(
     &amp;self,
-    engine: &amp;impl <a class="trait" href="../../../../halo2_middleware/zal/traits/trait.MsmAccel.html" title="trait halo2_middleware::zal::traits::MsmAccel">MsmAccel</a>&lt;E::G1Affine&gt;,
+    engine: &amp;impl MsmAccel&lt;E::G1Affine&gt;,
     _: R,
     transcript: <a class="primitive" href="https://doc.rust-lang.org/nightly/std/primitive.reference.html">&amp;mut T</a>,
     queries: I
