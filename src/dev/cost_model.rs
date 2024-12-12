@@ -2,12 +2,14 @@
 //! verification cost, as well as resulting proof size.
 
 use std::collections::HashSet;
-use std::{iter, num::ParseIntError, str::FromStr};
+use std::panic::AssertUnwindSafe;
+use std::{iter, num::ParseIntError, panic, str::FromStr};
 
 use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
 use serde::Deserialize;
 use serde_derive::Serialize;
+use crate::plonk::Any::Fixed;
 
 use super::MockProver;
 
@@ -46,11 +48,21 @@ pub struct CostOptions {
     /// A permutation over N columns. May be repeated.
     pub permutation: Permutation,
 
-    /// A shuffle over N columns with max input degree I and max shuffle degree T. May be repeated.
-    pub shuffle: Vec<Shuffle>,
+    /// 2^K bound on the number of rows, accounting for ZK, PIs and Lookup tables.
+    pub min_k: usize,
 
-    /// 2^K bound on the number of rows.
-    pub k: usize,
+    /// Rows count, not including table rows and not accounting for compression
+    /// (where multiple regions can use the same rows).
+    pub rows_count: usize,
+
+    /// Table rows count, not accounting for compression (where multiple regions
+    /// can use the same rows), but not much if any compression can happen with
+    /// table rows anyway.
+    pub table_rows_count: usize,
+
+    /// Compressed rows count, accounting for compression (where multiple
+    /// regions can use the same rows).
+    pub compressed_rows_count: usize,
 }
 
 /// Structure holding polynomial related data for benchmarks
@@ -110,19 +122,6 @@ impl Permutation {
     }
 }
 
-/// Structure holding the [Shuffle] related data for circuit benchmarks.
-#[derive(Debug, Clone)]
-pub struct Shuffle;
-
-impl Shuffle {
-    fn queries(&self) -> impl Iterator<Item = Poly> {
-        // Open shuffle product commitment at x and \omega x
-        let shuffle = "0, 1".parse().unwrap();
-
-        iter::empty().chain(Some(shuffle))
-    }
-}
-
 /// High-level specifications of an abstract circuit.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ModelCircuit {
@@ -136,8 +135,6 @@ pub struct ModelCircuit {
     pub lookups: usize,
     /// Equality constraint enabled columns.
     pub permutations: usize,
-    /// Number of shuffle arguments
-    pub shuffles: usize,
     /// Number of distinct column queries across all gates.
     pub column_queries: usize,
     /// Number of distinct sets of points in the multiopening argument.
@@ -160,7 +157,6 @@ impl CostOptions {
             .cloned()
             .chain(self.lookup.iter().flat_map(|l| l.queries()))
             .chain(self.permutation.queries())
-            .chain(self.shuffle.iter().flat_map(|s| s.queries()))
             .chain(iter::repeat("0".parse().unwrap()).take(self.max_degree - 1))
             .collect();
 
@@ -199,7 +195,7 @@ impl CostOptions {
                 // - inner product argument (k rounds * 2 * COMM bytes)
                 // - a (SCALAR bytes)
                 // - xi (SCALAR bytes)
-                comp_bytes(1 + 2 * self.k, 2)
+                comp_bytes(1 + 2 * self.min_k, 2)
             }
             CommitmentScheme::KZGGWC => {
                 let mut nr_rotations = HashSet::new();
@@ -227,12 +223,11 @@ impl CostOptions {
         let size = plonk + vanishing + multiopen + polycomm;
 
         ModelCircuit {
-            k: self.k,
+            k: self.min_k,
             max_deg: self.max_degree,
             advice_columns: self.advice.len(),
             lookups: self.lookup.len(),
             permutations: self.permutation.columns,
-            shuffles: self.shuffle.len(),
             column_queries,
             point_sets,
             size,
@@ -247,7 +242,7 @@ pub fn from_circuit_to_model_circuit<
     const COMM: usize,
     const SCALAR: usize,
 >(
-    k: u32,
+    k: Option<u32>,
     circuit: &C,
     instances: Vec<Vec<F>>,
     comm_scheme: CommitmentScheme,
@@ -256,13 +251,34 @@ pub fn from_circuit_to_model_circuit<
     options.into_model_circuit::<COMM, SCALAR>(comm_scheme)
 }
 
-/// Given a Plonk circuit, this function returns [CostOptions]
+fn run_mock_prover_with_fallback<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>>(
+    circuit: &C,
+    instances: Vec<Vec<F>>,
+) -> MockProver<F> {
+    (5..25)
+        .find_map(|k| {
+            panic::catch_unwind(AssertUnwindSafe(|| {
+                MockProver::run(k, circuit, instances.clone()).unwrap()
+            }))
+                .ok()
+        })
+        .expect("A circuit which can be implemented with at most 2^24 rows.")
+}
+
+/// Given a circuit, this function returns [CostOptions]. If no upper bound for `k` is
+/// provided, we iterate until a valid `k` is found (this might delay the computation).
 pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>>(
-    k: u32,
+    k_upper_bound: Option<u32>,
     circuit: &C,
     instances: Vec<Vec<F>>,
 ) -> CostOptions {
-    let prover = MockProver::run(k, circuit, instances).unwrap();
+    let instance_len = instances.iter().map(Vec::len).max().unwrap_or(0);
+    let prover = if let Some(k) = k_upper_bound {
+        MockProver::run(k, circuit, instances).unwrap()
+    } else {
+        run_mock_prover_with_fallback(circuit, instances.clone())
+    };
+
     let cs = prover.cs;
 
     let fixed = {
@@ -298,8 +314,6 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         columns: cs.permutation().get_columns().len(),
     };
 
-    let shuffle = { cs.shuffles.iter().map(|_| Shuffle).collect::<Vec<_>>() };
-
     let gate_degree = cs
         .gates
         .iter()
@@ -307,7 +321,49 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         .max()
         .unwrap_or(0);
 
-    let k = prover.k.try_into().unwrap();
+    // Note that this computation does't assume that `regions` is already in
+    // order of increasing row indices.
+    let (rows_count, table_rows_count, compressed_rows_count) = {
+        let mut rows_count = 0;
+        let mut table_rows_count = 0;
+        let mut compressed_rows_count = 0;
+        for region in prover.regions {
+            // If `region.rows == None`, then that region has no rows.
+            if let Some((start, end)) = region.rows {
+                // Note that `end` is the index of the last column, so when
+                // counting rows this last column needs to be counted via `end +
+                // 1`.
+
+                // A region is a _table region_ if all of its columns are `Fixed`
+                // columns (see that [`plonk::circuit::TableColumn` is a wrapper
+                // around `Column<Fixed>`]). All of a table region's rows are
+                // counted towards `table_rows_count.`
+                if region
+                    .columns
+                    .iter()
+                    .all(|c| *c.column_type() == Fixed)
+                {
+                    table_rows_count += (end + 1) - start;
+                } else {
+                    rows_count += (end + 1) - start;
+                }
+                compressed_rows_count = std::cmp::max(compressed_rows_count, end + 1);
+            }
+        }
+        (rows_count, table_rows_count, compressed_rows_count)
+    };
+
+    let min_k = [
+        rows_count + cs.blinding_factors(),
+        table_rows_count + cs.blinding_factors(),
+        instance_len,
+    ]
+        .into_iter()
+        .max()
+        .unwrap();
+    if min_k == instance_len {
+        println!("WARNING: The dominant factor in your circuit's size is the number of public inputs, which causes the verifier to perform linear work.");
+    }
 
     CostOptions {
         advice,
@@ -317,7 +373,9 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         max_degree: cs.degree(),
         lookup,
         permutation,
-        shuffle,
-        k,
+        min_k,
+        rows_count,
+        table_rows_count,
+        compressed_rows_count,
     }
 }
