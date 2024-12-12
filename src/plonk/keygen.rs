@@ -3,6 +3,7 @@
 use std::ops::Range;
 
 use ff::{Field, FromUniformBytes, WithSmallOrderMulGroup};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use super::{
     circuit::{
@@ -312,12 +313,12 @@ where
     );
 
     let fixed_polys: Vec<_> = fixed
-        .iter()
+        .par_iter()
         .map(|poly| vk.domain.lagrange_to_coeff(poly.clone()))
         .collect();
 
     let fixed_cosets = fixed_polys
-        .iter()
+        .par_iter()
         .map(|poly| vk.domain.coeff_to_extended(poly.clone()))
         .collect();
 

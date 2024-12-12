@@ -213,21 +213,7 @@ pub fn slot_in_biggest_advice_first(
         advice_cols * shape.row_count()
     };
 
-    // This used to incorrectly use `sort_unstable_by_key` with non-unique keys, which gave
-    // output that differed between 32-bit and 64-bit platforms, and potentially between Rust
-    // versions.
-    // We now use `sort_by_cached_key` with non-unique keys, and rely on `region_shapes`
-    // being sorted by region index (which we also rely on below to return `RegionStart`s
-    // in the correct order).
-    #[cfg(not(feature = "floor-planner-v1-legacy-pdqsort"))]
     sorted_regions.sort_by_cached_key(sort_key);
-
-    // To preserve compatibility, when the "floor-planner-v1-legacy-pdqsort" feature is enabled,
-    // we use a copy of the pdqsort implementation from the Rust 1.56.1 standard library, fixed
-    // to its behaviour on 64-bit platforms.
-    // https://github.com/rust-lang/rust/blob/1.56.1/library/core/src/slice/mod.rs#L2365-L2402
-    #[cfg(feature = "floor-planner-v1-legacy-pdqsort")]
-    halo2_legacy_pdqsort::sort::quicksort(&mut sorted_regions, |a, b| sort_key(a).lt(&sort_key(b)));
 
     sorted_regions.reverse();
 

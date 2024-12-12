@@ -47,10 +47,13 @@ pub use tfp::TracingFloorPlanner;
 #[cfg(feature = "dev-graph")]
 mod graph;
 
+use crate::plonk::VirtualCell;
 use crate::rational::Rational;
 #[cfg(feature = "dev-graph")]
 #[cfg_attr(docsrs, doc(cfg(feature = "dev-graph")))]
 pub use graph::{circuit_dot_graph, layout::CircuitLayout};
+
+use crate::poly::Rotation;
 
 #[derive(Debug)]
 struct Region {
@@ -820,7 +823,15 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                             }
                                             _ => {
                                                 // Check that it was assigned!
-                                                if r.cells.contains_key(&(cell.column, cell_row)) {
+                                                if r.cells.contains_key(&(cell.column, cell_row))
+                                                    || gate.polynomials().par_iter().all(|expr| {
+                                                        self.cell_is_irrelevant(
+                                                            cell,
+                                                            expr,
+                                                            gate_row as usize,
+                                                        )
+                                                    })
+                                                {
                                                     None
                                                 } else {
                                                     Some(VerifyFailure::CellNotAssigned {
@@ -1121,6 +1132,69 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                 _ => false,
             });
             Err(errors)
+        }
+    }
+
+    // Checks if the given expression is guaranteed to be constantly zero at the given offset.
+    fn expr_is_constantly_zero(&self, expr: &Expression<F>, offset: usize) -> bool {
+        match expr {
+            Expression::Constant(constant) => constant.is_zero().into(),
+            Expression::Selector(selector) => !self.selectors[selector.0][offset],
+            Expression::Fixed(query) => match self.fixed[query.column_index][offset] {
+                CellValue::Assigned(value) => value.is_zero().into(),
+                _ => false,
+            },
+            Expression::Scaled(e, factor) => {
+                factor.is_zero().into() || self.expr_is_constantly_zero(e, offset)
+            }
+            Expression::Sum(e1, e2) => {
+                self.expr_is_constantly_zero(e1, offset) && self.expr_is_constantly_zero(e2, offset)
+            }
+            Expression::Product(e1, e2) => {
+                self.expr_is_constantly_zero(e1, offset) || self.expr_is_constantly_zero(e2, offset)
+            }
+            _ => false,
+        }
+    }
+
+    // Verify that the value of the given cell within the given expression is
+    // irrelevant to the evaluation of the expression. This may be because
+    // the cell is always multiplied by an expression that evaluates to 0, or
+    // because the cell is not being queried in the expression at all.
+    fn cell_is_irrelevant(&self, cell: &VirtualCell, expr: &Expression<F>, offset: usize) -> bool {
+        // Check if a given query (defined by its columnd and rotation, since we
+        // want this function to support different query types) is equal to `cell`.
+        let eq_query = |query_column: usize, query_rotation: Rotation, col_type: Any| {
+            cell.column.index() == query_column
+                && cell.column.column_type() == &col_type
+                && query_rotation == cell.rotation
+        };
+        match expr {
+            Expression::Constant(_) | Expression::Selector(_) => true,
+            Expression::Fixed(query) => !eq_query(query.column_index, query.rotation(), Any::Fixed),
+            Expression::Advice(query) => !eq_query(
+                query.column_index,
+                query.rotation(),
+                Any::Advice(Advice::new(query.phase)),
+            ),
+            Expression::Instance(query) => {
+                !eq_query(query.column_index, query.rotation(), Any::Instance)
+            }
+            Expression::Challenge(_) => true,
+            Expression::Negated(e) => self.cell_is_irrelevant(cell, e, offset),
+            Expression::Sum(e1, e2) => {
+                self.cell_is_irrelevant(cell, e1, offset)
+                    && self.cell_is_irrelevant(cell, e2, offset)
+            }
+            Expression::Product(e1, e2) => {
+                (self.expr_is_constantly_zero(e1, offset)
+                    || self.expr_is_constantly_zero(e2, offset))
+                    || (self.cell_is_irrelevant(cell, e1, offset)
+                        && self.cell_is_irrelevant(cell, e2, offset))
+            }
+            Expression::Scaled(e, factor) => {
+                factor.is_zero().into() || self.cell_is_irrelevant(cell, e, offset)
+            }
         }
     }
 

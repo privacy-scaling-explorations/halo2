@@ -65,7 +65,7 @@ pub(super) fn format_value<F: Field>(v: F) -> String {
         // Format value as hex.
         let s = format!("{v:?}");
         // Remove leading zeroes.
-        let s = s.strip_prefix("0x").unwrap();
+        let s = s.split_once("0x").unwrap().1.split(')').next().unwrap();
         let s = s.trim_start_matches('0');
         format!("0x{s}")
     }

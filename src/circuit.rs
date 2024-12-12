@@ -50,7 +50,7 @@ pub trait Chip<F: Field>: Sized {
 }
 
 /// Index of a region in a layouter
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct RegionIndex(usize);
 
 impl From<usize> for RegionIndex {
@@ -86,7 +86,7 @@ impl std::ops::Deref for RegionStart {
 }
 
 /// A pointer to a cell within a circuit.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Cell {
     /// Identifies the region in which this cell resides.
     pub region_index: RegionIndex,
@@ -102,6 +102,21 @@ pub struct AssignedCell<V, F: Field> {
     value: Value<V>,
     cell: Cell,
     _marker: PhantomData<F>,
+}
+
+impl<V, F: Field> PartialEq for AssignedCell<V, F> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cell == other.cell
+    }
+}
+
+impl<V, F: Field> Eq for AssignedCell<V, F> {}
+
+use std::hash::{Hash, Hasher};
+impl<V, F: Field> Hash for AssignedCell<V, F> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.cell.hash(state)
+    }
 }
 
 impl<V, F: Field> AssignedCell<V, F> {

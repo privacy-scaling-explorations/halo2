@@ -5,11 +5,11 @@ use std::collections::HashSet;
 use std::panic::AssertUnwindSafe;
 use std::{iter, num::ParseIntError, panic, str::FromStr};
 
+use crate::plonk::Any::Fixed;
 use crate::plonk::Circuit;
 use ff::{Field, FromUniformBytes};
 use serde::Deserialize;
 use serde_derive::Serialize;
-use crate::plonk::Any::Fixed;
 
 use super::MockProver;
 
@@ -88,7 +88,8 @@ impl FromStr for Poly {
 pub struct Lookup;
 
 impl Lookup {
-    fn queries(&self) -> impl Iterator<Item = Poly> {
+    /// Returns the queries of the lookup argument
+    pub fn queries(&self) -> impl Iterator<Item = Poly> {
         // - product commitments at x and \omega x
         // - input commitments at x and x_inv
         // - table commitments at x
@@ -110,7 +111,8 @@ pub struct Permutation {
 }
 
 impl Permutation {
-    fn queries(&self) -> impl Iterator<Item = Poly> {
+    /// Returns the queries of the Permutation argument
+    pub fn queries(&self) -> impl Iterator<Item = Poly> {
         // - product commitments at x and x_inv
         // - polynomial commitments at x
         let product = "0,-1".parse().unwrap();
@@ -120,6 +122,11 @@ impl Permutation {
             .chain(Some(product))
             .chain(iter::repeat(poly).take(self.columns))
     }
+
+    /// Returns the number of columns of the Permutation argument
+    pub fn nr_columns(&self) -> usize {
+        self.columns
+    }
 }
 
 /// High-level specifications of an abstract circuit.
@@ -127,6 +134,10 @@ impl Permutation {
 pub struct ModelCircuit {
     /// Power-of-2 bound on the number of rows in the circuit.
     pub k: usize,
+    /// Number of rows in the circuit (not including table rows).
+    pub rows: usize,
+    /// Number of table rows in the circuit.
+    pub table_rows: usize,
     /// Maximum degree of the circuit.
     pub max_deg: usize,
     /// Number of advice columns.
@@ -224,6 +235,8 @@ impl CostOptions {
 
         ModelCircuit {
             k: self.min_k,
+            rows: self.rows_count,
+            table_rows: self.table_rows_count,
             max_deg: self.max_degree,
             advice_columns: self.advice.len(),
             lookups: self.lookup.len(),
@@ -260,7 +273,7 @@ fn run_mock_prover_with_fallback<F: Ord + Field + FromUniformBytes<64>, C: Circu
             panic::catch_unwind(AssertUnwindSafe(|| {
                 MockProver::run(k, circuit, instances.clone()).unwrap()
             }))
-                .ok()
+            .ok()
         })
         .expect("A circuit which can be implemented with at most 2^24 rows.")
 }
@@ -338,11 +351,7 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
                 // columns (see that [`plonk::circuit::TableColumn` is a wrapper
                 // around `Column<Fixed>`]). All of a table region's rows are
                 // counted towards `table_rows_count.`
-                if region
-                    .columns
-                    .iter()
-                    .all(|c| *c.column_type() == Fixed)
-                {
+                if region.columns.iter().all(|c| *c.column_type() == Fixed) {
                     table_rows_count += (end + 1) - start;
                 } else {
                     rows_count += (end + 1) - start;
@@ -358,9 +367,9 @@ pub fn from_circuit_to_cost_model_options<F: Ord + Field + FromUniformBytes<64>,
         table_rows_count + cs.blinding_factors(),
         instance_len,
     ]
-        .into_iter()
-        .max()
-        .unwrap();
+    .into_iter()
+    .max()
+    .unwrap();
     if min_k == instance_len {
         println!("WARNING: The dominant factor in your circuit's size is the number of public inputs, which causes the verifier to perform linear work.");
     }

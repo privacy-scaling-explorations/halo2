@@ -49,9 +49,9 @@ pub trait SerdeCurveAffine: PrimeCurveAffine + SerdeObject + Default {
     /// Reads an element from the buffer and parses it according to the `format`:
     /// - `Processed`: Reads a compressed curve element and decompress it
     /// - `RawBytes`: Reads an uncompressed curve element with coordinates in Montgomery form.
-    /// Checks that field elements are less than modulus, and then checks that the point is on the curve.
+    ///   Checks that field elements are less than modulus, and then checks that the point is on the curve.
     /// - `RawBytesUnchecked`: Reads an uncompressed curve element with coordinates in Montgomery form;
-    /// does not perform any checks
+    ///   does not perform any checks
     fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         match format {
             SerdeFormat::Processed => <Self as CurveRead>::read(reader),
@@ -83,9 +83,9 @@ impl<C: PrimeCurveAffine + SerdeObject + Default> SerdeCurveAffine for C {}
 pub trait SerdePrimeField: PrimeField + SerdeObject {
     /// Reads a field element as bytes from the buffer according to the `format`:
     /// - `Processed`: Reads a field element in standard form, with endianness specified by the
-    /// `PrimeField` implementation, and checks that the element is less than the modulus.
+    ///   `PrimeField` implementation, and checks that the element is less than the modulus.
     /// - `RawBytes`: Reads a field element from raw bytes in its internal Montgomery representations,
-    /// and checks that the element is less than the modulus.
+    ///   and checks that the element is less than the modulus.
     /// - `RawBytesUnchecked`: Reads a field element in Montgomery form and performs no checks.
     fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         match format {
@@ -103,9 +103,9 @@ pub trait SerdePrimeField: PrimeField + SerdeObject {
 
     /// Writes a field element as bytes to the buffer according to the `format`:
     /// - `Processed`: Writes a field element in standard form, with endianness specified by the
-    /// `PrimeField` implementation.
+    ///   `PrimeField` implementation.
     /// - Otherwise: Writes a field element into raw bytes in its internal Montgomery representation,
-    /// WITHOUT performing the expensive Montgomery reduction.
+    ///   WITHOUT performing the expensive Montgomery reduction.
     fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
         match format {
             SerdeFormat::Processed => writer.write_all(self.to_repr().as_ref()),
