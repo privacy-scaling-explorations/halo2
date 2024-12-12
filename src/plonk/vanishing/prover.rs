@@ -125,26 +125,20 @@ impl<F: PrimeField> Constructed<F> {
     pub(in crate::plonk) fn evaluate<T: Transcript>(
         self,
         x: F,
-        _xn: F,
-        _domain: &EvaluationDomain<F>,
         transcript: &mut T,
     ) -> Result<Evaluated<F>, Error>
     where
         F: Hashable<T::Hash> + SerdeObject,
     {
-        self.h_pieces
-            .iter()
-            // .fold(domain.empty_coeff(), |acc, eval| acc * xn + eval);
-            .try_for_each(|p| {
-                let random_eval = eval_polynomial(p, x);
-                transcript.write(&random_eval)
-            })?;
+        self.h_pieces.iter().try_for_each(|p| {
+            let eval = eval_polynomial(p, x);
+            transcript.write(&eval)
+        })?;
 
         let random_eval = eval_polynomial(&self.committed.random_poly, x);
         transcript.write(&random_eval)?;
 
         Ok(Evaluated {
-            // h_poly,
             h_pieces: self.h_pieces,
             committed: self.committed,
         })

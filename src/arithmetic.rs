@@ -236,14 +236,12 @@ pub(crate) fn powers<F: Field>(base: F) -> impl Iterator<Item = F> {
 }
 
 /// Multi scalar multiplication engine
-pub trait MSM<C: PrimeCurveAffine>: Clone + Debug + Send + Sync {
+pub trait MSM<C: PrimeCurveAffine>: Clone + Debug + Send + Sized + Sync {
     /// Add arbitrary term (the scalar and the point)
     fn append_term(&mut self, scalar: C::Scalar, point: C::Curve);
 
     /// Add another multiexp into this one
-    fn add_msm(&mut self, other: &Self)
-    where
-        Self: Sized;
+    fn add_msm(&mut self, other: &Self);
 
     /// Scale all scalars in the MSM by some scaling factor
     fn scale(&mut self, factor: C::Scalar);

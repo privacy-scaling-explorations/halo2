@@ -476,7 +476,6 @@ where
     let vanishing = vanishing.construct::<CS, T>(params, domain, h_poly, transcript)?;
 
     let x: F = transcript.squeeze_challenge();
-    let xn = x.pow([params.n()]);
 
     // Compute and hash advice evals for each circuit instance
     for advice in advice.iter() {
@@ -512,7 +511,7 @@ where
         transcript.write(eval)?;
     }
 
-    let vanishing = vanishing.evaluate(x, xn, domain, transcript)?;
+    let vanishing = vanishing.evaluate(x, transcript)?;
 
     // Evaluate common permutation data
     pk.permutation.evaluate(x, transcript)?;
