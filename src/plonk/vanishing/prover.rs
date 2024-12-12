@@ -110,8 +110,8 @@ impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
             .collect();
 
         // Hash each h(X) piece
-        for c in h_commitments.iter() {
-            transcript.write(c)?;
+        for c in h_commitments {
+            transcript.write(&c)?;
         }
 
         Ok(Constructed {

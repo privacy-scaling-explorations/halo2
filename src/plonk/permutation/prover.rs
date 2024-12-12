@@ -11,28 +11,19 @@ use crate::transcript::{Hashable, Transcript};
 use crate::{
     arithmetic::{eval_polynomial, parallelize},
     plonk::{self, Error},
-    poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
+    poly::{Coeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
 };
 
 pub(crate) struct CommittedSet<F: PrimeField> {
     pub(crate) permutation_product_poly: Polynomial<F, Coeff>,
-    pub(crate) permutation_product_coset: Polynomial<F, ExtendedLagrangeCoeff>,
 }
 
 pub(crate) struct Committed<F: PrimeField> {
     pub(crate) sets: Vec<CommittedSet<F>>,
 }
 
-pub struct ConstructedSet<F: PrimeField> {
-    permutation_product_poly: Polynomial<F, Coeff>,
-}
-
-pub(crate) struct Constructed<F: PrimeField> {
-    sets: Vec<ConstructedSet<F>>,
-}
-
 pub(crate) struct Evaluated<F: PrimeField> {
-    constructed: Constructed<F>,
+    constructed: Committed<F>,
 }
 
 impl Argument {
@@ -162,35 +153,17 @@ impl Argument {
             last_z = z[params.n() as usize - (blinding_factors + 1)];
 
             let permutation_product_commitment = params.commit_lagrange(&z);
-            let z = domain.lagrange_to_coeff(z);
-            let permutation_product_poly = z.clone();
-
-            let permutation_product_coset = domain.coeff_to_extended(z.clone());
+            let permutation_product_poly = domain.lagrange_to_coeff(z);
 
             // Hash the permutation product commitment
             transcript.write(&permutation_product_commitment)?;
 
             sets.push(CommittedSet {
                 permutation_product_poly,
-                permutation_product_coset,
             });
         }
 
         Ok(Committed { sets })
-    }
-}
-
-impl<F: PrimeField> Committed<F> {
-    pub(in crate::plonk) fn construct(self) -> Constructed<F> {
-        Constructed {
-            sets: self
-                .sets
-                .iter()
-                .map(|set| ConstructedSet {
-                    permutation_product_poly: set.permutation_product_poly.clone(),
-                })
-                .collect(),
-        }
     }
 }
 
@@ -218,7 +191,7 @@ impl<F: PrimeField> super::ProvingKey<F> {
     }
 }
 
-impl<F: WithSmallOrderMulGroup<3>> Constructed<F> {
+impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
     // TODO: I don't quite like the PCS in the function
     pub(in crate::plonk) fn evaluate<T: Transcript, CS: PolynomialCommitmentScheme<F>>(
         self,
