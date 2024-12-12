@@ -1,10 +1,9 @@
 pub use rayon::{
     current_num_threads,
     iter::{IndexedParallelIterator, IntoParallelRefIterator},
-    iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator},
-    join, scope,
+    iter::{IntoParallelIterator, ParallelIterator},
+    scope,
     slice::ParallelSliceMut,
-    Scope,
 };
 
 pub trait TryFoldAndReduce<T, E> {
@@ -25,7 +24,7 @@ impl<T, E, I> TryFoldAndReduce<T, E> for I
 where
     T: Send + Sync,
     E: Send + Sync,
-    I: rayon::iter::ParallelIterator<Item = Result<T, E>>,
+    I: ParallelIterator<Item = Result<T, E>>,
 {
     fn try_fold_and_reduce(
         self,

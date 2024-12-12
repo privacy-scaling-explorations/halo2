@@ -1,4 +1,4 @@
-use crate::arithmetic::{best_multiexp, g_to_lagrange, parallelize};
+use crate::arithmetic::{g_to_lagrange, parallelize};
 use crate::helpers::SerdeCurveAffine;
 use crate::poly::{LagrangeCoeff, Polynomial};
 use crate::SerdeFormat;
@@ -11,7 +11,9 @@ use std::fmt::Debug;
 
 use crate::poly::commitment::Params;
 use crate::poly::kzg::KZGCommitmentScheme;
+use halo2curves::msm::msm_best;
 use halo2curves::serde::SerdeObject;
+use halo2curves::CurveAffine;
 use std::io;
 
 use super::msm::MSMKZG;
@@ -30,7 +32,7 @@ pub struct ParamsKZG<E: Engine> {
 impl<E: MultiMillerLoop> Params<E::Fr, KZGCommitmentScheme<E>> for ParamsKZG<E>
 where
     E::Fr: SerdeObject,
-    E::G1Affine: Default + SerdeObject,
+    E::G1Affine: Default + SerdeObject + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
 {
     fn k(&self) -> u32 {
         self.k
@@ -46,7 +48,7 @@ where
         let bases = &self.g_lagrange;
         let size = scalars.len();
         assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size]).into()
+        msm_best(&scalars, &bases[0..size]).into()
     }
 }
 

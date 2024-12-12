@@ -8,7 +8,7 @@ pub mod params;
 
 use std::fmt::Debug;
 
-use crate::arithmetic::{best_multiexp, kate_division, powers, MSM};
+use crate::arithmetic::{kate_division, powers, MSM};
 use crate::poly::kzg::msm::{DualMSM, MSMKZG};
 use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
 use crate::poly::query::Query;
@@ -19,8 +19,10 @@ use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Sampleable, Transcript};
 use ff::Field;
 use group::prime::PrimeCurveAffine;
+use halo2curves::msm::msm_best;
 use halo2curves::pairing::MultiMillerLoop;
 use halo2curves::serde::SerdeObject;
+use halo2curves::CurveAffine;
 
 #[derive(Clone, Debug)]
 /// KZG verifier
@@ -31,7 +33,7 @@ pub struct KZGCommitmentScheme<E: Engine> {
 impl<E: MultiMillerLoop> PolynomialCommitmentScheme<E::Fr> for KZGCommitmentScheme<E>
 where
     E::Fr: SerdeObject,
-    E::G1Affine: Default + SerdeObject,
+    E::G1Affine: Default + SerdeObject + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
 {
     type Parameters = ParamsKZG<E>;
     type VerifierParameters = ParamsVerifierKZG<E>;
@@ -51,7 +53,7 @@ where
         let bases = &params.g;
         let size = scalars.len();
         assert!(bases.len() >= size);
-        best_multiexp(&scalars, &bases[0..size]).into()
+        msm_best(&scalars, &bases[0..size]).into()
     }
 
     fn open<'com, T: Transcript, I>(
@@ -293,7 +295,10 @@ mod tests {
     fn create_proof<E: MultiMillerLoop, T: Transcript>(kzg_params: &ParamsKZG<E>) -> Vec<u8>
     where
         E::Fr: WithSmallOrderMulGroup<3> + SerdeObject + Hashable<T::Hash> + Sampleable<T::Hash>,
-        E::G1Affine: SerdeObject + Hashable<T::Hash> + Default,
+        E::G1Affine: SerdeObject
+            + Hashable<T::Hash>
+            + Default
+            + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     {
         let domain = EvaluationDomain::new(1, kzg_params.k);
 

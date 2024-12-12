@@ -8,13 +8,12 @@ authors = [
     "Jack Grigg <jack@electriccoin.co>",
 ]
 edition = "2021"
-rust-version = "1.66.0"
+rust-version = "1.76.0"
 description = """
-Fast PLONK-based zero-knowledge proving system with no trusted setup
+Fast PLONK-based zero-knowledge proving system
 """
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/zcash/halo2"
-documentation = "https://docs.rs/halo2_proofs"
+repository = "https://github.com/input-output-hk/halo2"
 readme = "README.md"
 categories = ["cryptography"]
 keywords = ["halo", "proofs", "zkp", "zkSNARKs"]
@@ -39,15 +38,11 @@ harness = false
 name = "dev_lookup"
 harness = false
 
-[[bench]]
-name = "fft"
-harness = false
-
 [dependencies]
 backtrace = { version = "0.3", optional = true }
 ff = "0.13"
 group = "0.13"
-halo2curves = { version = "0.6.0", default-features = false }
+halo2curves = { version = "0.7.0", default-features = false }
 rand_core = { version = "0.6", default-features = false }
 tracing = "0.1"
 blake2b_simd = "1" # MSRV 1.66.0

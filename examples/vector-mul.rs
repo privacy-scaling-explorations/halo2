@@ -288,7 +288,7 @@ fn main() {
     // Prepare the private and public inputs to the circuit!
     let a = [Fp::from(2); N];
     let b = [Fp::from(3); N];
-    let c: Vec<Fp> = a.iter().zip(b.iter()).map(|(&a, b)| a * b).collect();
+    let c: Vec<Fp> = a.iter().zip(b).map(|(&a, b)| a * b).collect();
 
     // Instantiate the circuit with the private inputs.
     let circuit = MyCircuit {

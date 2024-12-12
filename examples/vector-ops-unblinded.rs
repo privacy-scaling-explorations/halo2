@@ -15,6 +15,7 @@ use halo2_proofs::{
 };
 use halo2curves::pairing::{Engine, MultiMillerLoop};
 use halo2curves::serde::SerdeObject;
+use halo2curves::CurveAffine;
 use rand_core::OsRng;
 
 // ANCHOR: instructions
@@ -467,7 +468,8 @@ fn test_prover<E: Engine + MultiMillerLoop>(
     instances: Vec<E::Fr>,
 ) -> Vec<u8>
 where
-    E::G1Affine: Default + SerdeObject + Hashable<State>,
+    E::G1Affine:
+        Default + SerdeObject + Hashable<State> + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::Fr: WithSmallOrderMulGroup<3>
         + FromUniformBytes<64>
         + SerdeObject

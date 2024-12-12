@@ -1,9 +1,10 @@
 use std::fmt::Debug;
 
 use super::params::ParamsKZG;
+use crate::arithmetic::parallelize;
 use crate::arithmetic::MSM;
-use crate::arithmetic::{best_multiexp, parallelize};
 use group::{Curve, Group};
+use halo2curves::msm::msm_best;
 use halo2curves::{
     pairing::{Engine, MillerLoopResult, MultiMillerLoop},
     CurveAffine, CurveExt,
@@ -38,7 +39,10 @@ impl<E: Engine> MSMKZG<E> {
     }
 }
 
-impl<E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<E> {
+impl<E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<E>
+where
+    E::G1Affine: CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
+{
     fn append_term(&mut self, scalar: E::Fr, point: E::G1) {
         self.scalars.push(scalar);
         self.bases.push(point);
@@ -67,7 +71,7 @@ impl<E: Engine + Debug> MSM<E::G1Affine> for MSMKZG<E> {
         use group::prime::PrimeCurveAffine;
         let mut bases = vec![E::G1Affine::identity(); self.scalars.len()];
         E::G1::batch_normalize(&self.bases, &mut bases);
-        best_multiexp(&self.scalars, &bases)
+        msm_best(&self.scalars, &bases)
     }
 
     fn bases(&self) -> Vec<E::G1> {
@@ -97,7 +101,10 @@ pub struct DualMSM<'a, E: Engine> {
     pub(crate) right: MSMKZG<E>,
 }
 
-impl<'a, E: MultiMillerLoop + Debug> DualMSM<'a, E> {
+impl<'a, E: MultiMillerLoop + Debug> DualMSM<'a, E>
+where
+    E::G1Affine: CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
+{
     /// Create a new two channel MSM accumulator instance
     pub fn new(params: &'a ParamsKZG<E>) -> Self {
         Self {

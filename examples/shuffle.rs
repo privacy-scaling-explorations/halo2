@@ -10,7 +10,7 @@ use halo2_proofs::{
 };
 use halo2curves::pairing::MultiMillerLoop;
 use halo2curves::serde::SerdeObject;
-use halo2curves::{bn256, pairing::Engine};
+use halo2curves::{bn256, pairing::Engine, CurveAffine};
 use rand_core::{OsRng, RngCore};
 use std::iter;
 
@@ -267,7 +267,8 @@ fn test_prover<E: Engine + MultiMillerLoop, const W: usize, const H: usize>(
     circuit: MyCircuit<E::Fr, W, H>,
     expected: bool,
 ) where
-    E::G1Affine: Default + SerdeObject + Hashable<State>,
+    E::G1Affine:
+        Default + SerdeObject + Hashable<State> + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     E::Fr: WithSmallOrderMulGroup<3>
         + FromUniformBytes<64>
         + SerdeObject

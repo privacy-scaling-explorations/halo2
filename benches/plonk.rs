@@ -4,15 +4,14 @@ extern crate criterion;
 use group::ff::Field;
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::plonk::*;
-use halo2_proofs::poly::{Rotation};
+use halo2_proofs::poly::Rotation;
 use halo2curves::bn256;
 use rand_core::OsRng;
-
 
 use std::marker::PhantomData;
 
 use criterion::{BenchmarkId, Criterion};
-use halo2_proofs::poly::kzg::{KZGCommitmentScheme, params::ParamsKZG};
+use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::rational::Rational;
 use halo2_proofs::transcript::{CircuitTranscript, Transcript};
 
@@ -252,7 +251,12 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    fn keygen(k: u32) -> (ParamsKZG<bn256::Bn256>, ProvingKey<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>>) {
+    fn keygen(
+        k: u32,
+    ) -> (
+        ParamsKZG<bn256::Bn256>,
+        ProvingKey<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>>,
+    ) {
         let params: ParamsKZG<bn256::Bn256> = ParamsKZG::new(k);
         let empty_circuit: MyCircuit<bn256::Fr> = MyCircuit {
             a: Value::unknown(),
@@ -295,13 +299,15 @@ fn criterion_benchmark(c: &mut Criterion) {
         proof: &[u8],
     ) {
         let mut transcript = CircuitTranscript::parse(proof);
-        assert!(verify_proof::<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>, _>(
-            params,
-            vk,
-            &[&[]],
-            &mut transcript
-        )
-        .is_ok());
+        assert!(
+            verify_proof::<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>, _>(
+                params,
+                vk,
+                &[&[]],
+                &mut transcript
+            )
+            .is_ok()
+        );
     }
 
     let k_range = 8..=16;
