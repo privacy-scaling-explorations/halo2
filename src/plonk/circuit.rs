@@ -1,7 +1,7 @@
 use super::{lookup, permutation, Error};
 use crate::circuit::layouter::SyncDeps;
 use crate::dev::metadata;
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use crate::{
     circuit::{Layouter, Region, Value},
     poly::Rotation,

@@ -16,7 +16,7 @@ use halo2_proofs::{
         kzg::{params::ParamsKZG, KZGCommitmentScheme},
         Rotation,
     },
-    SerdeFormat,
+    utils::SerdeFormat,
 };
 use halo2curves::bn256::{Bn256, Fr};
 use rand_core::OsRng;

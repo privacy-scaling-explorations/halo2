@@ -4,7 +4,7 @@ use crate::plonk::evaluation::evaluate;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize},
+    utils::arithmetic::{eval_polynomial, parallelize},
     poly::{Coeff, EvaluationDomain, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
 };
 use ff::{PrimeField, WithSmallOrderMulGroup};

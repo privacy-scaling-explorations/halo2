@@ -2,16 +2,16 @@ use ff::WithSmallOrderMulGroup;
 
 use super::{Argument, ProvingKey, VerifyingKey};
 use crate::{
-    arithmetic::parallelize,
+    utils::arithmetic::parallelize,
     plonk::{Any, Column, Error},
     poly::EvaluationDomain,
 };
 
 #[cfg(feature = "thread-safe-region")]
-use crate::multicore::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use crate::utils::multicore::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 #[cfg(not(feature = "thread-safe-region"))]
-use crate::multicore::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
+use crate::utils::multicore::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use rayon::iter::IntoParallelRefMutIterator;

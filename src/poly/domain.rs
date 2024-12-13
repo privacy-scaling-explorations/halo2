@@ -1,13 +1,13 @@
 //! Contains utilities for performing polynomial arithmetic over an evaluation
 //! domain that is of a suitable size for the application.
 
-use crate::arithmetic::parallelize;
+use crate::utils::arithmetic::parallelize;
 
 use super::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial, Rotation};
 use ff::WithSmallOrderMulGroup;
 use group::ff::{BatchInvert, Field};
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use halo2curves::fft::best_fft;
 use std::marker::PhantomData;
 
@@ -486,7 +486,7 @@ pub struct PinnedEvaluationDomain<'a, F: Field> {
 fn test_rotate() {
     use rand_core::OsRng;
 
-    use crate::arithmetic::eval_polynomial;
+    use crate::utils::arithmetic::eval_polynomial;
     use halo2curves::pasta::pallas::Scalar;
 
     let domain = EvaluationDomain::<Scalar>::new(1, 3);
@@ -527,7 +527,7 @@ fn test_rotate() {
 fn test_l_i() {
     use rand_core::OsRng;
 
-    use crate::arithmetic::{eval_polynomial, lagrange_interpolate};
+    use crate::utils::arithmetic::{eval_polynomial, lagrange_interpolate};
     use halo2curves::pasta::pallas::Scalar;
     let domain = EvaluationDomain::<Scalar>::new(1, 3);
 

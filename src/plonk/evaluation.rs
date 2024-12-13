@@ -1,9 +1,9 @@
-use crate::multicore;
+use crate::utils::multicore;
 use crate::plonk::{lookup, permutation, Any, ProvingKey};
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::poly::Basis;
 use crate::{
-    arithmetic::parallelize,
+    utils::arithmetic::parallelize,
     poly::{Coeff, ExtendedLagrangeCoeff, Polynomial, Rotation},
 };
 use ff::{PrimeField, WithSmallOrderMulGroup};

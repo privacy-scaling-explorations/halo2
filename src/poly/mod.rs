@@ -2,10 +2,10 @@
 //! various forms, including computing commitments to them and provably opening
 //! the committed polynomials at arbitrary points.
 
-use crate::arithmetic::parallelize;
-use crate::helpers::SerdePrimeField;
+use crate::utils::arithmetic::parallelize;
+use crate::utils::helpers::SerdePrimeField;
 // use crate::plonk::Assigned;
-use crate::SerdeFormat;
+use crate::utils::SerdeFormat;
 
 use ff::BatchInvert;
 use group::ff::Field;
@@ -25,7 +25,7 @@ pub mod kzg;
 
 pub mod commitment;
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 pub use domain::*;
 pub use query::{ProverQuery, VerifierQuery};
 // pub use strategy::{Guard, VerificationStrategy};
@@ -144,7 +144,7 @@ impl<F, B> Polynomial<F, B> {
 }
 
 impl<F: SerdePrimeField, B> Polynomial<F, B> {
-    /// Reads polynomial from buffer using `SerdePrimeField::read`.  
+    /// Reads polynomial from buffer using `SerdePrimeField::read`.
     pub(crate) fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         let mut poly_len = [0u8; 4];
         reader.read_exact(&mut poly_len)?;
@@ -159,7 +159,7 @@ impl<F: SerdePrimeField, B> Polynomial<F, B> {
             })
     }
 
-    /// Writes polynomial to buffer using `SerdePrimeField::write`.  
+    /// Writes polynomial to buffer using `SerdePrimeField::write`.
     pub(crate) fn write<W: io::Write>(
         &self,
         writer: &mut W,

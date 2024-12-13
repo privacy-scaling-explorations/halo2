@@ -9,7 +9,7 @@ use ff::Field;
 pub use super::table_layouter::TableLayouter;
 use super::{Cell, RegionIndex, Value};
 use crate::plonk::{Advice, Any, Column, Error, Fixed, Instance, Selector};
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 
 /// Intermediate trait requirements for [`RegionLayouter`] when thread-safe regions are enabled.
 #[cfg(feature = "thread-safe-region")]

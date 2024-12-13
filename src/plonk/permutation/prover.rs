@@ -9,7 +9,7 @@ use super::{Argument, ProvingKey};
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize},
+    utils::arithmetic::{eval_polynomial, parallelize},
     plonk::{self, Error},
     poly::{Coeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
 };

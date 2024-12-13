@@ -15,7 +15,7 @@ pub use floor_planner::single_pass::SimpleFloorPlanner;
 pub mod layouter;
 mod table_layouter;
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 pub use table_layouter::{SimpleTableLayouter, TableLayouter};
 
 /// A chip implements a set of instructions that can be used by gadgets.
@@ -133,7 +133,7 @@ impl<V, F: Field> AssignedCell<V, F> {
 
 impl<V, F: Field> AssignedCell<V, F>
 where
-    for<'v> Rational<F>: From<&'v V>,
+        for<'v> Rational<F>: From<&'v V>,
 {
     /// Returns the field element value of the [`AssignedCell`].
     pub fn value_field(&self) -> Value<Rational<F>> {
@@ -157,7 +157,7 @@ impl<F: Field> AssignedCell<Rational<F>, F> {
 
 impl<V: Clone, F: Field> AssignedCell<V, F>
 where
-    for<'v> Rational<F>: From<&'v V>,
+        for<'v> Rational<F>: From<&'v V>,
 {
     /// Copies the value to a given advice cell and constrains them to be equal.
     ///
@@ -281,9 +281,9 @@ impl<'r, F: Field> Region<'r, F> {
         constant: VR,
     ) -> Result<AssignedCell<VR, F>, Error>
     where
-        for<'vr> Rational<F>: From<&'vr VR>,
-        A: Fn() -> AR,
-        AR: Into<String>,
+            for<'vr> Rational<F>: From<&'vr VR>,
+            A: Fn() -> AR,
+            AR: Into<String>,
     {
         let cell = self.region.assign_advice_from_constant(
             &|| annotation().into(),

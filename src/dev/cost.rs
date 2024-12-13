@@ -11,7 +11,7 @@ use std::{
 use ff::{Field, PrimeField};
 use group::prime::PrimeGroup;
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use crate::{
     circuit::{layouter::RegionColumn, Value},
     plonk::{

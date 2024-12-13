@@ -9,8 +9,8 @@ use super::Argument;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    arithmetic::{eval_polynomial, parallelize},
-    multicore::current_num_threads,
+    utils::arithmetic::{eval_polynomial, parallelize},
+    utils::multicore::current_num_threads,
     plonk::Error,
     poly::{Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery},
 };

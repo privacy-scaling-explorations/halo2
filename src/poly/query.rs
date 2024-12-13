@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::{
-    arithmetic::eval_polynomial,
+    utils::arithmetic::eval_polynomial,
     poly::{Coeff, Polynomial},
 };
 

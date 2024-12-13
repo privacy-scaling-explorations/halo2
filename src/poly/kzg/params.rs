@@ -1,7 +1,7 @@
-use crate::arithmetic::{g_to_lagrange, parallelize};
-use crate::helpers::SerdeCurveAffine;
+use crate::utils::arithmetic::{g_to_lagrange, parallelize};
+use crate::utils::helpers::SerdeCurveAffine;
 use crate::poly::{LagrangeCoeff, Polynomial};
-use crate::SerdeFormat;
+use crate::utils::SerdeFormat;
 
 use ff::{Field, PrimeField};
 use group::{prime::PrimeCurveAffine, Curve, Group};

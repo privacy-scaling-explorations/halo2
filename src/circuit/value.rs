@@ -4,7 +4,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 use group::ff::Field;
 
 use crate::plonk::Error;
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 
 /// A value that might exist within a circuit.
 ///

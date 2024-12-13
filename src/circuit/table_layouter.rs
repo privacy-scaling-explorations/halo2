@@ -8,7 +8,7 @@ use std::{
 use ff::Field;
 
 use crate::plonk::{Assignment, Error, TableColumn, TableError};
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 
 use super::Value;
 

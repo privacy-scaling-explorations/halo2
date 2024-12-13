@@ -2,7 +2,7 @@ use std::fmt;
 
 use ff::Field;
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use crate::{
     circuit::{
         layouter::{RegionColumn, RegionLayouter, RegionShape, SyncDeps, TableLayouter},

@@ -8,7 +8,7 @@ pub mod params;
 
 use std::fmt::Debug;
 
-use crate::arithmetic::{kate_division, powers, MSM};
+use crate::utils::arithmetic::{kate_division, powers, MSM};
 use crate::poly::kzg::msm::{DualMSM, MSMKZG};
 use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
 use crate::poly::query::Query;
@@ -212,7 +212,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::arithmetic::eval_polynomial;
+    use crate::utils::arithmetic::eval_polynomial;
     use crate::poly::commitment::PolynomialCommitmentScheme;
     use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
     use crate::poly::kzg::KZGCommitmentScheme;

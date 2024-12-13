@@ -16,8 +16,8 @@ use super::{
 use crate::circuit::Value;
 use crate::poly::batch_invert_rational;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
-use crate::rational::Rational;
-use crate::{arithmetic::parallelize, poly::EvaluationDomain};
+use crate::utils::rational::Rational;
+use crate::{utils::arithmetic::parallelize, poly::EvaluationDomain};
 
 pub(crate) fn create_domain<F, ConcreteCircuit>(
     k: u32,

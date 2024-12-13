@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 
 use criterion::{BenchmarkId, Criterion};
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
-use halo2_proofs::rational::Rational;
+use halo2_proofs::utils::rational::Rational;
 use halo2_proofs::transcript::{CircuitTranscript, Transcript};
 
 fn criterion_benchmark(c: &mut Criterion) {

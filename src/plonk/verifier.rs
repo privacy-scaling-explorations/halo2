@@ -3,7 +3,7 @@ use halo2curves::serde::SerdeObject;
 use std::iter;
 
 use super::{vanishing, Error, VerifyingKey};
-use crate::arithmetic::compute_inner_product;
+use crate::utils::arithmetic::compute_inner_product;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::poly::VerifierQuery;
 use crate::transcript::{read_n, Hashable, Sampleable, Transcript};

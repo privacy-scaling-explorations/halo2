@@ -2,11 +2,11 @@
 
 use super::circuit::{Any, Column};
 use crate::{
-    helpers::{
+    utils::helpers::{
         polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdePrimeField,
     },
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
-    SerdeFormat,
+    utils::SerdeFormat,
 };
 
 pub(crate) mod keygen;
@@ -15,7 +15,7 @@ pub(crate) mod verifier;
 
 pub use keygen::Assembly;
 
-use crate::helpers::byte_length;
+use crate::utils::helpers::byte_length;
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use ff::PrimeField;
 use halo2curves::serde::SerdeObject;

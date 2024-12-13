@@ -14,7 +14,7 @@ use super::{
 };
 
 use crate::{
-    arithmetic::eval_polynomial,
+    utils::arithmetic::eval_polynomial,
     // circuit::Value,
     // plonk::Assigned,
     poly::{Basis, Coeff, LagrangeCoeff, Polynomial, ProverQuery},
@@ -23,7 +23,7 @@ use crate::{
 use crate::circuit::Value;
 use crate::poly::batch_invert_rational;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use crate::transcript::{Hashable, Sampleable, Transcript};
 use halo2curves::serde::SerdeObject;
 

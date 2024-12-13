@@ -449,7 +449,7 @@ mod proptests {
         ops::{Add, Mul, Neg, Sub},
     };
 
-    use crate::rational::Rational;
+    use crate::utils::rational::Rational;
     use group::ff::Field;
     use halo2curves::pasta::Fp;
     use proptest::{collection::vec, prelude::*, sample::select};

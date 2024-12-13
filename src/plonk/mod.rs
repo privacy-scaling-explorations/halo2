@@ -8,7 +8,7 @@
 use blake2b_simd::Params as Blake2bParams;
 use group::ff::FromUniformBytes;
 
-use crate::helpers::{
+use crate::utils::helpers::{
     byte_length, polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
     SerdePrimeField,
 };
@@ -17,7 +17,7 @@ use crate::poly::{
     Polynomial,
 };
 use crate::transcript::{Hashable, Transcript};
-use crate::SerdeFormat;
+use crate::utils::SerdeFormat;
 
 mod circuit;
 mod error;
@@ -93,7 +93,7 @@ where
         for selector in &self.selectors {
             // since `selector` is filled with `bool`, we pack them 8 at a time into bytes and then write
             for bits in selector.chunks(8) {
-                writer.write_all(&[crate::helpers::pack(bits)])?;
+                writer.write_all(&[crate::utils::helpers::pack(bits)])?;
             }
         }
         Ok(())
@@ -190,11 +190,11 @@ impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> VerifyingK
         10 + (self.fixed_commitments.len() * byte_length::<CS::Commitment>(format))
             + self.permutation.bytes_length(format)
             + self.selectors.len()
-                * (self
-                    .selectors
-                    .first()
-                    .map(|selector| (selector.len() + 7) / 8)
-                    .unwrap_or(0))
+            * (self
+            .selectors
+            .first()
+            .map(|selector| (selector.len() + 7) / 8)
+            .unwrap_or(0))
     }
 
     fn from_parts(

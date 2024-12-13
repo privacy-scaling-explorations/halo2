@@ -3,7 +3,7 @@ use ff::{BatchInvert, FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
 use halo2_proofs::{
-    arithmetic::Field,
+    utils::arithmetic::Field,
     circuit::{floor_planner::V1, Layouter, Value},
     dev::{metadata, FailureLocation, MockProver, VerifyFailure},
     plonk::*,

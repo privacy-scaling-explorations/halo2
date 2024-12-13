@@ -8,7 +8,7 @@ use ff::{FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
 use halo2_proofs::{
-    arithmetic::Field,
+    utils::arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::*,
     poly::Rotation,

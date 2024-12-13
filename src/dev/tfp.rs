@@ -3,7 +3,7 @@ use std::{fmt, marker::PhantomData};
 use ff::Field;
 use tracing::{debug, debug_span, span::EnteredSpan};
 
-use crate::rational::Rational;
+use crate::utils::rational::Rational;
 use crate::{
     circuit::{
         layouter::{RegionLayouter, SyncDeps},

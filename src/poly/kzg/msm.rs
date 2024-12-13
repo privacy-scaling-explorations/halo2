@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use super::params::ParamsKZG;
-use crate::arithmetic::parallelize;
-use crate::arithmetic::MSM;
+use crate::utils::arithmetic::parallelize;
+use crate::utils::arithmetic::MSM;
 use group::{Curve, Group};
 use halo2curves::msm::msm_best;
 use halo2curves::{
