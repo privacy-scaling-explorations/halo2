@@ -582,8 +582,8 @@
         ev,
     })
 }
-
-<span class="kw">struct </span>QueriesMap {
+<span class="doccomment">/// A map of whole queries used in the circuit
+</span><span class="kw">struct </span>QueriesMap {
     map: HashMap&lt;(ColumnMid, Rotation), usize&gt;,
     advice: Vec&lt;(ColumnMid, Rotation)&gt;,
     instance: Vec&lt;(ColumnMid, Rotation)&gt;,
