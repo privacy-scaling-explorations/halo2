@@ -212,7 +212,6 @@ impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> Evaluated<
             )
     }
 
-    // todo: Removing the MSM tricks here. Bring them back
     pub(in crate::plonk) fn queries<'r>(
         &'r self,
         vk: &'r plonk::VerifyingKey<F, CS>,
@@ -252,7 +251,6 @@ impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> Evaluated<
 }
 
 impl<F: PrimeField> CommonEvaluated<F> {
-    // todo: MSM trick here
     pub(in crate::plonk) fn queries<'r, CS: PolynomialCommitmentScheme<F>>(
         &'r self,
         vkey: &'r VerifyingKey<F, CS>,

@@ -172,7 +172,6 @@ impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> Evaluated<
             ))
     }
 
-    // todo: Removing trick from MSMs here
     pub(in crate::plonk) fn queries(
         &self,
         vk: &VerifyingKey<F, CS>,

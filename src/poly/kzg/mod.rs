@@ -253,7 +253,7 @@ mod tests {
             + SerdeObject
             + Hashable<T::Hash>,
     {
-        let mut transcript = T::parse(proof);
+        let mut transcript = T::init_from_bytes(proof);
 
         let a: E::G1Affine = transcript.read().unwrap();
         let b: E::G1Affine = transcript.read().unwrap();

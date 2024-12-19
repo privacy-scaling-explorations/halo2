@@ -164,7 +164,7 @@ fn main() {
 
     let proof = transcript.finalize();
 
-    let mut transcript = CircuitTranscript::<State>::parse(&proof[..]);
+    let mut transcript = CircuitTranscript::<State>::init_from_bytes(&proof[..]);
 
     assert!(verify_proof::<Fr, KZGCommitmentScheme<Bn256>, _>(
         &params,

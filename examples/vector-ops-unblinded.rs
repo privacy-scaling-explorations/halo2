@@ -498,7 +498,7 @@ where
     };
 
     let accepted = {
-        let mut transcript = CircuitTranscript::<State>::parse(&proof[..]);
+        let mut transcript = CircuitTranscript::<State>::init_from_bytes(&proof[..]);
 
         verify_proof::<E::Fr, KZGCommitmentScheme<E>, _>(
             &params,

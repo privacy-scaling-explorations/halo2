@@ -192,7 +192,6 @@ impl<F: PrimeField> super::ProvingKey<F> {
 }
 
 impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
-    // TODO: I don't quite like the PCS in the function
     pub(in crate::plonk) fn evaluate<T: Transcript, CS: PolynomialCommitmentScheme<F>>(
         self,
         pk: &plonk::ProvingKey<F, CS>,
@@ -243,7 +242,6 @@ impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
 }
 
 impl<F: WithSmallOrderMulGroup<3>> Evaluated<F> {
-    // todo: ditto - I don't like the PCS here
     pub(in crate::plonk) fn open<'a, CS: PolynomialCommitmentScheme<F>>(
         &'a self,
         pk: &'a plonk::ProvingKey<F, CS>,

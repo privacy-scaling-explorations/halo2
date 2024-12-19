@@ -296,7 +296,7 @@ fn test_prover<E: Engine + MultiMillerLoop, const W: usize, const H: usize>(
         transcript.finalize()
     };
 
-    let mut transcript = CircuitTranscript::<State>::parse(&proof[..]);
+    let mut transcript = CircuitTranscript::<State>::init_from_bytes(&proof[..]);
 
     let verifier = verify_proof::<E::Fr, KZGCommitmentScheme<E>, _>(
         &params,

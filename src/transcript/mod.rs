@@ -23,7 +23,6 @@ means that we need to have a trait for something that is hashable.
  */
 
 /// Hash function that can be used for transcript
-/// todo: This looks pretty similar to our sponge instructions in halo2 circuits. Check it out.
 pub trait TranscriptHash {
     /// Input type of the hash function
     type Input;
@@ -59,22 +58,20 @@ pub trait Transcript {
     fn init() -> Self;
 
     /// Parses an existing transcript
-    /// // todo: call from_bytes?
-    fn parse(bytes: &[u8]) -> Self;
+    fn init_from_bytes(bytes: &[u8]) -> Self;
 
-    /// Squeeze a challenge of type `T`
-    /// todo: clarify type `T` in this and other functions
+    /// Squeeze a challenge of type `T`, which only needs to be `Sampleable` with
+    /// the corresponding hash function.
     fn squeeze_challenge<T: Sampleable<Self::Hash>>(&mut self) -> T;
 
-    /// Writing a commitment to the transcript without writing it to the proof,
+    /// Writing a hashable element `T` to the transcript without writing it to the proof,
     /// treating it as a common commitment.
     fn common<T: Hashable<Self::Hash>>(&mut self, input: &T) -> io::Result<()>;
 
-    /// Read a value from the prover.
-    /// FIXME: Do we want to rely on `SerdeObject`?
+    /// Read a hashable element `T` from the prover.
     fn read<T: Hashable<Self::Hash> + SerdeObject>(&mut self) -> io::Result<T>;
 
-    /// Write a value to the proof and the transcript.
+    /// Write a hashable element `T` to the proof and the transcript.
     fn write<T: Hashable<Self::Hash> + SerdeObject>(&mut self, input: &T) -> io::Result<()>;
 
     /// Returns the buffer with the proof
@@ -98,7 +95,7 @@ impl<H: TranscriptHash> Transcript for CircuitTranscript<H> {
         }
     }
 
-    fn parse(bytes: &[u8]) -> Self {
+    fn init_from_bytes(bytes: &[u8]) -> Self {
         Self {
             state: H::init(),
             buffer: Cursor::new(bytes.to_vec()),

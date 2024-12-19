@@ -298,7 +298,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         vk: &VerifyingKey<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>>,
         proof: &[u8],
     ) {
-        let mut transcript = CircuitTranscript::parse(proof);
+        let mut transcript = CircuitTranscript::init_from_bytes(proof);
         assert!(
             verify_proof::<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>, _>(
                 params,

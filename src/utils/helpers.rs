@@ -1,5 +1,4 @@
 //! HELPER FUNCTIONS
-//! TODO: CHECK IF WE ACTUALLY WANT TO EXPOSE THIS
 
 use crate::poly::Polynomial;
 use ff::PrimeField;
