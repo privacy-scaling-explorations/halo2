@@ -6,7 +6,7 @@ use std::iter::{self, ExactSizeIterator};
 
 use super::super::circuit::Any;
 use super::{Argument, ProvingKey};
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Transcript};
 use crate::{
     plonk::{self, Error},
@@ -80,7 +80,7 @@ impl Argument {
             // where p_j(X) is the jth column in this permutation,
             // and i is the ith row of the column.
 
-            let mut modified_values = vec![F::ONE; params.n() as usize];
+            let mut modified_values = vec![F::ONE; domain.n as usize];
 
             // Iterate over each column of the permutation
             for (&column, permuted_column_values) in columns.iter().zip(permutations.iter()) {
@@ -138,7 +138,7 @@ impl Argument {
             // Compute the evaluations of the permutation product polynomial
             // over our domain, starting with z[0] = 1
             let mut z = vec![last_z];
-            for row in 1..(params.n() as usize) {
+            for row in 1..(domain.n as usize) {
                 let mut tmp = z[row - 1];
 
                 tmp *= &modified_values[row - 1];
@@ -146,13 +146,13 @@ impl Argument {
             }
             let mut z = domain.lagrange_from_vec(z);
             // Set blinding factors
-            for z in &mut z[params.n() as usize - blinding_factors..] {
+            for z in &mut z[domain.n as usize - blinding_factors..] {
                 *z = F::random(&mut rng);
             }
             // Set new last_z
-            last_z = z[params.n() as usize - (blinding_factors + 1)];
+            last_z = z[domain.n as usize - (blinding_factors + 1)];
 
-            let permutation_product_commitment = params.commit_lagrange(&z);
+            let permutation_product_commitment = CS::commit_lagrange(params, &z);
             let permutation_product_poly = domain.lagrange_to_coeff(z);
 
             // Hash the permutation product commitment

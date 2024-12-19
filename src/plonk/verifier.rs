@@ -1,25 +1,25 @@
-use ff::WithSmallOrderMulGroup;
+use ff::{FromUniformBytes, WithSmallOrderMulGroup};
 use halo2curves::serde::SerdeObject;
 use std::iter;
 
 use super::{vanishing, Error, VerifyingKey};
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::poly::VerifierQuery;
 use crate::transcript::{read_n, Hashable, Sampleable, Transcript};
 use crate::utils::arithmetic::compute_inner_product;
 
-/// Returns a boolean indicating whether or not the proof is valid
-pub fn verify_proof<
+/// Prepares a plonk proof into a PCS instance that can be finalized or batched.
+pub fn prepare<
     F: WithSmallOrderMulGroup<3> + Hashable<T::Hash> + Sampleable<T::Hash> + SerdeObject,
     CS: PolynomialCommitmentScheme<F>,
     T: Transcript,
 >(
-    params: &CS::VerifierParameters,
     vk: &VerifyingKey<F, CS>,
     instances: &[&[&[F]]],
     transcript: &mut T,
-) -> Result<(), Error>
+) -> Result<CS::VerificationGuard, Error>
 where
+    F: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
     CS::Commitment: Hashable<T::Hash> + SerdeObject,
 {
     // Check that instances matches the expected number of instance columns
@@ -120,7 +120,7 @@ where
     // satisfied with high probability.
     let x: F = transcript.squeeze_challenge();
     let instance_evals = {
-        let xn = x.pow([params.n()]);
+        let xn = x.pow([vk.n()]);
         let (min_rotation, max_rotation) =
             vk.cs
                 .instance_queries
@@ -189,7 +189,7 @@ where
     // commitments open to the correct values.
     let vanishing = {
         // x^n
-        let xn = x.pow([params.n()]);
+        let xn = x.pow([vk.n()]);
 
         let blinding_factors = vk.cs.blinding_factors();
         let l_evals = vk
@@ -211,7 +211,7 @@ where
             .flat_map(|(((advice_evals, instance_evals), permutation), lookups)| {
                 let challenges = &challenges;
                 let fixed_evals = &fixed_evals;
-                std::iter::empty()
+                iter::empty()
                     // Evaluate the circuit using the custom gates provided
                     .chain(vk.cs.gates.iter().flat_map(move |gate| {
                         gate.polynomials().iter().map(move |poly| {
@@ -304,5 +304,5 @@ where
 
     // We are now convinced the circuit is satisfied so long as the
     // polynomial commitments open to the correct values.
-    CS::verify(params, queries, transcript).map_err(|_| Error::Opening)
+    CS::prepare(queries, transcript).map_err(|_| Error::Opening)
 }

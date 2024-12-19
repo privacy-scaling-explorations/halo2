@@ -5,12 +5,13 @@ use std::{
 };
 
 use ff::Field;
+use halo2_proofs::poly::commitment::Guard;
 use halo2_proofs::transcript::{CircuitTranscript, Transcript};
 use halo2_proofs::{
     circuit::{Layouter, SimpleFloorPlanner, Value},
     plonk::{
-        create_proof, keygen_pk, keygen_vk, verify_proof, Advice, Circuit, Column,
-        ConstraintSystem, Error, Fixed, Instance, ProvingKey,
+        create_proof, keygen_pk, keygen_vk, prepare, Advice, Circuit, Column, ConstraintSystem,
+        Error, Fixed, Instance, ProvingKey,
     },
     poly::{
         kzg::{params::ParamsKZG, KZGCommitmentScheme},
@@ -126,10 +127,10 @@ impl Circuit<Fr> for StandardPlonk {
 fn main() {
     let k = 4;
     let circuit = StandardPlonk(Fr::random(OsRng));
-    let params = ParamsKZG::<Bn256>::setup(k, OsRng);
+    let params = ParamsKZG::<Bn256>::unsafe_setup(k, OsRng);
     let vk = keygen_vk::<_, KZGCommitmentScheme<Bn256>, _>(&params, &circuit)
         .expect("vk should not fail");
-    let pk = keygen_pk(&params, vk, &circuit).expect("pk should not fail");
+    let pk = keygen_pk(vk, &circuit).expect("pk should not fail");
 
     let f = File::create("serialization-test.pk").unwrap();
     let mut writer = BufWriter::new(f);
@@ -166,11 +167,12 @@ fn main() {
 
     let mut transcript = CircuitTranscript::<State>::init_from_bytes(&proof[..]);
 
-    assert!(verify_proof::<Fr, KZGCommitmentScheme<Bn256>, _>(
-        &params,
+    assert!(prepare::<Fr, KZGCommitmentScheme<Bn256>, _>(
         pk.get_vk(),
         &[instances],
         &mut transcript,
     )
+    .unwrap()
+    .verify(&params.verifier_params())
     .is_ok());
 }

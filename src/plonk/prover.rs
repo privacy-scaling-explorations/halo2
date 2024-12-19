@@ -1,4 +1,4 @@
-use ff::{Field, PrimeField, WithSmallOrderMulGroup};
+use ff::{Field, FromUniformBytes, PrimeField, WithSmallOrderMulGroup};
 use rand_core::{CryptoRng, RngCore};
 use std::collections::{BTreeSet, HashSet};
 use std::ops::RangeTo;
@@ -22,7 +22,7 @@ use crate::{
 
 use crate::circuit::Value;
 use crate::poly::batch_invert_rational;
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Sampleable, Transcript};
 use crate::utils::rational::Rational;
 use halo2curves::serde::SerdeObject;
@@ -46,7 +46,7 @@ pub fn create_proof<
 ) -> Result<(), Error>
 where
     CS::Commitment: Hashable<T::Hash> + SerdeObject,
-    F: Sampleable<T::Hash> + Hashable<T::Hash> + SerdeObject + Ord,
+    F: Sampleable<T::Hash> + Hashable<T::Hash> + SerdeObject + Ord + FromUniformBytes<64>,
 {
     if circuits.len() != instances.len() {
         return Err(Error::InvalidInstances);
@@ -84,7 +84,7 @@ where
                 .iter()
                 .map(|values| {
                     let mut poly = domain.empty_lagrange();
-                    assert_eq!(poly.len(), params.n() as usize);
+                    assert_eq!(poly.len(), domain.n as usize);
                     if values.len() > (poly.len() - (meta.blinding_factors() + 1)) {
                         return Err(Error::InstanceTooLarge);
                     }
@@ -270,7 +270,7 @@ where
         ];
         let mut challenges = HashMap::<usize, F>::with_capacity(meta.num_challenges);
 
-        let unusable_rows_start = params.n() as usize - (meta.blinding_factors() + 1);
+        let unusable_rows_start = domain.n as usize - (meta.blinding_factors() + 1);
         for current_phase in pk.vk.cs.phases() {
             let column_indices = meta
                 .advice_column_phase
@@ -289,7 +289,7 @@ where
                 circuits.iter().zip(advice.iter_mut()).zip(instances)
             {
                 let mut witness = WitnessCollection {
-                    k: params.k(),
+                    k: domain.k(),
                     current_phase,
                     advice: vec![domain.empty_lagrange_rational(); meta.num_advice_columns],
                     unblinded_advice: HashSet::from_iter(meta.unblinded_advice_columns.clone()),
@@ -341,7 +341,7 @@ where
 
                 let advice_commitments: Vec<_> = advice_values
                     .iter()
-                    .map(|poly| params.commit_lagrange(poly))
+                    .map(|poly| CS::commit_lagrange(params, poly))
                     .collect();
 
                 for commitment in &advice_commitments {
@@ -605,9 +605,9 @@ fn test_create_proof() {
         }
     }
 
-    let params: ParamsKZG<Bn256> = KZGCommitmentScheme::setup(3);
+    let params: ParamsKZG<Bn256> = ParamsKZG::unsafe_setup(3, OsRng);
     let vk = keygen_vk(&params, &MyCircuit).expect("keygen_vk should not fail");
-    let pk = keygen_pk(&params, vk, &MyCircuit).expect("keygen_pk should not fail");
+    let pk = keygen_pk(vk, &MyCircuit).expect("keygen_pk should not fail");
     let mut transcript = CircuitTranscript::<_>::init();
 
     // Create proof with wrong number of instances

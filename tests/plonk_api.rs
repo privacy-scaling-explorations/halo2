@@ -7,10 +7,10 @@ use ff::{FromUniformBytes, PrimeField, WithSmallOrderMulGroup};
 use halo2_proofs::circuit::{Cell, Layouter, SimpleFloorPlanner, Value};
 use halo2_proofs::dev::MockProver;
 use halo2_proofs::plonk::{
-    create_proof as create_plonk_proof, keygen_pk, keygen_vk, verify_proof as verify_plonk_proof,
+    create_proof as create_plonk_proof, keygen_pk, keygen_vk, prepare as prepare_plonk_proof,
     Advice, Circuit, Column, ConstraintSystem, Error, Fixed, ProvingKey, TableColumn, VerifyingKey,
 };
-use halo2_proofs::poly::commitment::PolynomialCommitmentScheme;
+use halo2_proofs::poly::commitment::{Guard, PolynomialCommitmentScheme};
 use halo2_proofs::poly::kzg::params::ParamsKZG;
 use halo2_proofs::poly::kzg::KZGCommitmentScheme;
 use halo2_proofs::poly::Rotation;
@@ -416,7 +416,7 @@ fn plonk_api() {
 
             // Check that we get an error if we try to initialize the proving key with a value of
             // k that is too small for the minimum required number of rows.
-            let much_too_small_params= <$scheme as PolynomialCommitmentScheme<$field>>::Parameters::new(1);
+            let much_too_small_params= <$scheme as PolynomialCommitmentScheme<$field>>::gen_params(1);
             assert_matches!(
                 keygen_vk::<_, $scheme, _>(&much_too_small_params, &empty_circuit),
                 Err(Error::NotEnoughRowsAvailable {
@@ -426,7 +426,7 @@ fn plonk_api() {
 
             // Check that we get an error if we try to initialize the proving key with a value of
             // k that is too small for the number of rows the circuit uses.
-            let slightly_too_small_params = <$scheme as PolynomialCommitmentScheme<$field>>::Parameters::new(K-1);
+            let slightly_too_small_params = <$scheme as PolynomialCommitmentScheme<$field>>::gen_params(K-1);
             assert_matches!(
                 keygen_vk::<_, $scheme, _>(&slightly_too_small_params, &empty_circuit),
                 Err(Error::NotEnoughRowsAvailable {
@@ -438,10 +438,9 @@ fn plonk_api() {
 
     fn keygen<F: PrimeField, Scheme: PolynomialCommitmentScheme<F>>(
         params: &Scheme::Parameters,
-        params_vk: &Scheme::VerifierParameters,
     ) -> ProvingKey<F, Scheme>
     where
-        F: FromUniformBytes<64> + WithSmallOrderMulGroup<3>,
+        F: FromUniformBytes<64> + WithSmallOrderMulGroup<3> + Ord,
     {
         let (_, _, lookup_table) = common!(F);
         let empty_circuit: MyCircuit<F> = MyCircuit {
@@ -450,9 +449,9 @@ fn plonk_api() {
         };
 
         // Initialize the proving key
-        let vk = keygen_vk(params_vk, &empty_circuit).expect("keygen_vk should not fail");
+        let vk = keygen_vk(params, &empty_circuit).expect("keygen_vk should not fail");
 
-        keygen_pk(params, vk, &empty_circuit).expect("keygen_pk should not fail")
+        keygen_pk(vk, &empty_circuit).expect("keygen_pk should not fail")
     }
 
     fn create_proof<
@@ -521,14 +520,11 @@ fn plonk_api() {
 
         let mut transcript = T::init_from_bytes(proof);
 
-        let verifier = verify_plonk_proof(
-            params_verifier,
-            vk,
-            &[&[&pubinputs[..]], &[&pubinputs[..]]],
-            &mut transcript,
-        );
+        let verifier =
+            prepare_plonk_proof(vk, &[&[&pubinputs[..]], &[&pubinputs[..]]], &mut transcript)
+                .unwrap();
 
-        assert!(verifier.is_ok());
+        assert!(verifier.verify(params_verifier).is_ok());
     }
 
     use halo2curves::bn256::{Bn256, Fr};
@@ -536,14 +532,16 @@ fn plonk_api() {
     type Scheme = KZGCommitmentScheme<Bn256>;
     bad_keys!(Fr, Scheme);
 
-    let params = ParamsKZG::<Bn256>::new(K);
     let rng = OsRng;
+    let params = ParamsKZG::<Bn256>::unsafe_setup(K, rng);
 
-    let pk = keygen::<Fr, Scheme>(&params, params.verifier_params());
+    let pk = keygen::<Fr, Scheme>(&params);
 
     let proof = create_proof::<Fr, Scheme, CircuitTranscript<State>, _>(rng, &params, &pk);
 
-    let verifier_params = params.verifier_params();
-
-    verify_proof::<_, _, CircuitTranscript<State>>(verifier_params, pk.get_vk(), &proof[..]);
+    verify_proof::<_, _, CircuitTranscript<State>>(
+        &params.verifier_params(),
+        pk.get_vk(),
+        &proof[..],
+    );
 }

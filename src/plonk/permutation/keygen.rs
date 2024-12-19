@@ -13,7 +13,7 @@ use crate::utils::multicore::{IndexedParallelIterator, IntoParallelIterator, Par
 #[cfg(not(feature = "thread-safe-region"))]
 use crate::utils::multicore::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use rayon::iter::IntoParallelRefMutIterator;
 #[cfg(feature = "thread-safe-region")]
 use std::collections::{BTreeSet, HashMap};
@@ -113,20 +113,19 @@ impl Assembly {
 
     pub(crate) fn build_vk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>>(
         self,
-        params: &CS::VerifierParameters,
+        params: &CS::Parameters,
         domain: &EvaluationDomain<F>,
         p: &Argument,
     ) -> VerifyingKey<F, CS> {
         build_vk(params, domain, p, |i, j| self.mapping[i][j])
     }
 
-    pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>>(
+    pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>>(
         self,
-        params: &CS::Parameters,
         domain: &EvaluationDomain<F>,
         p: &Argument,
     ) -> ProvingKey<F> {
-        build_pk::<_, CS>(params, domain, p, |i, j| self.mapping[i][j])
+        build_pk::<_>(domain, p, |i, j| self.mapping[i][j])
     }
 
     /// Returns columns that participate in the permutation argument.
@@ -319,14 +318,13 @@ impl Assembly {
     }
 }
 
-pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>>(
-    params: &CS::Parameters,
+pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>>(
     domain: &EvaluationDomain<F>,
     p: &Argument,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
 ) -> ProvingKey<F> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-    let mut omega_powers = vec![F::ZERO; params.n() as usize];
+    let mut omega_powers = vec![F::ZERO; domain.n as usize];
     {
         let omega = domain.get_omega();
         parallelize(&mut omega_powers, |o, start| {
@@ -401,13 +399,13 @@ pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentSch
 }
 
 pub(crate) fn build_vk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>>(
-    params: &CS::VerifierParameters,
+    params: &CS::Parameters,
     domain: &EvaluationDomain<F>,
     p: &Argument,
     mapping: impl Fn(usize, usize) -> (usize, usize) + Sync,
 ) -> VerifyingKey<F, CS> {
     // Compute [omega^0, omega^1, ..., omega^{params.n - 1}]
-    let mut omega_powers = vec![F::ZERO; params.n() as usize];
+    let mut omega_powers = vec![F::ZERO; domain.n as usize];
     {
         let omega = domain.get_omega();
         parallelize(&mut omega_powers, |o, start| {
@@ -452,7 +450,7 @@ pub(crate) fn build_vk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentSch
     let mut commitments = Vec::with_capacity(p.columns.len());
     for permutation in &permutations {
         // Compute commitment to permutation polynomial
-        commitments.push(params.commit_lagrange(permutation));
+        commitments.push(CS::commit_lagrange(params, permutation));
     }
 
     VerifyingKey { commitments }

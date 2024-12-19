@@ -6,7 +6,7 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 
 use super::Argument;
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Transcript};
 use crate::{
     plonk::Error,
@@ -98,7 +98,7 @@ impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
 
         // Split h(X) up into pieces
         let h_pieces = h_poly
-            .chunks_exact(params.n() as usize)
+            .chunks_exact(domain.n as usize)
             .map(|v| domain.coeff_from_vec(v.to_vec()))
             .collect::<Vec<_>>();
         drop(h_poly);

@@ -1,61 +1,29 @@
-use crate::poly::{LagrangeCoeff, Polynomial};
 use crate::utils::arithmetic::{g_to_lagrange, parallelize};
 use crate::utils::SerdeFormat;
 
 use ff::{Field, PrimeField};
 use group::{prime::PrimeCurveAffine, Curve, Group};
-use halo2curves::pairing::{Engine, MultiMillerLoop};
-use rand_core::{OsRng, RngCore};
+use halo2curves::pairing::Engine;
+use rand_core::RngCore;
 use std::fmt::Debug;
 
-use crate::poly::commitment::Params;
-use crate::poly::kzg::KZGCommitmentScheme;
 use crate::utils::helpers::ProcessedSerdeObject;
-use halo2curves::msm::msm_best;
-use halo2curves::serde::SerdeObject;
 use halo2curves::CurveAffine;
 use std::io;
-
-use super::msm::MSMKZG;
 
 /// These are the public parameters for the polynomial commitment scheme.
 #[derive(Debug, Clone)]
 pub struct ParamsKZG<E: Engine> {
-    pub(crate) k: u32,
-    pub(crate) n: u64,
     pub(crate) g: Vec<E::G1Affine>,
     pub(crate) g_lagrange: Vec<E::G1Affine>,
     pub(crate) g2: E::G2Affine,
     pub(crate) s_g2: E::G2Affine,
 }
 
-impl<E: MultiMillerLoop> Params<E::Fr, KZGCommitmentScheme<E>> for ParamsKZG<E>
-where
-    E::Fr: SerdeObject,
-    E::G1Affine: Default + SerdeObject + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
-{
-    fn k(&self) -> u32 {
-        self.k
-    }
-
-    fn n(&self) -> u64 {
-        self.n
-    }
-
-    fn commit_lagrange(&self, poly: &Polynomial<E::Fr, LagrangeCoeff>) -> E::G1Affine {
-        let mut scalars = Vec::with_capacity(poly.len());
-        scalars.extend(poly.iter());
-        let bases = &self.g_lagrange;
-        let size = scalars.len();
-        assert!(bases.len() >= size);
-        msm_best(&scalars, &bases[0..size]).into()
-    }
-}
-
 impl<E: Engine + Debug> ParamsKZG<E> {
     /// Initializes parameters for the curve, draws toxic secret from given rng.
     /// MUST NOT be used in production.
-    pub fn setup<R: RngCore>(k: u32, rng: R) -> Self {
+    pub fn unsafe_setup<R: RngCore>(k: u32, rng: R) -> Self {
         // Largest root of unity exponent of the Engine is `2^E::Fr::S`, so we can
         // only support FFTs of polynomials below degree `2^E::Fr::S`.
         assert!(k <= E::Fr::S);
@@ -115,8 +83,6 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         let s_g2 = (g2 * s).into();
 
         Self {
-            k,
-            n,
             g,
             g_lagrange,
             g2,
@@ -135,8 +101,6 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         s_g2: E::G2Affine,
     ) -> Self {
         Self {
-            k,
-            n: 1 << k,
             g_lagrange: match g_lagrange {
                 Some(g_l) => g_l,
                 None => g_to_lagrange(g.iter().map(PrimeCurveAffine::to_curve).collect(), k),
@@ -163,7 +127,7 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         E::G1Affine: CurveAffine + ProcessedSerdeObject,
         E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
-        writer.write_all(&self.k.to_le_bytes())?;
+        writer.write_all(&(self.g.len() as u64).to_le_bytes())?;
         for el in self.g.iter() {
             el.write(writer, format)?;
         }
@@ -181,10 +145,9 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         E::G1Affine: CurveAffine + ProcessedSerdeObject,
         E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
-        let mut k = [0u8; 4];
-        reader.read_exact(&mut k[..])?;
-        let k = u32::from_le_bytes(k);
-        let n = 1 << k;
+        let mut n = [0u8; 8];
+        reader.read_exact(&mut n[..])?;
+        let n = u64::from_le_bytes(n) as usize;
 
         let (g, g_lagrange) = match format {
             SerdeFormat::Processed => {
@@ -253,8 +216,6 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         let s_g2 = E::G2Affine::read(reader, format)?;
 
         Ok(Self {
-            k,
-            n: n as u64,
             g,
             g_lagrange,
             g2,
@@ -266,72 +227,45 @@ impl<E: Engine + Debug> ParamsKZG<E> {
 // TODO: see the issue at https://github.com/appliedzkp/halo2/issues/45
 // So we probably need much smaller verifier key. However for new bases in g1 should be in verifier keys.
 /// KZG multi-open verification parameters
-pub type ParamsVerifierKZG<E> = ParamsKZG<E>;
+#[derive(Debug)]
+pub struct ParamsVerifierKZG<E: Engine> {
+    pub(crate) s_g2: E::G2Affine,
+}
 
-impl<'params, E: Engine + Debug> ParamsKZG<E>
+impl<E: Engine + Debug> ParamsVerifierKZG<E>
 where
     E::G1Affine: CurveAffine + ProcessedSerdeObject,
     E::G2Affine: CurveAffine + ProcessedSerdeObject,
 {
-    /// TODO
-    pub fn k(&self) -> u32 {
-        self.k
-    }
-
-    /// TODO
-    pub fn n(&self) -> u64 {
-        self.n
-    }
-
-    /// TODO
-    pub fn downsize(&mut self, k: u32) {
-        assert!(k <= self.k);
-
-        self.k = k;
-        self.n = 1 << k;
-
-        self.g.truncate(self.n as usize);
-        self.g_lagrange = g_to_lagrange(self.g.iter().map(|g| g.to_curve()).collect(), k);
-    }
-
-    /// TODO
-    pub fn empty_msm(&'params self) -> MSMKZG<E> {
-        MSMKZG::new()
-    }
-
-    /// Writes params to a buffer.
-    pub fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
-        self.write_custom(writer, SerdeFormat::RawBytes)
+    /// Writes parameters to buffer
+    pub fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
+        self.s_g2.write(writer, format)?;
+        Ok(())
     }
 
     /// Reads params from a buffer.
-    pub fn read<R: io::Read>(reader: &mut R) -> io::Result<Self> {
-        Self::read_custom(reader, SerdeFormat::RawBytes)
+    pub fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
+        let s_g2 = E::G2Affine::read(reader, format)?;
+
+        Ok(Self { s_g2 })
     }
 }
 
-impl<'params, E: Engine + Debug> ParamsKZG<E> {
-    /// TODO
-    pub fn verifier_params(&'params self) -> &'params ParamsVerifierKZG<E> {
-        self
-    }
-
-    /// UNSAFE function - do not use in production
-    pub fn new(k: u32) -> Self {
-        Self::setup(k, OsRng)
-    }
-
-    /// TODO
-    pub fn get_g(&self) -> &[E::G1Affine] {
-        &self.g
+impl<E: Engine + Debug> ParamsKZG<E> {
+    /// Consume the prover parameters into verifier parameters. Need to specify the size of
+    /// public inputs.
+    pub fn verifier_params(&self) -> ParamsVerifierKZG<E> {
+        ParamsVerifierKZG { s_g2: self.s_g2 }
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+    use crate::poly::commitment::PolynomialCommitmentScheme;
     use crate::poly::kzg::params::ParamsKZG;
     use crate::poly::kzg::KZGCommitmentScheme;
+    use crate::utils::SerdeFormat;
+    use rand_core::OsRng;
 
     #[test]
     fn test_commit_lagrange() {
@@ -340,7 +274,7 @@ mod test {
         use crate::poly::EvaluationDomain;
         use halo2curves::bn256::{Bn256, Fr};
 
-        let params = ParamsKZG::<Bn256>::new(K);
+        let params: ParamsKZG<Bn256> = ParamsKZG::unsafe_setup(K, OsRng);
         let domain = EvaluationDomain::new(1, K);
 
         let mut a = domain.empty_lagrange();
@@ -351,7 +285,7 @@ mod test {
 
         let b = domain.lagrange_to_coeff(a.clone());
 
-        let tmp = params.commit_lagrange(&a);
+        let tmp = KZGCommitmentScheme::commit_lagrange(&params, &a);
         let commitment = KZGCommitmentScheme::commit(&params, &b);
 
         assert_eq!(commitment, tmp);
@@ -363,13 +297,13 @@ mod test {
 
         use crate::halo2curves::bn256::Bn256;
 
-        let params0 = ParamsKZG::<Bn256>::new(K);
+        let params0: ParamsKZG<Bn256> = ParamsKZG::unsafe_setup(K, OsRng);
         let mut data = vec![];
-        ParamsKZG::write(&params0, &mut data).unwrap();
-        let params1 = ParamsKZG::<Bn256>::read::<_>(&mut &data[..]).unwrap();
+        ParamsKZG::write_custom(&params0, &mut data, SerdeFormat::RawBytesUnchecked).unwrap();
+        let params1 =
+            ParamsKZG::<Bn256>::read_custom::<_>(&mut &data[..], SerdeFormat::RawBytesUnchecked)
+                .unwrap();
 
-        assert_eq!(params0.k, params1.k);
-        assert_eq!(params0.n, params1.n);
         assert_eq!(params0.g.len(), params1.g.len());
         assert_eq!(params0.g_lagrange.len(), params1.g_lagrange.len());
 

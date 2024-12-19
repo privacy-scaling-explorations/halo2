@@ -5,6 +5,7 @@ use blake2b_simd::State;
 use std::marker::PhantomData;
 
 use ff::{FromUniformBytes, WithSmallOrderMulGroup};
+use halo2_proofs::poly::commitment::Guard;
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
 use halo2_proofs::{
@@ -477,9 +478,9 @@ where
         + Hashable<State>
         + Ord,
 {
-    let params = ParamsKZG::<E>::new(k);
+    let params: ParamsKZG<E> = ParamsKZG::unsafe_setup(k, OsRng);
     let vk = keygen_vk(&params, &circuit).unwrap();
-    let pk = keygen_pk(&params, vk, &circuit).unwrap();
+    let pk = keygen_pk(vk, &circuit).unwrap();
 
     let proof = {
         let mut transcript = CircuitTranscript::<State>::init();
@@ -500,12 +501,9 @@ where
     let accepted = {
         let mut transcript = CircuitTranscript::<State>::init_from_bytes(&proof[..]);
 
-        verify_proof::<E::Fr, KZGCommitmentScheme<E>, _>(
-            &params,
-            pk.get_vk(),
-            &[&[&instances]],
-            &mut transcript,
-        )
+        prepare::<E::Fr, KZGCommitmentScheme<E>, _>(pk.get_vk(), &[&[&instances]], &mut transcript)
+            .unwrap()
+            .verify(&params.verifier_params())
     };
 
     assert_eq!(accepted.is_ok(), expected);

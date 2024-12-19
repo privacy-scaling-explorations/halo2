@@ -66,6 +66,10 @@ where
     CS: PolynomialCommitmentScheme<F>,
     CS::Commitment: SerdeObject,
 {
+    /// Returns `n`
+    pub fn n(&self) -> u64 {
+        self.domain.n
+    }
     /// Writes a verifying key to a buffer.
     ///
     /// Writes a curve element according to `format`:

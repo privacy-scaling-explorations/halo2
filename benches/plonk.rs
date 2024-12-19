@@ -11,9 +11,12 @@ use rand_core::OsRng;
 use std::marker::PhantomData;
 
 use criterion::{BenchmarkId, Criterion};
+use halo2_proofs::poly::commitment::Guard;
+use halo2_proofs::poly::kzg::params::ParamsVerifierKZG;
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::transcript::{CircuitTranscript, Transcript};
 use halo2_proofs::utils::rational::Rational;
+use halo2curves::bn256::Bn256;
 
 fn criterion_benchmark(c: &mut Criterion) {
     /// This represents an advice column at a certain row in the ConstraintSystem
@@ -257,13 +260,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         ParamsKZG<bn256::Bn256>,
         ProvingKey<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>>,
     ) {
-        let params: ParamsKZG<bn256::Bn256> = ParamsKZG::new(k);
+        let params: ParamsKZG<Bn256> = ParamsKZG::unsafe_setup(k, OsRng);
         let empty_circuit: MyCircuit<bn256::Fr> = MyCircuit {
             a: Value::unknown(),
             k,
         };
         let vk = keygen_vk(&params, &empty_circuit).expect("keygen_vk should not fail");
-        let pk = keygen_pk(&params, vk, &empty_circuit).expect("keygen_pk should not fail");
+        let pk = keygen_pk(vk, &empty_circuit).expect("keygen_pk should not fail");
         (params, pk)
     }
 
@@ -294,20 +297,19 @@ fn criterion_benchmark(c: &mut Criterion) {
     }
 
     fn verifier(
-        params: &ParamsKZG<bn256::Bn256>,
+        params: &ParamsVerifierKZG<bn256::Bn256>,
         vk: &VerifyingKey<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>>,
         proof: &[u8],
     ) {
         let mut transcript = CircuitTranscript::init_from_bytes(proof);
-        assert!(
-            verify_proof::<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>, _>(
-                params,
-                vk,
-                &[&[]],
-                &mut transcript
-            )
-            .is_ok()
-        );
+        assert!(prepare::<bn256::Fr, KZGCommitmentScheme<bn256::Bn256>, _>(
+            vk,
+            &[&[]],
+            &mut transcript
+        )
+        .unwrap()
+        .verify(params)
+        .is_ok());
     }
 
     let k_range = 8..=16;
@@ -345,7 +347,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             BenchmarkId::from_parameter(k),
             &(&params, pk.get_vk(), &proof[..]),
             |b, &(params, vk, proof)| {
-                b.iter(|| verifier(params, vk, proof));
+                b.iter(|| verifier(&params.verifier_params(), vk, proof));
             },
         );
     }
