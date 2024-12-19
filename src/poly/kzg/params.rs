@@ -1,5 +1,4 @@
 use crate::utils::arithmetic::{g_to_lagrange, parallelize};
-use crate::utils::helpers::SerdeCurveAffine;
 use crate::poly::{LagrangeCoeff, Polynomial};
 use crate::utils::SerdeFormat;
 
@@ -15,6 +14,7 @@ use halo2curves::msm::msm_best;
 use halo2curves::serde::SerdeObject;
 use halo2curves::CurveAffine;
 use std::io;
+use crate::utils::helpers::ProcessedSerdeObject;
 
 use super::msm::MSMKZG;
 
@@ -160,8 +160,8 @@ impl<E: Engine + Debug> ParamsKZG<E> {
     /// Writes parameters to buffer
     pub fn write_custom<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
-        E::G1Affine: SerdeCurveAffine,
-        E::G2Affine: SerdeCurveAffine,
+        E::G1Affine: CurveAffine + ProcessedSerdeObject,
+        E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
         writer.write_all(&self.k.to_le_bytes())?;
         for el in self.g.iter() {
@@ -178,8 +178,8 @@ impl<E: Engine + Debug> ParamsKZG<E> {
     /// Reads params from a buffer.
     pub fn read_custom<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self>
     where
-        E::G1Affine: SerdeCurveAffine,
-        E::G2Affine: SerdeCurveAffine,
+        E::G1Affine: CurveAffine + ProcessedSerdeObject,
+        E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
         let mut k = [0u8; 4];
         reader.read_exact(&mut k[..])?;
@@ -230,20 +230,20 @@ impl<E: Engine + Debug> ParamsKZG<E> {
             }
             SerdeFormat::RawBytes => {
                 let g = (0..n)
-                    .map(|_| <E::G1Affine as SerdeCurveAffine>::read(reader, format))
+                    .map(|_| <E::G1Affine as ProcessedSerdeObject>::read(reader, format))
                     .collect::<Result<Vec<_>, _>>()?;
                 let g_lagrange = (0..n)
-                    .map(|_| <E::G1Affine as SerdeCurveAffine>::read(reader, format))
+                    .map(|_| <E::G1Affine as ProcessedSerdeObject>::read(reader, format))
                     .collect::<Result<Vec<_>, _>>()?;
                 (g, g_lagrange)
             }
             SerdeFormat::RawBytesUnchecked => {
                 // avoid try branching for performance
                 let g = (0..n)
-                    .map(|_| <E::G1Affine as SerdeCurveAffine>::read(reader, format).unwrap())
+                    .map(|_| <E::G1Affine as ProcessedSerdeObject>::read(reader, format).unwrap())
                     .collect::<Vec<_>>();
                 let g_lagrange = (0..n)
-                    .map(|_| <E::G1Affine as SerdeCurveAffine>::read(reader, format).unwrap())
+                    .map(|_| <E::G1Affine as ProcessedSerdeObject>::read(reader, format).unwrap())
                     .collect::<Vec<_>>();
                 (g, g_lagrange)
             }
@@ -270,8 +270,8 @@ pub type ParamsVerifierKZG<E> = ParamsKZG<E>;
 
 impl<'params, E: Engine + Debug> ParamsKZG<E>
 where
-    E::G1Affine: SerdeCurveAffine,
-    E::G2Affine: SerdeCurveAffine,
+    E::G1Affine: CurveAffine + ProcessedSerdeObject,
+    E::G2Affine: CurveAffine + ProcessedSerdeObject,
 {
     /// TODO
     pub fn k(&self) -> u32 {

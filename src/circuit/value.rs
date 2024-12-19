@@ -647,7 +647,7 @@ impl<V> Value<V> {
     /// ```
     /// # use halo2curves::pasta::pallas::Base as F;
     /// use halo2_proofs::{circuit::Value};
-    /// use halo2_proofs::rational::Rational;
+    /// use halo2_proofs::utils::rational::Rational;
     ///
     /// let v = Value::known(F::from(2));
     /// let v: Value<Rational<F>> = v.into();

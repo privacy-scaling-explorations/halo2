@@ -3,22 +3,18 @@
 //! the committed polynomials at arbitrary points.
 
 use crate::utils::arithmetic::parallelize;
-use crate::utils::helpers::SerdePrimeField;
-// use crate::plonk::Assigned;
 use crate::utils::SerdeFormat;
 
-use ff::BatchInvert;
+use ff::{BatchInvert, PrimeField};
 use group::ff::Field;
 use std::fmt::Debug;
 use std::io;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, RangeFrom, RangeFull, Sub};
+use halo2curves::serde::SerdeObject;
 
-// /// Generic commitment scheme structures
-// pub mod commitment;
 mod domain;
 mod query;
-// mod strategy;
 
 /// KZG commitment scheme
 pub mod kzg;
@@ -28,7 +24,7 @@ pub mod commitment;
 use crate::utils::rational::Rational;
 pub use domain::*;
 pub use query::{ProverQuery, VerifierQuery};
-// pub use strategy::{Guard, VerificationStrategy};
+use crate::utils::helpers::{read_f};
 
 /// This is an error that could occur during proving or circuit synthesis.
 // TODO: these errors need to be cleaned up
@@ -143,7 +139,7 @@ impl<F, B> Polynomial<F, B> {
     }
 }
 
-impl<F: SerdePrimeField, B> Polynomial<F, B> {
+impl<F: PrimeField + SerdeObject, B> Polynomial<F, B> {
     /// Reads polynomial from buffer using `SerdePrimeField::read`.
     pub(crate) fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         let mut poly_len = [0u8; 4];
@@ -151,7 +147,7 @@ impl<F: SerdePrimeField, B> Polynomial<F, B> {
         let poly_len = u32::from_be_bytes(poly_len);
 
         (0..poly_len)
-            .map(|_| F::read(reader, format))
+            .map(|_| read_f(reader, format))
             .collect::<io::Result<Vec<_>>>()
             .map(|values| Self {
                 values,
@@ -163,11 +159,10 @@ impl<F: SerdePrimeField, B> Polynomial<F, B> {
     pub(crate) fn write<W: io::Write>(
         &self,
         writer: &mut W,
-        format: SerdeFormat,
     ) -> io::Result<()> {
         writer.write_all(&(self.values.len() as u32).to_be_bytes())?;
         for value in self.values.iter() {
-            value.write(writer, format)?;
+            value.write_raw(writer)?;
         }
         Ok(())
     }

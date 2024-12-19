@@ -3,7 +3,7 @@
 use super::circuit::{Any, Column};
 use crate::{
     utils::helpers::{
-        polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdePrimeField,
+        polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
     },
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
     utils::SerdeFormat,
@@ -15,7 +15,7 @@ pub(crate) mod verifier;
 
 pub use keygen::Assembly;
 
-use crate::utils::helpers::byte_length;
+use crate::utils::helpers::{byte_length, ProcessedSerdeObject};
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use ff::PrimeField;
 use halo2curves::serde::SerdeObject;
@@ -95,13 +95,12 @@ impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> VerifyingKey<F, CS> {
         &self.commitments
     }
 
-    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, _format: SerdeFormat) -> io::Result<()>
+    pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
         CS::Commitment: SerdeObject,
     {
-        // todo: How to handle formats?
         for commitment in &self.commitments {
-            commitment.write_raw(writer)?;
+            commitment.write(writer, format)?;
         }
         Ok(())
     }
@@ -109,13 +108,13 @@ impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> VerifyingKey<F, CS> {
     pub(crate) fn read<R: io::Read>(
         reader: &mut R,
         argument: &Argument,
-        _format: SerdeFormat,
+        format: SerdeFormat,
     ) -> io::Result<Self>
     where
         CS::Commitment: SerdeObject,
     {
         let commitments = (0..argument.columns.len())
-            .map(|_| CS::Commitment::read_raw(reader))
+            .map(|_| CS::Commitment::read(reader, format))
             .collect::<Result<Vec<_>, _>>()?;
         Ok(VerifyingKey { commitments })
     }
@@ -136,7 +135,7 @@ pub(crate) struct ProvingKey<F: PrimeField> {
     pub(super) cosets: Vec<Polynomial<F, ExtendedLagrangeCoeff>>,
 }
 
-impl<F: SerdePrimeField> ProvingKey<F> {
+impl<F: PrimeField + SerdeObject> ProvingKey<F> {
     /// Reads proving key for a single permutation argument from buffer using `Polynomial::read`.  
     pub(super) fn read<R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<Self> {
         let permutations = read_polynomial_vec(reader, format)?;
@@ -153,11 +152,10 @@ impl<F: SerdePrimeField> ProvingKey<F> {
     pub(super) fn write<W: io::Write>(
         &self,
         writer: &mut W,
-        format: SerdeFormat,
     ) -> io::Result<()> {
-        write_polynomial_slice(&self.permutations, writer, format)?;
-        write_polynomial_slice(&self.polys, writer, format)?;
-        write_polynomial_slice(&self.cosets, writer, format)?;
+        write_polynomial_slice(&self.permutations, writer)?;
+        write_polynomial_slice(&self.polys, writer)?;
+        write_polynomial_slice(&self.cosets, writer)?;
         Ok(())
     }
 }

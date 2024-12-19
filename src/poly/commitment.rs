@@ -2,8 +2,8 @@
 use crate::poly::{Coeff, Error, LagrangeCoeff, Polynomial, ProverQuery, VerifierQuery};
 use crate::transcript::{Hashable, Sampleable, Transcript};
 use ff::PrimeField;
-use halo2curves::serde::SerdeObject;
 use std::fmt::Debug;
+use crate::utils::helpers::ProcessedSerdeObject;
 
 /// Public interface for a Polynomial Commitment Scheme (PCS)
 pub trait PolynomialCommitmentScheme<F: PrimeField>: Clone + Debug {
@@ -14,7 +14,7 @@ pub trait PolynomialCommitmentScheme<F: PrimeField>: Clone + Debug {
     type VerifierParameters: Params<F, Self>;
 
     /// Type of a committed polynomial
-    type Commitment: Clone + Copy + Debug + Default + PartialEq + SerdeObject + Send + Sync;
+    type Commitment: Clone + Copy + Debug + Default + PartialEq + ProcessedSerdeObject + Send + Sync;
 
     /// Setup the parameters for the PCS
     fn setup(k: u32) -> Self::Parameters;

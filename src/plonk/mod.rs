@@ -8,10 +8,7 @@
 use blake2b_simd::Params as Blake2bParams;
 use group::ff::FromUniformBytes;
 
-use crate::utils::helpers::{
-    byte_length, polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
-    SerdePrimeField,
-};
+use crate::utils::helpers::{byte_length, polynomial_slice_byte_length, ProcessedSerdeObject, read_polynomial_vec, write_polynomial_slice};
 use crate::poly::{
     Coeff, EvaluationDomain, ExtendedLagrangeCoeff, LagrangeCoeff, PinnedEvaluationDomain,
     Polynomial,
@@ -62,7 +59,7 @@ const VERSION: u8 = 0x03;
 
 impl<F, CS> VerifyingKey<F, CS>
 where
-    F: WithSmallOrderMulGroup<3> + SerdePrimeField + FromUniformBytes<64> + SerdeObject,
+    F: WithSmallOrderMulGroup<3> + SerdeObject + FromUniformBytes<64>,
     CS: PolynomialCommitmentScheme<F>,
     CS::Commitment: SerdeObject,
 {
@@ -84,8 +81,7 @@ where
         writer.write_all(&[*k as u8])?;
         writer.write_all(&(self.fixed_commitments.len() as u32).to_le_bytes())?;
         for commitment in &self.fixed_commitments {
-            // TODO: writting raw here - do we maybe want a wrapper like we had?
-            commitment.write_raw(writer)?;
+            commitment.write(writer, format)?;
         }
         self.permutation.write(writer, format)?;
 
@@ -143,8 +139,7 @@ where
         let num_fixed_columns = u32::from_le_bytes(num_fixed_columns);
 
         let fixed_commitments: Vec<_> = (0..num_fixed_columns)
-            // TODO: Fix FORMAT - wrapper like before?
-            .map(|_| CS::Commitment::read_raw(reader))
+            .map(|_| CS::Commitment::read(reader, format))
             .collect::<Result<_, _>>()?;
 
         let permutation = permutation::VerifyingKey::read(reader, &cs.permutation, format)?;
@@ -328,7 +323,7 @@ where
 
 impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> ProvingKey<F, CS>
 where
-    F: SerdePrimeField + FromUniformBytes<64>,
+    F: PrimeField + FromUniformBytes<64> + SerdeObject,
 {
     /// Writes a proving key to a buffer.
     ///
@@ -342,13 +337,13 @@ where
     ///   Does so by first writing the verifying key and then serializing the rest of the data (in the form of field polynomials)
     pub fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
         self.vk.write(writer, format)?;
-        self.l0.write(writer, format)?;
-        self.l_last.write(writer, format)?;
-        self.l_active_row.write(writer, format)?;
-        write_polynomial_slice(&self.fixed_values, writer, format)?;
-        write_polynomial_slice(&self.fixed_polys, writer, format)?;
-        write_polynomial_slice(&self.fixed_cosets, writer, format)?;
-        self.permutation.write(writer, format)?;
+        self.l0.write(writer)?;
+        self.l_last.write(writer)?;
+        self.l_active_row.write(writer)?;
+        write_polynomial_slice(&self.fixed_values, writer)?;
+        write_polynomial_slice(&self.fixed_polys, writer)?;
+        write_polynomial_slice(&self.fixed_cosets, writer)?;
+        self.permutation.write(writer)?;
         Ok(())
     }
 
