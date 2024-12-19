@@ -2,10 +2,8 @@
 
 use super::circuit::{Any, Column};
 use crate::{
-    utils::helpers::{
-        polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
-    },
     poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial},
+    utils::helpers::{polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice},
     utils::SerdeFormat,
 };
 
@@ -15,8 +13,8 @@ pub(crate) mod verifier;
 
 pub use keygen::Assembly;
 
-use crate::utils::helpers::{byte_length, ProcessedSerdeObject};
 use crate::poly::commitment::PolynomialCommitmentScheme;
+use crate::utils::helpers::{byte_length, ProcessedSerdeObject};
 use ff::PrimeField;
 use halo2curves::serde::SerdeObject;
 use std::io;
@@ -149,10 +147,7 @@ impl<F: PrimeField + SerdeObject> ProvingKey<F> {
     }
 
     /// Writes proving key for a single permutation argument to buffer using `Polynomial::write`.  
-    pub(super) fn write<W: io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> io::Result<()> {
+    pub(super) fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         write_polynomial_slice(&self.permutations, writer)?;
         write_polynomial_slice(&self.polys, writer)?;
         write_polynomial_slice(&self.cosets, writer)?;

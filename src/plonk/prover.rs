@@ -14,17 +14,17 @@ use super::{
 };
 
 use crate::{
-    utils::arithmetic::eval_polynomial,
     // circuit::Value,
     // plonk::Assigned,
     poly::{Basis, Coeff, LagrangeCoeff, Polynomial, ProverQuery},
+    utils::arithmetic::eval_polynomial,
 };
 
 use crate::circuit::Value;
 use crate::poly::batch_invert_rational;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
-use crate::utils::rational::Rational;
 use crate::transcript::{Hashable, Sampleable, Transcript};
+use crate::utils::rational::Rational;
 use halo2curves::serde::SerdeObject;
 
 /// This creates a proof for the provided `circuit` when given the public

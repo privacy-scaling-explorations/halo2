@@ -88,7 +88,7 @@ const K: u32 = 11;
 fn main() {
     let circuit = TestCircuit {};
 
-    let model = from_circuit_to_model_circuit::<_, _, 56, 56>(
+    let model = from_circuit_to_model_circuit::<_, _, 32, 32>(
         Some(K),
         &circuit,
         vec![],

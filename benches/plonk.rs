@@ -12,8 +12,8 @@ use std::marker::PhantomData;
 
 use criterion::{BenchmarkId, Criterion};
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
-use halo2_proofs::utils::rational::Rational;
 use halo2_proofs::transcript::{CircuitTranscript, Transcript};
+use halo2_proofs::utils::rational::Rational;
 
 fn criterion_benchmark(c: &mut Criterion) {
     /// This represents an advice column at a certain row in the ConstraintSystem

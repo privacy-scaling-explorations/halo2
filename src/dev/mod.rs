@@ -151,10 +151,10 @@ impl<F: Field> Mul for Value<F> {
             // If poison is multiplied by zero, then we treat the poison as unconstrained
             // and we don't propagate it.
             (Value::Real(x), Value::Poison) | (Value::Poison, Value::Real(x))
-            if x.is_zero_vartime() =>
-                {
-                    Value::Real(F::ZERO)
-                }
+                if x.is_zero_vartime() =>
+            {
+                Value::Real(F::ZERO)
+            }
             _ => Value::Poison,
         }
     }
@@ -683,8 +683,8 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                 hash = blake2b(&hash).as_bytes().try_into().unwrap();
                 F::from_uniform_bytes(&hash)
             })
-                .take(cs.num_challenges)
-                .collect()
+            .take(cs.num_challenges)
+            .collect()
         };
 
         let mut prover = MockProver {
@@ -825,12 +825,12 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                                 // Check that it was assigned!
                                                 if r.cells.contains_key(&(cell.column, cell_row))
                                                     || gate.polynomials().par_iter().all(|expr| {
-                                                    self.cell_is_irrelevant(
-                                                        cell,
-                                                        expr,
-                                                        gate_row as usize,
-                                                    )
-                                                })
+                                                        self.cell_is_irrelevant(
+                                                            cell,
+                                                            expr,
+                                                            gate_row as usize,
+                                                        )
+                                                    })
                                                 {
                                                     None
                                                 } else {
@@ -871,70 +871,70 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                     .clone()
                     .into_par_iter()
                     .chain(blinding_rows.into_par_iter()))
-                    .flat_map(move |row| {
-                        let row = row as i32 + n;
-                        gate.polynomials()
-                            .iter()
-                            .enumerate()
-                            .filter_map(move |(poly_index, poly)| {
-                                match poly.evaluate_lazy(
-                                    &|scalar| Value::Real(scalar),
-                                    &|_| panic!("virtual selectors are removed during optimization"),
-                                    &util::load(n, row, &self.cs.fixed_queries, &self.fixed),
-                                    &util::load(n, row, &self.cs.advice_queries, &self.advice),
-                                    &util::load_instance(
-                                        n,
-                                        row,
-                                        &self.cs.instance_queries,
-                                        &self.instance,
+                .flat_map(move |row| {
+                    let row = row as i32 + n;
+                    gate.polynomials()
+                        .iter()
+                        .enumerate()
+                        .filter_map(move |(poly_index, poly)| {
+                            match poly.evaluate_lazy(
+                                &|scalar| Value::Real(scalar),
+                                &|_| panic!("virtual selectors are removed during optimization"),
+                                &util::load(n, row, &self.cs.fixed_queries, &self.fixed),
+                                &util::load(n, row, &self.cs.advice_queries, &self.advice),
+                                &util::load_instance(
+                                    n,
+                                    row,
+                                    &self.cs.instance_queries,
+                                    &self.instance,
+                                ),
+                                &|challenge| Value::Real(self.challenges[challenge.index()]),
+                                &|a| -a,
+                                &|a, b| a + b,
+                                &|a, b| a * b,
+                                &|a, scalar| a * scalar,
+                                &Value::Real(F::ZERO),
+                            ) {
+                                Value::Real(x) if x.is_zero_vartime() => None,
+                                Value::Real(_) => Some(VerifyFailure::ConstraintNotSatisfied {
+                                    constraint: (
+                                        (gate_index, gate.name()).into(),
+                                        poly_index,
+                                        gate.constraint_name(poly_index),
+                                    )
+                                        .into(),
+                                    location: FailureLocation::find_expressions(
+                                        &self.cs,
+                                        &self.regions,
+                                        (row - n) as usize,
+                                        Some(poly).into_iter(),
                                     ),
-                                    &|challenge| Value::Real(self.challenges[challenge.index()]),
-                                    &|a| -a,
-                                    &|a, b| a + b,
-                                    &|a, b| a * b,
-                                    &|a, scalar| a * scalar,
-                                    &Value::Real(F::ZERO),
-                                ) {
-                                    Value::Real(x) if x.is_zero_vartime() => None,
-                                    Value::Real(_) => Some(VerifyFailure::ConstraintNotSatisfied {
-                                        constraint: (
-                                            (gate_index, gate.name()).into(),
-                                            poly_index,
-                                            gate.constraint_name(poly_index),
-                                        )
-                                            .into(),
-                                        location: FailureLocation::find_expressions(
-                                            &self.cs,
-                                            &self.regions,
-                                            (row - n) as usize,
-                                            Some(poly).into_iter(),
+                                    cell_values: util::cell_values(
+                                        gate,
+                                        poly,
+                                        &util::load(n, row, &self.cs.fixed_queries, &self.fixed),
+                                        &util::load(n, row, &self.cs.advice_queries, &self.advice),
+                                        &util::load_instance(
+                                            n,
+                                            row,
+                                            &self.cs.instance_queries,
+                                            &self.instance,
                                         ),
-                                        cell_values: util::cell_values(
-                                            gate,
-                                            poly,
-                                            &util::load(n, row, &self.cs.fixed_queries, &self.fixed),
-                                            &util::load(n, row, &self.cs.advice_queries, &self.advice),
-                                            &util::load_instance(
-                                                n,
-                                                row,
-                                                &self.cs.instance_queries,
-                                                &self.instance,
-                                            ),
-                                        ),
-                                    }),
-                                    Value::Poison => Some(VerifyFailure::ConstraintPoisoned {
-                                        constraint: (
-                                            (gate_index, gate.name()).into(),
-                                            poly_index,
-                                            gate.constraint_name(poly_index),
-                                        )
-                                            .into(),
-                                    }),
-                                }
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .collect::<Vec<_>>()
+                                    ),
+                                }),
+                                Value::Poison => Some(VerifyFailure::ConstraintPoisoned {
+                                    constraint: (
+                                        (gate_index, gate.name()).into(),
+                                        poly_index,
+                                        gate.constraint_name(poly_index),
+                                    )
+                                        .into(),
+                                }),
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
             });
 
         let load = |expression: &Expression<F>, row| {
@@ -1190,7 +1190,7 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                 (self.expr_is_constantly_zero(e1, offset)
                     || self.expr_is_constantly_zero(e2, offset))
                     || (self.cell_is_irrelevant(cell, e1, offset)
-                    && self.cell_is_irrelevant(cell, e2, offset))
+                        && self.cell_is_irrelevant(cell, e2, offset))
             }
             Expression::Scaled(e, factor) => {
                 factor.is_zero().into() || self.cell_is_irrelevant(cell, e, offset)
@@ -1537,7 +1537,7 @@ mod tests {
                 Fp::from(6u64),
             ]],
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(
             prover.verify(),
             Err(vec![VerifyFailure::Lookup {

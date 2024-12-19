@@ -8,12 +8,15 @@
 use blake2b_simd::Params as Blake2bParams;
 use group::ff::FromUniformBytes;
 
-use crate::utils::helpers::{byte_length, polynomial_slice_byte_length, ProcessedSerdeObject, read_polynomial_vec, write_polynomial_slice};
 use crate::poly::{
     Coeff, EvaluationDomain, ExtendedLagrangeCoeff, LagrangeCoeff, PinnedEvaluationDomain,
     Polynomial,
 };
 use crate::transcript::{Hashable, Transcript};
+use crate::utils::helpers::{
+    byte_length, polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice,
+    ProcessedSerdeObject,
+};
 use crate::utils::SerdeFormat;
 
 mod circuit;
@@ -185,11 +188,11 @@ impl<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentScheme<F>> VerifyingK
         10 + (self.fixed_commitments.len() * byte_length::<CS::Commitment>(format))
             + self.permutation.bytes_length(format)
             + self.selectors.len()
-            * (self
-            .selectors
-            .first()
-            .map(|selector| (selector.len() + 7) / 8)
-            .unwrap_or(0))
+                * (self
+                    .selectors
+                    .first()
+                    .map(|selector| (selector.len() + 7) / 8)
+                    .unwrap_or(0))
     }
 
     fn from_parts(

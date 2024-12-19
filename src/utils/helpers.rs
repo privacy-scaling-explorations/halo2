@@ -3,9 +3,9 @@
 use crate::poly::Polynomial;
 use ff::PrimeField;
 use group::prime::PrimeCurveAffine;
+use group::GroupEncoding;
 use halo2curves::serde::SerdeObject;
 use std::io;
-use group::GroupEncoding;
 
 /// This enum specifies how various types are serialized and deserialized.
 #[derive(Clone, Copy, Debug)]
@@ -47,17 +47,19 @@ pub fn byte_length<T: ProcessedSerdeObject + Default>(format: SerdeFormat) -> us
 
 /// Helper function to read a field element with a serde format. There is no way to compress field
 /// elements, so `Processed` and `RawBytes` act equivalently.
-pub(crate) fn read_f<F: PrimeField + SerdeObject, R: io::Read>(reader: &mut R, format: SerdeFormat) -> io::Result<F> {
-   match format {
-       SerdeFormat::Processed => {<F as SerdeObject>::read_raw(reader)}
-       SerdeFormat::RawBytes => {<F as SerdeObject>::read_raw(reader)}
-       SerdeFormat::RawBytesUnchecked => {Ok(<F as SerdeObject>::read_raw_unchecked(reader))}
-   }
+pub(crate) fn read_f<F: PrimeField + SerdeObject, R: io::Read>(
+    reader: &mut R,
+    format: SerdeFormat,
+) -> io::Result<F> {
+    match format {
+        SerdeFormat::Processed => <F as SerdeObject>::read_raw(reader),
+        SerdeFormat::RawBytes => <F as SerdeObject>::read_raw(reader),
+        SerdeFormat::RawBytesUnchecked => Ok(<F as SerdeObject>::read_raw_unchecked(reader)),
+    }
 }
 
 /// Trait for serialising SerdeObjects
-impl<C: PrimeCurveAffine + SerdeObject + Default> ProcessedSerdeObject for C
-{
+impl<C: PrimeCurveAffine + SerdeObject + Default> ProcessedSerdeObject for C {
     /// Reads an element from the buffer and parses it according to the `format`:
     /// - `Processed`: Reads a compressed curve element and decompress it
     /// - `RawBytes`: Reads an uncompressed curve element with coordinates in Montgomery form.
@@ -69,9 +71,10 @@ impl<C: PrimeCurveAffine + SerdeObject + Default> ProcessedSerdeObject for C
             SerdeFormat::Processed => {
                 let mut compressed = <Self as GroupEncoding>::Repr::default();
                 reader.read_exact(compressed.as_mut())?;
-                Option::from(Self::from_bytes(&compressed))
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Invalid point encoding in proof"))
-            },
+                Option::from(Self::from_bytes(&compressed)).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::Other, "Invalid point encoding in proof")
+                })
+            }
             SerdeFormat::RawBytes => <Self as SerdeObject>::read_raw(reader),
             SerdeFormat::RawBytesUnchecked => Ok(<Self as SerdeObject>::read_raw_unchecked(reader)),
         }

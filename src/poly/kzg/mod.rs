@@ -8,12 +8,12 @@ pub mod params;
 
 use std::fmt::Debug;
 
-use crate::utils::arithmetic::{kate_division, powers, MSM};
 use crate::poly::kzg::msm::{DualMSM, MSMKZG};
 use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
 use crate::poly::query::Query;
 use crate::poly::query::VerifierQuery;
 use crate::poly::{Coeff, Error, Polynomial, ProverQuery};
+use crate::utils::arithmetic::{kate_division, powers, MSM};
 
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Sampleable, Transcript};
@@ -212,7 +212,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::arithmetic::eval_polynomial;
     use crate::poly::commitment::PolynomialCommitmentScheme;
     use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
     use crate::poly::kzg::KZGCommitmentScheme;
@@ -221,6 +220,7 @@ mod tests {
         Error, EvaluationDomain,
     };
     use crate::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
+    use crate::utils::arithmetic::eval_polynomial;
     use blake2b_simd::State as Blake2bState;
     use ff::WithSmallOrderMulGroup;
     use halo2curves::pairing::{Engine, MultiMillerLoop};

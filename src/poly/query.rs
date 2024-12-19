@@ -3,8 +3,8 @@ use std::fmt::Debug;
 
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::{
-    utils::arithmetic::eval_polynomial,
     poly::{Coeff, Polynomial},
+    utils::arithmetic::eval_polynomial,
 };
 
 pub trait Query<F>: Sized + Clone + Send + Sync {
@@ -107,28 +107,6 @@ where
         }
     }
 }
-
-// #[allow(clippy::upper_case_acronyms)]
-// #[derive(Clone, Debug)]
-// pub enum CommitmentReference<'r, C: CurveAffine, M: MSM<C>> {
-//     Commitment(&'r C),
-//     MSM(&'r M),
-// }
-//
-// impl<'r, C: CurveAffine, M: MSM<C>> Copy for CommitmentReference<'r, C, M> {}
-//
-// impl<'r, C: CurveAffine, M: MSM<C>> PartialEq for CommitmentReference<'r, C, M> {
-//     #![allow(clippy::vtable_address_comparisons)]
-//     fn eq(&self, other: &Self) -> bool {
-//         match (self, other) {
-//             (&CommitmentReference::Commitment(a), &CommitmentReference::Commitment(b)) => {
-//                 std::ptr::eq(a, b)
-//             }
-//             (&CommitmentReference::MSM(a), &CommitmentReference::MSM(b)) => std::ptr::eq(a, b),
-//             _ => false,
-//         }
-//     }
-// }
 
 impl<F: PrimeField, CS: PolynomialCommitmentScheme<F>> Query<F> for VerifierQuery<F, CS> {
     type Commitment = CS::Commitment;

@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use halo2_proofs::{
-    utils::arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Instance, Selector},
     poly::Rotation,
+    utils::arithmetic::Field,
 };
 
 // ANCHOR: field-instructions

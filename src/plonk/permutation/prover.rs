@@ -9,9 +9,9 @@ use super::{Argument, ProvingKey};
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    utils::arithmetic::{eval_polynomial, parallelize},
     plonk::{self, Error},
     poly::{Coeff, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
+    utils::arithmetic::{eval_polynomial, parallelize},
 };
 
 pub(crate) struct CommittedSet<F: PrimeField> {

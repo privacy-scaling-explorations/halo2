@@ -1,9 +1,9 @@
 //! Trait for a commitment scheme
 use crate::poly::{Coeff, Error, LagrangeCoeff, Polynomial, ProverQuery, VerifierQuery};
 use crate::transcript::{Hashable, Sampleable, Transcript};
+use crate::utils::helpers::ProcessedSerdeObject;
 use ff::PrimeField;
 use std::fmt::Debug;
-use crate::utils::helpers::ProcessedSerdeObject;
 
 /// Public interface for a Polynomial Commitment Scheme (PCS)
 pub trait PolynomialCommitmentScheme<F: PrimeField>: Clone + Debug {

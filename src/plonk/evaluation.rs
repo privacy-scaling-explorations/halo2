@@ -1,10 +1,10 @@
-use crate::utils::multicore;
 use crate::plonk::{lookup, permutation, Any, ProvingKey};
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::poly::Basis;
+use crate::utils::multicore;
 use crate::{
-    utils::arithmetic::parallelize,
     poly::{Coeff, ExtendedLagrangeCoeff, Polynomial, Rotation},
+    utils::arithmetic::parallelize,
 };
 use ff::{PrimeField, WithSmallOrderMulGroup};
 use group::ff::Field;

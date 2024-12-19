@@ -1,5 +1,5 @@
-use crate::utils::arithmetic::{g_to_lagrange, parallelize};
 use crate::poly::{LagrangeCoeff, Polynomial};
+use crate::utils::arithmetic::{g_to_lagrange, parallelize};
 use crate::utils::SerdeFormat;
 
 use ff::{Field, PrimeField};
@@ -10,11 +10,11 @@ use std::fmt::Debug;
 
 use crate::poly::commitment::Params;
 use crate::poly::kzg::KZGCommitmentScheme;
+use crate::utils::helpers::ProcessedSerdeObject;
 use halo2curves::msm::msm_best;
 use halo2curves::serde::SerdeObject;
 use halo2curves::CurveAffine;
 use std::io;
-use crate::utils::helpers::ProcessedSerdeObject;
 
 use super::msm::MSMKZG;
 

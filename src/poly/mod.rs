@@ -7,11 +7,11 @@ use crate::utils::SerdeFormat;
 
 use ff::{BatchInvert, PrimeField};
 use group::ff::Field;
+use halo2curves::serde::SerdeObject;
 use std::fmt::Debug;
 use std::io;
 use std::marker::PhantomData;
 use std::ops::{Add, Deref, DerefMut, Index, IndexMut, Mul, RangeFrom, RangeFull, Sub};
-use halo2curves::serde::SerdeObject;
 
 mod domain;
 mod query;
@@ -21,10 +21,10 @@ pub mod kzg;
 
 pub mod commitment;
 
+use crate::utils::helpers::read_f;
 use crate::utils::rational::Rational;
 pub use domain::*;
 pub use query::{ProverQuery, VerifierQuery};
-use crate::utils::helpers::{read_f};
 
 /// This is an error that could occur during proving or circuit synthesis.
 // TODO: these errors need to be cleaned up
@@ -156,10 +156,7 @@ impl<F: PrimeField + SerdeObject, B> Polynomial<F, B> {
     }
 
     /// Writes polynomial to buffer using `SerdePrimeField::write`.
-    pub(crate) fn write<W: io::Write>(
-        &self,
-        writer: &mut W,
-    ) -> io::Result<()> {
+    pub(crate) fn write<W: io::Write>(&self, writer: &mut W) -> io::Result<()> {
         writer.write_all(&(self.values.len() as u32).to_be_bytes())?;
         for value in self.values.iter() {
             value.write_raw(writer)?;

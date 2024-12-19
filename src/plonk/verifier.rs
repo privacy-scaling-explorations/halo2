@@ -3,10 +3,10 @@ use halo2curves::serde::SerdeObject;
 use std::iter;
 
 use super::{vanishing, Error, VerifyingKey};
-use crate::utils::arithmetic::compute_inner_product;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::poly::VerifierQuery;
 use crate::transcript::{read_n, Hashable, Sampleable, Transcript};
+use crate::utils::arithmetic::compute_inner_product;
 
 /// Returns a boolean indicating whether or not the proof is valid
 pub fn verify_proof<

@@ -2,9 +2,9 @@ use ff::WithSmallOrderMulGroup;
 
 use super::{Argument, ProvingKey, VerifyingKey};
 use crate::{
-    utils::arithmetic::parallelize,
     plonk::{Any, Column, Error},
     poly::EvaluationDomain,
+    utils::arithmetic::parallelize,
 };
 
 #[cfg(feature = "thread-safe-region")]

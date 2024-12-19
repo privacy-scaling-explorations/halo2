@@ -9,10 +9,10 @@ use super::Argument;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    utils::arithmetic::{eval_polynomial, parallelize},
-    utils::multicore::current_num_threads,
     plonk::Error,
     poly::{Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery},
+    utils::arithmetic::{eval_polynomial, parallelize},
+    utils::multicore::current_num_threads,
 };
 
 pub(in crate::plonk) struct Committed<F: PrimeField> {

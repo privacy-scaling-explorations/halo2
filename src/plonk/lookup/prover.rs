@@ -4,8 +4,8 @@ use crate::plonk::evaluation::evaluate;
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::transcript::{Hashable, Transcript};
 use crate::{
-    utils::arithmetic::{eval_polynomial, parallelize},
     poly::{Coeff, EvaluationDomain, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
+    utils::arithmetic::{eval_polynomial, parallelize},
 };
 use ff::{PrimeField, WithSmallOrderMulGroup};
 use group::ff::BatchInvert;

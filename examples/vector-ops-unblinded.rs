@@ -8,10 +8,10 @@ use ff::{FromUniformBytes, WithSmallOrderMulGroup};
 use halo2_proofs::poly::kzg::{params::ParamsKZG, KZGCommitmentScheme};
 use halo2_proofs::transcript::{CircuitTranscript, Hashable, Sampleable, Transcript};
 use halo2_proofs::{
-    utils::arithmetic::Field,
     circuit::{AssignedCell, Chip, Layouter, Region, SimpleFloorPlanner, Value},
     plonk::*,
     poly::Rotation,
+    utils::arithmetic::Field,
 };
 use halo2curves::pairing::{Engine, MultiMillerLoop};
 use halo2curves::serde::SerdeObject;
