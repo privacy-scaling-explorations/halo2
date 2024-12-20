@@ -1,8 +1,6 @@
-# halo2 [![Crates.io](https://img.shields.io/crates/v/halo2.svg)](https://crates.io/crates/halo2) #
+# halo2_proofs [![Crates.io](https://img.shields.io/crates/v/halo2_proofs.svg)](https://crates.io/crates/halo2_proofs) #
 
-## [Documentation](https://privacy-scaling-explorations.github.io/halo2/halo2_proofs)
-
-For experimental features `privacy-scaling-explorations/halo2` fork adds, please refer to [`experimental-features.md`](./book/src/user/experimental-features.md).
+## [Documentation](https://docs.rs/halo2_proofs)
 
 ## Minimum Supported Rust Version
 
@@ -13,7 +11,9 @@ minor version bump.
 
 ## Controlling parallelism
 
-`halo2` currently uses [rayon](https://github.com/rayon-rs/rayon) for parallel computation. The `RAYON_NUM_THREADS` environment variable can be used to set the number of threads.
+`halo2_proofs` currently uses [rayon](https://github.com/rayon-rs/rayon) for parallel
+computation. The `RAYON_NUM_THREADS` environment variable can be used to set the number of
+threads.
 
 When compiling to WASM-targets, notice that since version `1.7`, `rayon` will fallback automatically (with no need to handle features) to require `getrandom` in order to be able to work. For more info related to WASM-compilation.
 
