@@ -17,15 +17,18 @@ jobs:
         os: [ubuntu-latest, windows-latest, macOS-latest]
         include:
           - feature_set: basic
-            features: batch,dev-graph,gadget-traces
+            features: dev-graph,gadget-traces
           - feature_set: all
-            features: batch,dev-graph,gadget-traces,test-dev-graph,thread-safe-region,sanity-checks,circuit-params
+            features: dev-graph,gadget-traces,test-dev-graph,thread-safe-region,sanity-checks,circuit-params
 
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           override: false
+      - name: Install libfontconfig1-dev
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y libfontconfig1-dev
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
@@ -42,6 +45,7 @@ jobs:
           - wasm32-wasi
 
     steps:
+      - run: sudo apt-get install -y libfontconfig1-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
@@ -52,13 +56,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --no-default-features --features batch,dev-graph,gadget-traces --target ${{ matrix.target }}
+          args: --no-default-features --features dev-graph,gadget-traces --target ${{ matrix.target }}
 
   bitrot:
     name: Bitrot check
     runs-on: ubuntu-latest
 
     steps:
+      - run: sudo apt-get install -y libfontconfig1-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
@@ -75,6 +80,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - run: sudo apt-get install -y libfontconfig1-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
@@ -97,6 +103,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-latest
     steps:
+      - run: sudo apt-get install -y libfontconfig1-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:

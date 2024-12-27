@@ -20,9 +20,11 @@ use crate::{
     },
 };
 
-use crate::utils::multicore::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-    ParallelSliceMut,
+use rayon::{
+    iter::{
+        IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+    },
+    slice::ParallelSliceMut,
 };
 
 pub mod metadata;
@@ -912,9 +914,9 @@ impl<F: FromUniformBytes<64> + Ord> MockProver<F> {
                                     cell_values: util::cell_values(
                                         gate,
                                         poly,
-                                        &util::load(n, row, &self.cs.fixed_queries, &self.fixed),
-                                        &util::load(n, row, &self.cs.advice_queries, &self.advice),
-                                        &util::load_instance(
+                                        util::load(n, row, &self.cs.fixed_queries, &self.fixed),
+                                        util::load(n, row, &self.cs.advice_queries, &self.advice),
+                                        util::load_instance(
                                             n,
                                             row,
                                             &self.cs.instance_queries,

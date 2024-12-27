@@ -1,7 +1,6 @@
 use crate::plonk::{lookup, permutation, Any, ProvingKey};
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::poly::Basis;
-use crate::utils::multicore;
 use crate::{
     poly::{Coeff, ExtendedLagrangeCoeff, Polynomial, Rotation},
     utils::arithmetic::parallelize,
@@ -171,8 +170,6 @@ pub struct Evaluator<F: PrimeField> {
     pub custom_gates: GraphEvaluator<F>,
     ///  Lookups evalution
     pub lookups: Vec<GraphEvaluator<F>>,
-    ///  Shuffle evalution
-    pub shuffles: Vec<GraphEvaluator<F>>,
 }
 
 /// GraphEvaluator
@@ -313,7 +310,7 @@ impl<F: WithSmallOrderMulGroup<3>> Evaluator<F> {
         let mut values = domain.empty_extended();
 
         // Core expression evaluations
-        let num_threads = multicore::current_num_threads();
+        let num_threads = rayon::current_num_threads();
         for (((advice, instance), lookups), permutation) in advice
             .iter()
             .zip(instance.iter())
@@ -321,7 +318,7 @@ impl<F: WithSmallOrderMulGroup<3>> Evaluator<F> {
             .zip(permutations.iter())
         {
             // Custom gates
-            multicore::scope(|scope| {
+            rayon::scope(|scope| {
                 let chunk_size = (size + num_threads - 1) / num_threads;
                 for (thread_idx, values) in values.chunks_mut(chunk_size).enumerate() {
                     let start = thread_idx * chunk_size;

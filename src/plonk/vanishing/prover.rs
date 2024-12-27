@@ -6,14 +6,15 @@ use rand_chacha::ChaCha20Rng;
 use rand_core::{RngCore, SeedableRng};
 
 use super::Argument;
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Transcript};
 use crate::{
     plonk::Error,
     poly::{Coeff, EvaluationDomain, ExtendedLagrangeCoeff, Polynomial, ProverQuery},
     utils::arithmetic::{eval_polynomial, parallelize},
-    utils::multicore::current_num_threads,
 };
+
+use rayon::current_num_threads;
 
 pub(in crate::plonk) struct Committed<F: PrimeField> {
     random_poly: Polynomial<F, Coeff>,
@@ -98,7 +99,7 @@ impl<F: WithSmallOrderMulGroup<3>> Committed<F> {
 
         // Split h(X) up into pieces
         let h_pieces = h_poly
-            .chunks_exact(params.n() as usize)
+            .chunks_exact(domain.n as usize)
             .map(|v| domain.coeff_from_vec(v.to_vec()))
             .collect::<Vec<_>>();
         drop(h_poly);

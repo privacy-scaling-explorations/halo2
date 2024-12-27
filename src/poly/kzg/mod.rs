@@ -12,17 +12,19 @@ use crate::poly::kzg::msm::{DualMSM, MSMKZG};
 use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
 use crate::poly::query::Query;
 use crate::poly::query::VerifierQuery;
-use crate::poly::{Coeff, Error, Polynomial, ProverQuery};
+use crate::poly::{Coeff, Error, LagrangeCoeff, Polynomial, ProverQuery};
 use crate::utils::arithmetic::{kate_division, powers, MSM};
 
 use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Sampleable, Transcript};
 use ff::Field;
 use group::prime::PrimeCurveAffine;
+use group::Group;
 use halo2curves::msm::msm_best;
 use halo2curves::pairing::MultiMillerLoop;
 use halo2curves::serde::SerdeObject;
 use halo2curves::CurveAffine;
+use rand_core::OsRng;
 
 #[derive(Clone, Debug)]
 /// KZG verifier
@@ -38,10 +40,14 @@ where
     type Parameters = ParamsKZG<E>;
     type VerifierParameters = ParamsVerifierKZG<E>;
     type Commitment = E::G1Affine;
+    type VerificationGuard = DualMSM<E>;
 
-    /// Unsafe function - do not use in production
-    fn setup(k: u32) -> ParamsKZG<E> {
-        ParamsKZG::new(k)
+    fn gen_params(k: u32) -> Self::Parameters {
+        ParamsKZG::unsafe_setup(k, OsRng)
+    }
+
+    fn get_verifier_params(params: &Self::Parameters) -> Self::VerifierParameters {
+        params.verifier_params()
     }
 
     fn commit(
@@ -51,6 +57,18 @@ where
         let mut scalars = Vec::with_capacity(polynomial.len());
         scalars.extend(polynomial.iter());
         let bases = &params.g;
+        let size = scalars.len();
+        assert!(bases.len() >= size);
+        msm_best(&scalars, &bases[0..size]).into()
+    }
+
+    fn commit_lagrange(
+        params: &Self::Parameters,
+        poly: &Polynomial<E::Fr, LagrangeCoeff>,
+    ) -> E::G1Affine {
+        let mut scalars = Vec::with_capacity(poly.len());
+        scalars.extend(poly.iter());
+        let bases = &params.g_lagrange;
         let size = scalars.len();
         assert!(bases.len() >= size);
         msm_best(&scalars, &bases[0..size]).into()
@@ -99,11 +117,7 @@ where
         Ok(())
     }
 
-    fn verify<T: Transcript, I>(
-        params: &Self::VerifierParameters,
-        verifier_query: I,
-        transcript: &mut T,
-    ) -> Result<(), Error>
+    fn prepare<T: Transcript, I>(verifier_query: I, transcript: &mut T) -> Result<DualMSM<E>, Error>
     where
         E::Fr: Sampleable<T::Hash>,
         E::G1Affine: Hashable<T::Hash>,
@@ -159,20 +173,16 @@ where
             witness.append_term(power_of_u, wi.to_curve());
         }
 
-        let mut msm = DualMSM::new(params);
+        let mut msm = DualMSM::new();
 
         msm.left.add_msm(&witness);
 
         msm.right.add_msm(&witness_with_aux);
         msm.right.add_msm(&commitment_multi);
-        let g0: E::G1 = params.g[0].to_curve();
+        let g0 = E::G1::generator();
         msm.right.append_term(eval_multi, -g0);
 
-        if msm.check() {
-            Ok(())
-        } else {
-            Err(Error::OpeningError)
-        }
+        Ok(msm)
     }
 }
 
@@ -212,7 +222,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::poly::commitment::PolynomialCommitmentScheme;
+    use crate::poly::commitment::{Guard, PolynomialCommitmentScheme};
     use crate::poly::kzg::params::{ParamsKZG, ParamsVerifierKZG};
     use crate::poly::kzg::KZGCommitmentScheme;
     use crate::poly::{
@@ -226,21 +236,22 @@ mod tests {
     use halo2curves::pairing::{Engine, MultiMillerLoop};
     use halo2curves::serde::SerdeObject;
     use halo2curves::CurveAffine;
+    use rand_core::OsRng;
 
     #[test]
     fn test_roundtrip_gwc() {
-        use crate::poly::kzg::KZGCommitmentScheme;
         use halo2curves::bn256::Bn256;
 
         const K: u32 = 4;
 
-        let params = KZGCommitmentScheme::<Bn256>::setup(K);
+        let params: ParamsKZG<Bn256> = ParamsKZG::unsafe_setup(K, OsRng);
 
         let proof = create_proof::<_, CircuitTranscript<Blake2bState>>(&params);
 
-        verify::<_, CircuitTranscript<Blake2bState>>(&params, &proof[..], false);
+        let verifier_params = params.verifier_params();
+        verify::<_, CircuitTranscript<Blake2bState>>(&verifier_params, &proof[..], false);
 
-        verify::<Bn256, CircuitTranscript<Blake2bState>>(&params, &proof[..], true);
+        verify::<Bn256, CircuitTranscript<Blake2bState>>(&verifier_params, &proof[..], true);
     }
 
     fn verify<E: MultiMillerLoop, T: Transcript>(
@@ -282,13 +293,13 @@ mod tests {
             valid_queries
         };
 
-        let result = KZGCommitmentScheme::verify(verifier_params, queries, &mut transcript)
-            .map_err(|_| Error::OpeningError);
+        let result =
+            KZGCommitmentScheme::prepare(queries, &mut transcript).map_err(|_| Error::OpeningError);
 
         if should_fail {
-            assert!(result.is_err());
+            assert!(result.unwrap().verify(verifier_params).is_err());
         } else {
-            assert!(result.is_ok());
+            assert!(result.unwrap().verify(verifier_params).is_ok());
         }
     }
 
@@ -300,7 +311,8 @@ mod tests {
             + Default
             + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
     {
-        let domain = EvaluationDomain::new(1, kzg_params.k);
+        let k = (kzg_params.g.len() - 1).ilog2() + 1;
+        let domain = EvaluationDomain::new(1, k);
 
         let mut ax = domain.empty_coeff();
         for (i, a) in ax.iter_mut().enumerate() {

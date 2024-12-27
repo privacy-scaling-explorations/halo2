@@ -1,16 +1,13 @@
 use ff::Field;
+use halo2_proofs::utils::rational::Rational;
 use halo2_proofs::{
     circuit::{Cell, Layouter, Region, SimpleFloorPlanner, Value},
-    plonk::{Advice, Assigned, Circuit, Column, ConstraintSystem, Error, Fixed, TableColumn},
+    plonk::{Advice, Circuit, Column, ConstraintSystem, Error, Fixed, TableColumn},
     poly::Rotation,
 };
 use halo2curves::pasta::Fp;
 use rand_core::OsRng;
 use std::marker::PhantomData;
-
-/// This represents an advice column at a certain row in the ConstraintSystem
-#[derive(Copy, Clone, Debug)]
-pub struct Variable(Column<Advice>, usize);
 
 #[derive(Clone)]
 struct PlonkConfig {
@@ -30,10 +27,10 @@ struct PlonkConfig {
 trait StandardCs<FF: Field> {
     fn raw_multiply<F>(&self, region: &mut Region<FF>, f: F) -> Result<(Cell, Cell, Cell), Error>
     where
-        F: FnMut() -> Value<(Assigned<FF>, Assigned<FF>, Assigned<FF>)>;
+        F: FnMut() -> Value<(Rational<FF>, Rational<FF>, Rational<FF>)>;
     fn raw_add<F>(&self, region: &mut Region<FF>, f: F) -> Result<(Cell, Cell, Cell), Error>
     where
-        F: FnMut() -> Value<(Assigned<FF>, Assigned<FF>, Assigned<FF>)>;
+        F: FnMut() -> Value<(Rational<FF>, Rational<FF>, Rational<FF>)>;
     fn copy(&self, region: &mut Region<FF>, a: Cell, b: Cell) -> Result<(), Error>;
     fn lookup_table(&self, layouter: &mut impl Layouter<FF>, values: &[FF]) -> Result<(), Error>;
 }
@@ -64,7 +61,7 @@ impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
         mut f: F,
     ) -> Result<(Cell, Cell, Cell), Error>
     where
-        F: FnMut() -> Value<(Assigned<FF>, Assigned<FF>, Assigned<FF>)>,
+        F: FnMut() -> Value<(Rational<FF>, Rational<FF>, Rational<FF>)>,
     {
         let mut value = None;
         let lhs = region.assign_advice(
@@ -101,7 +98,7 @@ impl<FF: Field> StandardCs<FF> for StandardPlonk<FF> {
     }
     fn raw_add<F>(&self, region: &mut Region<FF>, mut f: F) -> Result<(Cell, Cell, Cell), Error>
     where
-        F: FnMut() -> Value<(Assigned<FF>, Assigned<FF>, Assigned<FF>)>,
+        F: FnMut() -> Value<(Rational<FF>, Rational<FF>, Rational<FF>)>,
     {
         let mut value = None;
         let lhs = region.assign_advice(
@@ -247,7 +244,7 @@ impl<F: Field> Circuit<F> for MyCircuit<F> {
             layouter.assign_region(
                 || format!("region_{i}"),
                 |mut region| {
-                    let a: Value<Assigned<_>> = self.a.into();
+                    let a: Value<Rational<_>> = self.a.into();
                     let mut a_squared = Value::unknown();
                     let (a0, _, c0) = cs.raw_multiply(&mut region, || {
                         a_squared = a.square();

@@ -1,13 +1,13 @@
 use super::super::{circuit::Expression, Error, ProvingKey};
 use super::Argument;
 use crate::plonk::evaluation::evaluate;
-use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
+use crate::poly::commitment::PolynomialCommitmentScheme;
 use crate::transcript::{Hashable, Transcript};
 use crate::{
     poly::{Coeff, EvaluationDomain, LagrangeCoeff, Polynomial, ProverQuery, Rotation},
     utils::arithmetic::{eval_polynomial, parallelize},
 };
-use ff::{PrimeField, WithSmallOrderMulGroup};
+use ff::{FromUniformBytes, PrimeField, WithSmallOrderMulGroup};
 use group::ff::BatchInvert;
 use halo2curves::serde::SerdeObject;
 use rand_core::{CryptoRng, RngCore};
@@ -43,6 +43,7 @@ impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
     ///   obtaining A' and S', and
     /// - constructs Permuted<C> struct using permuted_input_value = A', and
     ///   permuted_table_expression = S'.
+    ///
     /// The Permuted<C> struct is used to update the Lookup, and is then returned.
     #[allow(clippy::too_many_arguments)]
     pub(in crate::plonk) fn commit_permuted<
@@ -65,6 +66,7 @@ impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
         transcript: &mut T,
     ) -> Result<Permuted<F>, Error>
     where
+        F: FromUniformBytes<64> + SerdeObject,
         CS::Commitment: Hashable<T::Hash>,
     {
         // Closure to get values of expressions and compress them
@@ -74,7 +76,7 @@ impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
                 .map(|expression| {
                     pk.vk.domain.lagrange_from_vec(evaluate(
                         expression,
-                        params.n() as usize,
+                        domain.n as usize,
                         1,
                         fixed_values,
                         advice_values,
@@ -97,7 +99,6 @@ impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
         // Permute compressed (InputExpression, TableExpression) pair
         let (permuted_input_expression, permuted_table_expression) = permute_expression_pair(
             pk,
-            params,
             domain,
             &mut rng,
             &compressed_input_expression,
@@ -107,7 +108,7 @@ impl<F: WithSmallOrderMulGroup<3> + Ord> Argument<F> {
         // Closure to construct commitment to vector of values
         let commit_values = |values: &Polynomial<F, LagrangeCoeff>| {
             let poly = pk.vk.domain.lagrange_to_coeff(values.clone());
-            let commitment = params.commit_lagrange(values);
+            let commitment = CS::commit_lagrange(params, values);
             (poly, commitment)
         };
 
@@ -152,6 +153,7 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
         transcript: &mut T,
     ) -> Result<Committed<F>, Error>
     where
+        F: WithSmallOrderMulGroup<3> + FromUniformBytes<64> + SerdeObject,
         CS::Commitment: Hashable<T::Hash>,
     {
         let blinding_factors = pk.vk.cs.blinding_factors();
@@ -166,7 +168,7 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
         // s_j(X) is the jth table expression in this lookup,
         // s'(X) is the compression of the permuted table expressions,
         // and i is the ith row of the expression.
-        let mut lookup_product = vec![F::ZERO; params.n() as usize];
+        let mut lookup_product = vec![F::ZERO; pk.vk.n() as usize];
         // Denominator uses the permuted input expression and permuted table expression
         parallelize(&mut lookup_product, |lookup_product, start| {
             for ((lookup_product, permuted_input_value), permuted_table_value) in lookup_product
@@ -217,11 +219,11 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
             })
             // Take all rows including the "last" row which should
             // be a boolean (and ideally 1, else soundness is broken)
-            .take(params.n() as usize - blinding_factors)
+            .take(pk.vk.n() as usize - blinding_factors)
             // Chain random blinding factors.
             .chain((0..blinding_factors).map(|_| F::random(&mut rng)))
             .collect::<Vec<_>>();
-        assert_eq!(z.len(), params.n() as usize);
+        assert_eq!(z.len(), pk.vk.n() as usize);
         let z = pk.vk.domain.lagrange_from_vec(z);
 
         #[cfg(feature = "sanity-checks")]
@@ -229,7 +231,7 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
         // It can be used for debugging purposes.
         {
             // While in Lagrange basis, check that product is correctly constructed
-            let u = (params.n() as usize) - (blinding_factors + 1);
+            let u = (pk.vk.n() as usize) - (blinding_factors + 1);
 
             // l_0(X) * (1 - z(X)) = 0
             assert_eq!(z[0], F::ONE);
@@ -242,15 +244,15 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
 
                 let permuted_table_value = &self.permuted_table_expression[i];
 
-                left *= &(*beta + permuted_input_value);
-                left *= &(*gamma + permuted_table_value);
+                left *= &(beta + permuted_input_value);
+                left *= &(gamma + permuted_table_value);
 
                 let mut right = z[i];
                 let mut input_term = self.compressed_input_expression[i];
                 let mut table_term = self.compressed_table_expression[i];
 
-                input_term += &(*beta);
-                table_term += &(*gamma);
+                input_term += &(beta);
+                table_term += &(gamma);
                 right *= &(input_term * &table_term);
 
                 assert_eq!(left, right);
@@ -262,7 +264,7 @@ impl<F: WithSmallOrderMulGroup<3>> Permuted<F> {
             assert_eq!(z[u], F::ONE);
         }
 
-        let product_commitment = params.commit_lagrange(&z);
+        let product_commitment = CS::commit_lagrange(params, &z);
         let z = pk.vk.domain.lagrange_to_coeff(z);
 
         // Hash product commitment
@@ -356,21 +358,20 @@ type ExpressionPair<F> = (Polynomial<F, LagrangeCoeff>, Polynomial<F, LagrangeCo
 /// - like values in A' are vertically adjacent to each other; and
 /// - the first row in a sequence of like values in A' is the row
 ///   that has the corresponding value in S'.
+///
 /// This method returns (A', S') if no errors are encountered.
-fn permute_expression_pair<
-    F: WithSmallOrderMulGroup<3> + Ord,
-    CS: PolynomialCommitmentScheme<F>,
-    R: RngCore,
->(
+fn permute_expression_pair<F, CS: PolynomialCommitmentScheme<F>, R: RngCore>(
     pk: &ProvingKey<F, CS>,
-    params: &CS::Parameters,
     domain: &EvaluationDomain<F>,
     mut rng: R,
     input_expression: &Polynomial<F, LagrangeCoeff>,
     table_expression: &Polynomial<F, LagrangeCoeff>,
-) -> Result<ExpressionPair<F>, Error> {
+) -> Result<ExpressionPair<F>, Error>
+where
+    F: WithSmallOrderMulGroup<3> + Ord + FromUniformBytes<64> + SerdeObject,
+{
     let blinding_factors = pk.vk.cs.blinding_factors();
-    let usable_rows = params.n() as usize - (blinding_factors + 1);
+    let usable_rows = pk.vk.n() as usize - (blinding_factors + 1);
 
     let mut permuted_input_expression: Vec<F> = input_expression.to_vec();
     permuted_input_expression.truncate(usable_rows);
@@ -423,8 +424,8 @@ fn permute_expression_pair<
 
     permuted_input_expression.extend((0..(blinding_factors + 1)).map(|_| F::random(&mut rng)));
     permuted_table_coeffs.extend((0..(blinding_factors + 1)).map(|_| F::random(&mut rng)));
-    assert_eq!(permuted_input_expression.len(), params.n() as usize);
-    assert_eq!(permuted_table_coeffs.len(), params.n() as usize);
+    assert_eq!(permuted_input_expression.len(), pk.vk.n() as usize);
+    assert_eq!(permuted_table_coeffs.len(), pk.vk.n() as usize);
 
     #[cfg(feature = "sanity-checks")]
     {

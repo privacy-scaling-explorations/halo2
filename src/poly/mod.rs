@@ -59,8 +59,8 @@ impl Basis for ExtendedLagrangeCoeff {}
 /// basis.
 #[derive(Clone, Debug)]
 pub struct Polynomial<F, B> {
-    values: Vec<F>,
-    _marker: PhantomData<B>,
+    pub(crate) values: Vec<F>,
+    pub(crate) _marker: PhantomData<B>,
 }
 
 impl<F, B> Index<usize> for Polynomial<F, B> {
@@ -197,7 +197,7 @@ pub(crate) fn batch_invert_rational<F: Field>(
 impl<F: Field> Polynomial<Rational<F>, LagrangeCoeff> {
     pub(crate) fn invert(
         &self,
-        inv_denoms: impl Iterator<Item = F> + ExactSizeIterator,
+        inv_denoms: impl ExactSizeIterator<Item = F>,
     ) -> Polynomial<F, LagrangeCoeff> {
         assert_eq!(inv_denoms.len(), self.values.len());
         Polynomial {

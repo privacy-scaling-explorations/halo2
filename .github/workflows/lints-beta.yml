@@ -12,6 +12,7 @@ jobs:
     continue-on-error: true
 
     steps:
+      - run: sudo apt-get install -y libfontconfig1-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:

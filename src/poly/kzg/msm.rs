@@ -1,13 +1,18 @@
 use std::fmt::Debug;
 
-use super::params::ParamsKZG;
+use super::params::ParamsVerifierKZG;
+use crate::poly::commitment::{Guard, PolynomialCommitmentScheme};
+use crate::poly::kzg::KZGCommitmentScheme;
+use crate::poly::Error;
 use crate::utils::arithmetic::parallelize;
 use crate::utils::arithmetic::MSM;
+use group::prime::PrimeCurveAffine;
 use group::{Curve, Group};
 use halo2curves::msm::msm_best;
+use halo2curves::serde::SerdeObject;
 use halo2curves::{
     pairing::{Engine, MillerLoopResult, MultiMillerLoop},
-    CurveAffine, CurveExt,
+    CurveAffine,
 };
 
 /// A multiscalar multiplication in the polynomial commitment scheme
@@ -68,7 +73,6 @@ where
     }
 
     fn eval(&self) -> E::G1 {
-        use group::prime::PrimeCurveAffine;
         let mut bases = vec![E::G1Affine::identity(); self.scalars.len()];
         E::G1::batch_normalize(&self.bases, &mut bases);
         msm_best(&self.scalars, &bases)
@@ -83,32 +87,42 @@ where
     }
 }
 
-impl<'params, E: MultiMillerLoop + Debug> From<&'params ParamsKZG<E>> for DualMSM<'params, E>
-where
-    E::G1Affine: CurveAffine<ScalarExt = <E as Engine>::Fr, CurveExt = <E as Engine>::G1>,
-    E::G1: CurveExt<AffineExt = E::G1Affine>,
-{
-    fn from(params: &'params ParamsKZG<E>) -> Self {
-        DualMSM::new(params)
-    }
-}
-
 /// Two channel MSM accumulator
 #[derive(Debug, Clone)]
-pub struct DualMSM<'a, E: Engine> {
-    pub(crate) params: &'a ParamsKZG<E>,
+pub struct DualMSM<E: Engine> {
     pub(crate) left: MSMKZG<E>,
     pub(crate) right: MSMKZG<E>,
 }
 
-impl<'a, E: MultiMillerLoop + Debug> DualMSM<'a, E>
+impl<E: MultiMillerLoop + Debug> Default for DualMSM<E>
+where
+    E::G1Affine: CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<E: MultiMillerLoop> Guard<E::Fr, KZGCommitmentScheme<E>> for DualMSM<E>
+where
+    E::Fr: SerdeObject,
+    E::G1Affine: Default + SerdeObject + CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
+{
+    fn verify(
+        self,
+        params: &<KZGCommitmentScheme<E> as PolynomialCommitmentScheme<E::Fr>>::VerifierParameters,
+    ) -> Result<(), Error> {
+        self.check(params).then_some(()).ok_or(Error::OpeningError)
+    }
+}
+
+impl<E: MultiMillerLoop + Debug> DualMSM<E>
 where
     E::G1Affine: CurveAffine<ScalarExt = E::Fr, CurveExt = E::G1>,
 {
     /// Create a new two channel MSM accumulator instance
-    pub fn new(params: &'a ParamsKZG<E>) -> Self {
+    pub fn new() -> Self {
         Self {
-            params,
             left: MSMKZG::new(),
             right: MSMKZG::new(),
         }
@@ -127,9 +141,9 @@ where
     }
 
     /// Performs final pairing check with given verifier params and two channel linear combination
-    pub fn check(self) -> bool {
-        let s_g2_prepared = E::G2Prepared::from(self.params.s_g2);
-        let n_g2_prepared = E::G2Prepared::from(-self.params.g2);
+    pub fn check(self, params: &ParamsVerifierKZG<E>) -> bool {
+        let s_g2_prepared = E::G2Prepared::from(params.s_g2);
+        let n_g2_prepared = E::G2Prepared::from(-E::G2Affine::generator());
 
         let left = self.left.eval();
         let right = self.right.eval();

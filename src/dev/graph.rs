@@ -1,11 +1,12 @@
 use ff::Field;
 use tabbycat::{AttrList, Edge, GraphBuilder, GraphType, Identity, StmtList};
 
+use crate::utils::rational::Rational;
 use crate::{
     circuit::Value,
     plonk::{
-        Advice, Any, Assigned, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error,
-        Fixed, FloorPlanner, Instance, Selector,
+        Advice, Any, Assignment, Challenge, Circuit, Column, ConstraintSystem, Error, Fixed,
+        FloorPlanner, Instance, Selector,
     },
 };
 
@@ -123,7 +124,7 @@ impl<F: Field> Assignment<F> for Graph {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -140,7 +141,7 @@ impl<F: Field> Assignment<F> for Graph {
     ) -> Result<(), Error>
     where
         V: FnOnce() -> Value<VR>,
-        VR: Into<Assigned<F>>,
+        VR: Into<Rational<F>>,
         A: FnOnce() -> AR,
         AR: Into<String>,
     {
@@ -163,7 +164,7 @@ impl<F: Field> Assignment<F> for Graph {
         &mut self,
         _: Column<Fixed>,
         _: usize,
-        _: Value<Assigned<F>>,
+        _: Value<Rational<F>>,
     ) -> Result<(), Error> {
         Ok(())
     }

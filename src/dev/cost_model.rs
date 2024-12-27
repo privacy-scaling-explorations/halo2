@@ -268,7 +268,7 @@ fn run_mock_prover_with_fallback<F: Ord + Field + FromUniformBytes<64>, C: Circu
     circuit: &C,
     instances: Vec<Vec<F>>,
 ) -> MockProver<F> {
-    (5..25)
+    (1..25)
         .find_map(|k| {
             panic::catch_unwind(AssertUnwindSafe(|| {
                 MockProver::run(k, circuit, instances.clone()).unwrap()

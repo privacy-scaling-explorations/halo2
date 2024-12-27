@@ -66,15 +66,19 @@ where
     CS: PolynomialCommitmentScheme<F>,
     CS::Commitment: SerdeObject,
 {
+    /// Returns `n`
+    pub fn n(&self) -> u64 {
+        self.domain.n
+    }
     /// Writes a verifying key to a buffer.
     ///
     /// Writes a curve element according to `format`:
     /// - `Processed`: Writes a compressed curve element with coordinates in standard form.
-    /// Writes a field element in standard form, with endianness specified by the
-    /// `PrimeField` implementation.
+    ///   Writes a field element in standard form, with endianness specified by the
+    ///   `PrimeField` implementation.
     /// - Otherwise: Writes an uncompressed curve element with coordinates in Montgomery form
-    /// Writes a field element into raw bytes in its internal Montgomery representation,
-    /// WITHOUT performing the expensive Montgomery reduction.
+    ///   Writes a field element into raw bytes in its internal Montgomery representation,
+    ///   WITHOUT performing the expensive Montgomery reduction.
     pub fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()> {
         // Version byte that will be checked on read.
         writer.write_all(&[VERSION])?;
@@ -333,7 +337,7 @@ where
     /// Writes a curve element according to `format`:
     /// - `Processed`: Writes a compressed curve element with coordinates in standard form.
     ///   Writes a field element in standard form, with endianness specified by the
-    /// `PrimeField` implementation.
+    ///   `PrimeField` implementation.
     /// - Otherwise: Writes an uncompressed curve element with coordinates in Montgomery form
     ///   Writes a field element into raw bytes in its internal Montgomery representation,
     ///   WITHOUT performing the expensive Montgomery reduction.

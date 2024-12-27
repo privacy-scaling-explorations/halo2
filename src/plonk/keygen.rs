@@ -1,5 +1,6 @@
 #![allow(clippy::int_plus_one)]
 
+use std::marker::PhantomData;
 use std::ops::Range;
 
 use ff::{Field, FromUniformBytes, WithSmallOrderMulGroup};
@@ -198,33 +199,85 @@ impl<F: Field> Assignment<F> for Assembly<F> {
     }
 }
 
+// This code also appears in `keygen`. We duplicate it here for simplicity of the
+// function body.
+fn k_from_circuit<F: Ord + Field + FromUniformBytes<64>, C: Circuit<F>>(circuit: &C) -> u32 {
+    // TODO: We could optimize the order here.
+    (1..25)
+        .find(|k| {
+            let n = 2usize.pow(*k);
+
+            let mut cs = ConstraintSystem::default();
+            #[cfg(feature = "circuit-params")]
+            let config = C::configure_with_params(&mut cs, circuit.params());
+            #[cfg(not(feature = "circuit-params"))]
+            let config = C::configure(&mut cs);
+            let cs = cs;
+
+            if n < cs.minimum_rows() {
+                return false;
+            }
+
+            let zero_poly = Polynomial {
+                values: vec![F::ZERO.into(); n],
+                _marker: PhantomData,
+            };
+
+            let mut assembly = Assembly {
+                k: *k,
+                fixed: vec![zero_poly; cs.num_fixed_columns],
+                permutation: permutation::Assembly::new(n, &cs.permutation),
+                selectors: vec![vec![false; n]; cs.num_selectors],
+                usable_rows: 0..n - (cs.blinding_factors() + 1),
+                _marker: std::marker::PhantomData,
+            };
+
+            // Synthesize the circuit to obtain URS
+            C::FloorPlanner::synthesize(
+                &mut assembly,
+                circuit,
+                config.clone(),
+                cs.constants.clone(),
+            )
+            .is_ok()
+        })
+        .expect("A circuit which can be implemented with at most 2^24 rows.")
+}
+
 /// Generate a `VerifyingKey` from an instance of `Circuit`.
 /// By default, selector compression is turned **off**.
 pub fn keygen_vk<F, CS, ConcreteCircuit>(
-    params: &CS::VerifierParameters,
+    params: &CS::Parameters,
     circuit: &ConcreteCircuit,
 ) -> Result<VerifyingKey<F, CS>, Error>
 where
-    F: WithSmallOrderMulGroup<3> + FromUniformBytes<64>,
+    F: WithSmallOrderMulGroup<3> + FromUniformBytes<64> + Ord,
     CS: PolynomialCommitmentScheme<F>,
     ConcreteCircuit: Circuit<F>,
 {
+    let k = k_from_circuit(circuit);
+    if params.max_k() < k {
+        return Err(Error::NotEnoughRowsAvailable {
+            current_k: params.max_k(),
+        });
+    }
+
     let (domain, cs, config) = create_domain::<F, ConcreteCircuit>(
-        params.k(),
+        k,
         #[cfg(feature = "circuit-params")]
         circuit.params(),
     );
 
-    if (params.n() as usize) < cs.minimum_rows() {
-        return Err(Error::not_enough_rows_available(params.k()));
+    if (domain.n as usize) < cs.minimum_rows() {
+        return Err(Error::not_enough_rows_available(domain.k()));
     }
 
     let mut assembly: Assembly<F> = Assembly {
-        k: params.k(),
+        k: domain.k(),
         fixed: vec![domain.empty_lagrange_rational(); cs.num_fixed_columns],
-        permutation: permutation::keygen::Assembly::new(params.n() as usize, &cs.permutation),
-        selectors: vec![vec![false; params.n() as usize]; cs.num_selectors],
-        usable_rows: 0..params.n() as usize - (cs.blinding_factors() + 1),
+        permutation: permutation::keygen::Assembly::new(domain.n as usize, &cs.permutation),
+        selectors: vec![vec![false; domain.n as usize]; cs.num_selectors],
+        usable_rows: 0..domain.n as usize - (cs.blinding_factors() + 1),
         _marker: std::marker::PhantomData,
     };
 
@@ -252,7 +305,7 @@ where
 
     let fixed_commitments = fixed
         .iter()
-        .map(|poly| params.commit_lagrange(poly))
+        .map(|poly| CS::commit_lagrange(params, poly))
         .collect();
 
     Ok(VerifyingKey::from_parts(
@@ -266,7 +319,6 @@ where
 
 /// Generate a `ProvingKey` from a `VerifyingKey` and an instance of `Circuit`.
 pub fn keygen_pk<F, CS, ConcreteCircuit>(
-    params: &CS::Parameters,
     vk: VerifyingKey<F, CS>,
     circuit: &ConcreteCircuit,
 ) -> Result<ProvingKey<F, CS>, Error>
@@ -283,16 +335,13 @@ where
 
     let cs = cs;
 
-    if (params.n() as usize) < cs.minimum_rows() {
-        return Err(Error::not_enough_rows_available(params.k()));
-    }
-
+    let n = vk.domain.n as usize;
     let mut assembly: Assembly<F> = Assembly {
-        k: params.k(),
+        k: vk.domain.k(),
         fixed: vec![vk.domain.empty_lagrange_rational(); cs.num_fixed_columns],
-        permutation: permutation::keygen::Assembly::new(params.n() as usize, &cs.permutation),
-        selectors: vec![vec![false; params.n() as usize]; cs.num_selectors],
-        usable_rows: 0..params.n() as usize - (cs.blinding_factors() + 1),
+        permutation: permutation::keygen::Assembly::new(n, &cs.permutation),
+        selectors: vec![vec![false; n]; cs.num_selectors],
+        usable_rows: 0..n - (cs.blinding_factors() + 1),
         _marker: std::marker::PhantomData,
     };
 
@@ -322,10 +371,9 @@ where
         .map(|poly| vk.domain.coeff_to_extended(poly.clone()))
         .collect();
 
-    let permutation_pk =
-        assembly
-            .permutation
-            .build_pk::<F, CS>(params, &vk.domain, &cs.permutation);
+    let permutation_pk = assembly
+        .permutation
+        .build_pk::<F>(&vk.domain, &cs.permutation);
 
     // Compute l_0(X)
     // TODO: this can be done more efficiently
@@ -346,7 +394,7 @@ where
     // Compute l_last(X) which evaluates to 1 on the first inactive row (just
     // before the blinding factors) and 0 otherwise over the domain
     let mut l_last = vk.domain.empty_lagrange();
-    l_last[params.n() as usize - cs.blinding_factors() - 1] = F::ONE;
+    l_last[n - cs.blinding_factors() - 1] = F::ONE;
     let l_last = vk.domain.lagrange_to_coeff(l_last);
     let l_last = vk.domain.coeff_to_extended(l_last);
 

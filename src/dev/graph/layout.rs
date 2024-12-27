@@ -106,7 +106,7 @@ impl CircuitLayout {
             cs.constants.clone(),
         )
         .unwrap();
-        let (cs, selector_polys) = cs.compress_selectors(layout.selectors);
+        let (cs, selector_polys) = cs.directly_convert_selectors_to_fixed(layout.selectors.clone());
         let non_selector_fixed_columns = cs.num_fixed_columns - selector_polys.len();
 
         // Figure out what order to render the columns in.
@@ -115,7 +115,7 @@ impl CircuitLayout {
         let column_index = |cs: &ConstraintSystem<F>, column: RegionColumn| {
             let column: Column<Any> = match column {
                 RegionColumn::Column(col) => col,
-                RegionColumn::Selector(selector) => cs.selector_map[selector.0].into(),
+                RegionColumn::Selector(_) => panic!("We shouldn't have selectors by now"),
             };
             column.index()
                 + match column.column_type() {

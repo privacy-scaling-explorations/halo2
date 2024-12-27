@@ -1,7 +1,6 @@
 //! This module provides common utilities, traits and structures for group,
 //! field and polynomial arithmetic.
 
-use super::multicore;
 pub use ff::Field;
 use group::prime::PrimeCurveAffine;
 use group::{
@@ -63,13 +62,13 @@ pub fn eval_polynomial<F: Field>(poly: &[F], point: F) -> F {
             .fold(F::ZERO, |acc, coeff| acc * point + coeff)
     }
     let n = poly.len();
-    let num_threads = multicore::current_num_threads();
+    let num_threads = rayon::current_num_threads();
     if n * 2 < num_threads {
         evaluate(poly, point)
     } else {
         let chunk_size = (n + num_threads - 1) / num_threads;
         let mut parts = vec![F::ZERO; num_threads];
-        multicore::scope(|scope| {
+        rayon::scope(|scope| {
             for (chunk_idx, (out, poly)) in
                 parts.chunks_mut(1).zip(poly.chunks(chunk_size)).enumerate()
             {
@@ -149,13 +148,13 @@ pub fn parallelize<T: Send, F: Fn(&mut [T], usize) + Send + Sync + Clone>(v: &mu
 
     let f = &f;
     let total_iters = v.len();
-    let num_threads = multicore::current_num_threads();
+    let num_threads = rayon::current_num_threads();
     let base_chunk_size = total_iters / num_threads;
     let cutoff_chunk_id = total_iters % num_threads;
     let split_pos = cutoff_chunk_id * (base_chunk_size + 1);
     let (v_hi, v_lo) = v.split_at_mut(split_pos);
 
-    multicore::scope(|scope| {
+    rayon::scope(|scope| {
         // Skip special-case: number of iterations is cleanly divided by number of threads.
         if cutoff_chunk_id != 0 {
             for (chunk_id, chunk) in v_hi.chunks_exact_mut(base_chunk_size + 1).enumerate() {
