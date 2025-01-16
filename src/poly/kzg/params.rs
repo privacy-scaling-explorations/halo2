@@ -30,6 +30,14 @@ impl<E: Engine> Params for ParamsKZG<E> {
 }
 
 impl<E: Engine + Debug> ParamsKZG<E> {
+    /// Downsize the current parameters to match a smaller `k`.
+    pub fn downsize(&mut self, new_k: u32) {
+        let n = 1 << new_k;
+        assert!(n < self.g_lagrange.len() as u32);
+        self.g.truncate(n as usize);
+        self.g_lagrange = g_to_lagrange(self.g.iter().map(|g| g.to_curve()).collect(), new_k);
+    }
+
     /// Initializes parameters for the curve, draws toxic secret from given rng.
     /// MUST NOT be used in production.
     pub fn unsafe_setup<R: RngCore>(k: u32, rng: R) -> Self {
@@ -136,7 +144,7 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         E::G1Affine: CurveAffine + ProcessedSerdeObject,
         E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
-        writer.write_all(&(self.g.len() as u64).to_le_bytes())?;
+        writer.write_all(&self.g.len().ilog2().to_le_bytes())?;
         for el in self.g.iter() {
             el.write(writer, format)?;
         }
@@ -154,9 +162,10 @@ impl<E: Engine + Debug> ParamsKZG<E> {
         E::G1Affine: CurveAffine + ProcessedSerdeObject,
         E::G2Affine: CurveAffine + ProcessedSerdeObject,
     {
-        let mut n = [0u8; 8];
-        reader.read_exact(&mut n[..])?;
-        let n = u64::from_le_bytes(n) as usize;
+        let mut k = [0u8; 4];
+        reader.read_exact(&mut k[..])?;
+        let k = u32::from_le_bytes(k);
+        let n = 1 << k;
 
         let (g, g_lagrange) = match format {
             SerdeFormat::Processed => {

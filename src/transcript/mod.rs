@@ -35,7 +35,7 @@ pub trait Hashable<H: TranscriptHash> {
 /// Trait to represent values that can be sampled from a `TranscriptHash`
 pub trait Sampleable<H: TranscriptHash> {
     /// Converts `H`'s output to Self
-    fn sample(out: H::Output) -> Self;
+    fn sample(hash_output: H::Output) -> Self;
 }
 
 /// Generic transcript view
