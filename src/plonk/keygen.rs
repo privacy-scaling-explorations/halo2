@@ -15,7 +15,7 @@ use super::{
     permutation, Challenge, Error, LagrangeCoeff, Polynomial, ProvingKey, VerifyingKey,
 };
 use crate::circuit::Value;
-use crate::poly::batch_invert_rational;
+use crate::poly::{batch_invert_rational, ExtendedLagrangeCoeff};
 use crate::poly::commitment::{Params, PolynomialCommitmentScheme};
 use crate::utils::rational::Rational;
 use crate::{poly::EvaluationDomain, utils::arithmetic::parallelize};
@@ -375,6 +375,30 @@ where
         .permutation
         .build_pk::<F>(&vk.domain, &cs.permutation);
 
+    let [l0, l_last, l_active_row] = compute_lagrange_polys(&vk, &cs);
+    // Compute the optimized evaluation data structure
+    let ev = Evaluator::new(&vk.cs);
+    Ok(ProvingKey {
+        vk,
+        l0,
+        l_last,
+        l_active_row,
+        fixed_values: fixed,
+        fixed_polys,
+        fixed_cosets,
+        permutation: permutation_pk,
+        ev,
+    })
+}
+
+pub(crate) fn compute_lagrange_polys<F, CS>(
+    vk: &VerifyingKey<F, CS>,
+    cs: &ConstraintSystem<F>,
+) -> [Polynomial<F, ExtendedLagrangeCoeff>; 3]
+where
+    F: WithSmallOrderMulGroup<3>,
+    CS: PolynomialCommitmentScheme<F>,
+{
     // Compute l_0(X)
     // TODO: this can be done more efficiently
     let mut l0 = vk.domain.empty_lagrange();
@@ -394,6 +418,7 @@ where
     // Compute l_last(X) which evaluates to 1 on the first inactive row (just
     // before the blinding factors) and 0 otherwise over the domain
     let mut l_last = vk.domain.empty_lagrange();
+    let n = l_last.len();
     l_last[n - cs.blinding_factors() - 1] = F::ONE;
     let l_last = vk.domain.lagrange_to_coeff(l_last);
     let l_last = vk.domain.coeff_to_extended(l_last);
@@ -408,18 +433,5 @@ where
         }
     });
 
-    // Compute the optimized evaluation data structure
-    let ev = Evaluator::new(&vk.cs);
-
-    Ok(ProvingKey {
-        vk,
-        l0,
-        l_last,
-        l_active_row,
-        fixed_values: fixed,
-        fixed_polys,
-        fixed_cosets,
-        permutation: permutation_pk,
-        ev,
-    })
+    [l0, l_last, l_active_row]
 }

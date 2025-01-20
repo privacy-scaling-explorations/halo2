@@ -20,6 +20,7 @@ use crate::poly::commitment::PolynomialCommitmentScheme;
 use rayon::iter::IntoParallelRefMutIterator;
 #[cfg(feature = "thread-safe-region")]
 use std::collections::{BTreeSet, HashMap};
+use crate::poly::{Coeff, ExtendedLagrangeCoeff, LagrangeCoeff, Polynomial};
 
 #[cfg(not(feature = "thread-safe-region"))]
 /// Struct that accumulates all the necessary data in order to construct the permutation argument.
@@ -372,27 +373,7 @@ pub(crate) fn build_pk<F: WithSmallOrderMulGroup<3>>(
         });
     }
 
-    let mut polys = vec![domain.empty_coeff(); p.columns.len()];
-    {
-        parallelize(&mut polys, |o, start| {
-            o.par_iter_mut().enumerate().for_each(|(x, poly)| {
-                let i = start + x;
-                let permutation_poly = permutations[i].clone();
-                *poly = domain.lagrange_to_coeff(permutation_poly);
-            })
-        });
-    }
-
-    let mut cosets = vec![domain.empty_extended(); p.columns.len()];
-    {
-        parallelize(&mut cosets, |o, start| {
-            o.par_iter_mut().enumerate().for_each(|(x, coset)| {
-                let i = start + x;
-                let poly = polys[i].clone();
-                *coset = domain.coeff_to_extended(poly);
-            })
-        });
-    }
+    let (polys, cosets) = compute_polys_and_cosets::<F>(domain, p, &permutations);
 
     ProvingKey {
         permutations,
@@ -458,3 +439,37 @@ pub(crate) fn build_vk<F: WithSmallOrderMulGroup<3>, CS: PolynomialCommitmentSch
 
     VerifyingKey { commitments }
 }
+
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn compute_polys_and_cosets<F: WithSmallOrderMulGroup<3>>(
+    domain: &EvaluationDomain<F>,
+    p: &Argument,
+    permutations: &[Polynomial<F, LagrangeCoeff>],
+) -> (
+    Vec<Polynomial<F, Coeff>>,
+    Vec<Polynomial<F, ExtendedLagrangeCoeff>>,
+) {
+    let mut polys = vec![domain.empty_coeff(); p.columns.len()];
+    {
+        parallelize(&mut polys, |o, start| {
+            for (x, poly) in o.iter_mut().enumerate() {
+                let i = start + x;
+                let permutation_poly = permutations[i].clone();
+                *poly = domain.lagrange_to_coeff(permutation_poly);
+            }
+        });
+    }
+    let mut cosets = vec![domain.empty_extended(); p.columns.len()];
+    {
+        parallelize(&mut cosets, |o, start| {
+            for (x, coset) in o.iter_mut().enumerate() {
+                let i = start + x;
+                let poly = polys[i].clone();
+                *coset = domain.coeff_to_extended(poly);
+            }
+        });
+    }
+    (polys, cosets)
+}
+
