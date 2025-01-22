@@ -2,8 +2,13 @@
 
 ## [Documentation](https://privacy-scaling-explorations.github.io/halo2/halo2_proofs)
 
-This repository contains the [halo2](https://github.com/zcash/halo2) fork from
-PSE and includes contributions from the community.
+PSE-Halo2 is [halo2](https://github.com/zcash/halo2) fork by
+[PSE](https://pse.dev) and includes contributions from the community.
+
+PSE-Halo2 is in maintenance mode starting January 2025, which means: 
+- Bugs reported will be fixed
+- PRs with non-trivial but **narrow-scope** additions or fixes will be reviewed
+- Feature-add PRs or wide-scope changes to the architecture **will not be reviewed**. To extend PSE-Halo2 with significant features we recommend [Axiom's fork](https://github.com/axiom-crypto/halo2) instead. 
 
 We use the `main` branch for development, which means it may contain
 unstable/unfinished features.  For end-users we recommend using the tag releases
