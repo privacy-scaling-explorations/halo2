@@ -5,6 +5,10 @@
 PSE-Halo2 is [halo2](https://github.com/zcash/halo2) fork by
 [PSE](https://pse.dev) and includes contributions from the community.
 
+PSE-Halo2 modified, extended, and eventually [re-architected](https://github.com/privacy-scaling-explorations/halo2/pull/254) the [original Halo2 implementation by Zcash](https://github.com/zcash/halo2) - an instantiation of the PLONK proof system.
+      
+The original IPA backend was swapped with KZG for cost-effective Ethereum L1 verifiability, and comes with a Solidity verifier. Support for many [additional curves](https://github.com/privacy-scaling-explorations/halo2curves) and other [experimental features](https://github.com/kilic/tetris) were added, and the system was eventually re-architected by [splitting the front- and backends](https://github.com/privacy-scaling-explorations/halo2/pull/254).
+
 PSE-Halo2 is in maintenance mode starting January 2025, which means: 
 - Bugs reported will be fixed
 - PRs with non-trivial but **narrow-scope** additions or fixes will be reviewed
