@@ -246,12 +246,12 @@ impl<F: WithSmallOrderMulGroup<3>> EvaluationDomain<F> {
     // Compute L_i(X) in the extended co-domain, where
     // L_i(X)is the ith Lagrange polynomial in the original domain,
     // H = {1, g, g^2, ..., g^(n-1)}.
-    // We compute its represenation in the extended co-domain
+    // We compute its representation in the extended co-domain
     // zH = {z, z*w, z*w^2, ... , z*w^(n*k - 1)}, where k is the extension factor
     // of the domain, and z is the extended root such that w^k = g.
     // We assume z = F::ZETA, a cubic root the field. This simplifies the computation.
     //
-    // The computation uses the fomula:
+    // The computation uses the formula:
     // L_i(X) = g^i/n * (X^n -1)/(X-g^i)
     pub fn lagrange_extended(&self, idx: usize) -> Polynomial<F, ExtendedLagrangeCoeff> {
         let one = F::ONE;
