@@ -80,6 +80,9 @@ pub trait ParamsProver<C: CurveAffine>: Params<C> {
         poly: &Polynomial<C::ScalarExt, Coeff>,
         r: Blind<C::ScalarExt>,
     ) -> C::CurveExt;
+
+    /// Getter for g generators
+    fn get_g(&self) -> &[C];
 }
 
 /// Verifier specific functionality with circuit constraints

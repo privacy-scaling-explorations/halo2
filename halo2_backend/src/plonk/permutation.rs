@@ -21,6 +21,11 @@ pub(crate) struct VerifyingKey<C: CurveAffine> {
 }
 
 impl<C: CurveAffine> VerifyingKey<C> {
+    /// Returns commitments of sigma polynomials
+    pub fn commitments(&self) -> &[C] {
+        &self.commitments
+    }
+
     pub(crate) fn write<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
         C: SerdeCurveAffine,

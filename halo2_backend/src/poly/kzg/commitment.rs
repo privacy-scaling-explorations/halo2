@@ -254,6 +254,16 @@ where
         }
     }
 
+    /// Returns generator on G2
+    pub fn g2(&self) -> E::G2Affine {
+        self.g2
+    }
+
+    /// Returns first power of secret on G2
+    pub fn s_g2(&self) -> E::G2Affine {
+        self.s_g2
+    }
+
     /// Writes parameters to buffer
     pub fn write_custom<W: io::Write>(&self, writer: &mut W, format: SerdeFormat) -> io::Result<()>
     where
@@ -445,6 +455,10 @@ where
         let size = scalars.len();
         assert!(bases.len() >= size);
         engine.msm(&scalars, &bases[0..size])
+    }
+
+    fn get_g(&self) -> &[E::G1Affine] {
+        &self.g
     }
 }
 
