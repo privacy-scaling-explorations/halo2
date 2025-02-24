@@ -230,6 +230,7 @@ impl<C: CurveAffine> VerifyingKey<C> {
         &self.fixed_commitments
     }
 
+    /// Returns commitments of permutation polynomials
     pub fn permutation_commitments(&self) -> &[C] {
         self.permutation.commitments()
     }
