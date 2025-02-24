@@ -22,7 +22,7 @@ pub(crate) struct VerifyingKey<C: CurveAffine> {
 
 impl<C: CurveAffine> VerifyingKey<C> {
     /// Returns commitments of sigma polynomials
-    pub fn commitments(&self) -> &[C] {
+    pub(crate) fn commitments(&self) -> &[C] {
         &self.commitments
     }
 
