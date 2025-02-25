@@ -13,14 +13,14 @@ use crate::helpers::{
     polynomial_slice_byte_length, read_polynomial_vec, write_polynomial_slice, SerdeCurveAffine,
     SerdeFormat, SerdePrimeField,
 };
-use crate::plonk::circuit::{ConstraintSystemBack, PinnedConstraintSystem};
+use crate::plonk::circuit::PinnedConstraintSystem;
 use crate::poly::{
     Coeff, EvaluationDomain, ExtendedLagrangeCoeff, LagrangeCoeff, PinnedEvaluationDomain,
     Polynomial,
 };
 use crate::transcript::{ChallengeScalar, EncodedChallenge, Transcript};
+pub use circuit::{ConstraintSystemBack, QueryBack, VarBack};
 pub(crate) use evaluation::Evaluator;
-
 use std::io;
 
 mod circuit;
@@ -230,8 +230,13 @@ impl<C: CurveAffine> VerifyingKey<C> {
         &self.fixed_commitments
     }
 
+    /// Returns commitments of permutation polynomials
+    pub fn permutation_commitments(&self) -> &[C] {
+        self.permutation.commitments()
+    }
+
     /// Returns `ConstraintSystem`
-    pub(crate) fn cs(&self) -> &ConstraintSystemBack<C::Scalar> {
+    pub fn cs(&self) -> &ConstraintSystemBack<C::Scalar> {
         &self.cs
     }
 

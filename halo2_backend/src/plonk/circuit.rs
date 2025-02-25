@@ -15,6 +15,20 @@ pub struct QueryBack {
     pub(crate) rotation: Rotation,
 }
 
+impl QueryBack {
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn column(&self) -> ColumnMid {
+        self.column
+    }
+
+    pub fn rotation(&self) -> Rotation {
+        self.rotation
+    }
+}
+
 /// Represent the `Query` and `Challenge`, for backwards compatibility
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VarBack {
@@ -75,34 +89,34 @@ pub struct ConstraintSystemBack<F: Field> {
 
     pub(crate) gates: Vec<GateBack<F>>,
     pub(crate) advice_queries: Vec<(ColumnMid, Rotation)>,
-    // Contains an integer for each advice column
-    // identifying how many distinct queries it has
-    // so far; should be same length as num_advice_columns.
+    /// Contains an integer for each advice column
+    /// identifying how many distinct queries it has
+    /// so far; should be same length as num_advice_columns.
     pub(crate) num_advice_queries: Vec<usize>,
     pub(crate) instance_queries: Vec<(ColumnMid, Rotation)>,
     pub(crate) fixed_queries: Vec<(ColumnMid, Rotation)>,
 
-    // Permutation argument for performing equality constraints
+    /// Permutation argument for performing equality constraints
     pub(crate) permutation: PermutationArgumentBack,
 
-    // Vector of lookup arguments, where each corresponds to a sequence of
-    // input expressions and a sequence of table expressions involved in the lookup.
+    /// Vector of lookup arguments, where each corresponds to a sequence of
+    /// input expressions and a sequence of table expressions involved in the lookup.
     pub(crate) lookups: Vec<LookupArgumentBack<F>>,
 
-    // Vector of shuffle arguments, where each corresponds to a sequence of
-    // input expressions and a sequence of shuffle expressions involved in the shuffle.
+    /// Vector of shuffle arguments, where each corresponds to a sequence of
+    /// input expressions and a sequence of shuffle expressions involved in the shuffle.
     pub(crate) shuffles: Vec<ShuffleArgumentBack<F>>,
 
-    // The minimum degree required by the circuit, which can be set to a
-    // larger amount than actually needed. This can be used, for example, to
-    // force the permutation argument to involve more columns in the same set.
+    /// The minimum degree required by the circuit, which can be set to a
+    /// larger amount than actually needed. This can be used, for example, to
+    /// force the permutation argument to involve more columns in the same set.
     pub(crate) minimum_degree: Option<usize>,
 }
 
 impl<F: Field> ConstraintSystemBack<F> {
     /// Compute the degree of the constraint system (the maximum degree of all
     /// constraints).
-    pub(crate) fn degree(&self) -> usize {
+    pub fn degree(&self) -> usize {
         // The permutation argument will serve alongside the gates, so must be
         // accounted for.
         let mut degree = permutation_argument_required_degree();
@@ -145,7 +159,7 @@ impl<F: Field> ConstraintSystemBack<F> {
 
     /// Compute the number of blinding factors necessary to perfectly blind
     /// each of the prover's witness polynomials.
-    pub(crate) fn blinding_factors(&self) -> usize {
+    pub fn blinding_factors(&self) -> usize {
         // All of the prover's advice columns are evaluated at no more than
         let factors = *self.num_advice_queries.iter().max().unwrap_or(&1);
         // distinct points during gate checks.
@@ -229,6 +243,71 @@ impl<F: Field> ConstraintSystemBack<F> {
             shuffles: &self.shuffles,
             minimum_degree: &self.minimum_degree,
         }
+    }
+
+    /// Returns the number of advice columns.
+    pub fn num_advice_columns(&self) -> usize {
+        self.num_advice_columns
+    }
+
+    /// Returns the number of fixed columns.
+    pub fn num_fixed_columns(&self) -> usize {
+        self.num_fixed_columns
+    }
+
+    /// Returns the number of instance columns.
+    pub fn num_instance_columns(&self) -> usize {
+        self.num_instance_columns
+    }
+
+    /// Returns the number of challenges.
+    pub fn num_challenges(&self) -> usize {
+        self.num_challenges
+    }
+
+    /// Returns the indices of the advice columns left unblinded.
+    pub fn unblinded_advice_columns(&self) -> &[usize] {
+        &self.unblinded_advice_columns
+    }
+
+    /// Returns the phase for each advice column.
+    pub fn advice_column_phase(&self) -> &[u8] {
+        &self.advice_column_phase
+    }
+
+    /// Returns the phase for each challenge.
+    pub fn challenge_phase(&self) -> &[u8] {
+        &self.challenge_phase
+    }
+
+    /// Returns the advice queries.
+    pub fn advice_queries(&self) -> &[(ColumnMid, Rotation)] {
+        &self.advice_queries
+    }
+
+    /// Returns the instance queries.
+    pub fn instance_queries(&self) -> &[(ColumnMid, Rotation)] {
+        &self.instance_queries
+    }
+
+    /// Returns the fixed queries.
+    pub fn fixed_queries(&self) -> &[(ColumnMid, Rotation)] {
+        &self.fixed_queries
+    }
+
+    /// Returns the permutation columns.
+    pub fn permutation_columns(&self) -> &[ColumnMid] {
+        &self.permutation.columns
+    }
+
+    /// Returns the gates.
+    pub fn gates(&self) -> &[GateBack<F>] {
+        &self.gates
+    }
+
+    /// Returns the number of lookup arguments.
+    pub fn lookups(&self) -> &[lookup::Argument<F, VarBack>] {
+        &self.lookups
     }
 }
 
