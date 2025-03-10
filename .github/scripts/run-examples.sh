@@ -13,10 +13,10 @@ EXAMPLES=$(echo "$EXAMPLES_WITH_FEATURES $EXAMPLES_WITHOUT_FEATURES" | tr ' ' '\
 # Run the examples
 for example in $EXAMPLES; do
     if [ "$(echo "$example" | grep '#')" ]; then
-        name=$(echo $example | cut -d '#' -f 1)
-        features=$(echo $example | cut -d '#' -f 2)
-        cargo run --package halo2_proofs --example $name --features $features
+        name="$(echo "$example" | cut -d '#' -f 1)"
+        features="$(echo "$example" | cut -d '#' -f 2)"
+        cargo run --package halo2_proofs --example "$name" --features "$features"
     else
-        cargo run --package halo2_proofs --example $example
+        cargo run --package halo2_proofs --example "$example"
     fi
 done
