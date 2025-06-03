@@ -25,19 +25,16 @@ jobs:
           args: --all -- --check
 
   typos-check:
-    needs: [skip_check]
-    if: |
-      github.event.pull_request.draft == false &&
-      (github.event.action == 'ready_for_review' || needs.skip_check.outputs.should_skip != 'true')
-    name: TyposCheck
+    name: Spell Check with Typos
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: crate-ci/typos@v1.28.2
+      - uses: crate-ci/typos@v1.33.1
         with:
           config: ./typos.toml
           isolated: true
+
   test:
     name: Test on ${{ matrix.os }} with ${{ matrix.feature_set }} features
     runs-on: ${{ matrix.os }}
@@ -130,5 +127,3 @@ jobs:
         with:
           command: doc
           args: --all --document-private-items
-
-
