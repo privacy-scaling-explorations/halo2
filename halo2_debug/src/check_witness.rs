@@ -42,7 +42,7 @@ impl<'a, F: PrimeField> Assignments<'a, F> {
         }
     }
 
-    // Evaluate an expression using the assingment data
+    // Evaluate an expression using the assignment data
     fn eval(&self, expr: &ExpressionMid<F>, offset: usize) -> F {
         expr.evaluate(
             &|s| s,
