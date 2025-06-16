@@ -96,6 +96,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev pkg-config
+      - name: Set up env
+        run: |
+          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "RUST_FONTCONFIG_DLOPEN=on" >> $GITHUB_ENV
       - uses: actions-rs/toolchain@v1
         with:
           override: false
