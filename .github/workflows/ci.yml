@@ -59,7 +59,7 @@ jobs:
           elif [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
             brew update && brew install fontconfig pkg-config
           elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            choco install -y fontconfig pkgconfiglite
+            choco install -y pkgconfiglite
             echo "PKG_CONFIG_PATH=\"C:/ProgramData/chocolatey/lib/pkgconfiglite/tools/$env:VCPKG_INSTANCE_NAME/lib/pkgconfig\"" >> "$GITHUB_ENV"
           fi
         shell: bash
