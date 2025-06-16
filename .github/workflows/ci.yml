@@ -52,6 +52,20 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           override: false
+      - name: Install fontconfig system dependency
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            sudo apt-get update && sudo apt-get install -y libfontconfig1-dev pkg-config
+          elif [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
+            brew update && brew install fontconfig pkg-config
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            choco install -y fontconfig pkgconfiglite
+            echo "PKG_CONFIG_PATH=\"C:/ProgramData/chocolatey/lib/pkgconfiglite/tools/$env:VCPKG_INSTANCE_NAME/lib/pkgconfig\"" >> "$GITHUB_ENV"
+          fi
+      - name: Configure environment variables
+        run: |
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
+          echo "RUST_FONTCONFIG_DLOPEN=on" >> "$GITHUB_ENV"
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
