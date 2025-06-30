@@ -57,7 +57,7 @@ where
     {
         let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
 
-        let commitment_data = construct_intermediate_sets(queries);
+        let commitment_data = construct_intermediate_sets(queries).ok_or(Error::OpeningError)?;
 
         let w: Vec<E::G1Affine> = (0..commitment_data.len())
             .map(|_| transcript.read_point().map_err(|_| Error::SamplingError))
