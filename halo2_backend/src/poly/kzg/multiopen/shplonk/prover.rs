@@ -173,7 +173,12 @@ where
             }
         };
 
-        let intermediate_sets = construct_intermediate_sets(queries);
+        let intermediate_sets = construct_intermediate_sets(queries).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "queries iterator contains mismatching evaluations",
+            )
+        })?;
         let (rotation_sets, super_point_set) = (
             intermediate_sets.rotation_sets,
             intermediate_sets.super_point_set,

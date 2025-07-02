@@ -90,6 +90,64 @@ mod test {
         >(&verifier_params, &proof[..], true);
     }
 
+    #[test]
+    fn test_identical_queries_gwc() {
+        use crate::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+        use crate::poly::kzg::multiopen::{ProverGWC, VerifierGWC};
+        use crate::poly::kzg::strategy::AccumulatorStrategy;
+        use halo2curves::bn256::Bn256;
+
+        const K: u32 = 4;
+
+        let engine = H2cEngine::new();
+        let params = ParamsKZG::<Bn256>::new(K);
+
+        let proof = create_proof::<
+            KZGCommitmentScheme<Bn256>,
+            ProverGWC<_>,
+            _,
+            Blake2bWrite<_, _, Challenge255<_>>,
+        >(&engine, &params);
+
+        let verifier_params = params.verifier_params();
+        verify_identical_queries::<
+            KZGCommitmentScheme<Bn256>,
+            VerifierGWC<_>,
+            _,
+            Blake2bRead<_, _, Challenge255<_>>,
+            AccumulatorStrategy<_>,
+        >(&verifier_params, &proof[..]);
+    }
+
+    #[test]
+    fn test_identical_queries_shplonk() {
+        use crate::poly::kzg::commitment::{KZGCommitmentScheme, ParamsKZG};
+        use crate::poly::kzg::multiopen::{ProverSHPLONK, VerifierSHPLONK};
+        use crate::poly::kzg::strategy::AccumulatorStrategy;
+        use halo2curves::bn256::Bn256;
+
+        const K: u32 = 4;
+
+        let engine = H2cEngine::new();
+        let params = ParamsKZG::<Bn256>::new(K);
+
+        let proof = create_proof::<
+            KZGCommitmentScheme<Bn256>,
+            ProverSHPLONK<_>,
+            _,
+            Blake2bWrite<_, _, Challenge255<_>>,
+        >(&engine, &params);
+
+        let verifier_params = params.verifier_params();
+        verify_identical_queries::<
+            KZGCommitmentScheme<Bn256>,
+            VerifierSHPLONK<_>,
+            _,
+            Blake2bRead<_, _, Challenge255<_>>,
+            AccumulatorStrategy<_>,
+        >(&verifier_params, &proof[..]);
+    }
+
     fn verify<
         'a,
         'params,
@@ -222,5 +280,55 @@ mod test {
             .unwrap();
 
         transcript.finalize()
+    }
+
+    fn verify_identical_queries<
+        'a,
+        'params,
+        Scheme: CommitmentScheme,
+        V: Verifier<'params, Scheme>,
+        E: EncodedChallenge<Scheme::Curve>,
+        T: TranscriptReadBuffer<&'a [u8], Scheme::Curve, E>,
+        Strategy: VerificationStrategy<'params, Scheme, V> + std::fmt::Debug,
+    >(
+        params: &'params Scheme::ParamsVerifier,
+        proof: &'a [u8],
+    ) {
+        use assert_matches::assert_matches;
+        use group::ff::Field;
+
+        let verifier = V::new();
+
+        let mut transcript = T::init(proof);
+
+        let a = transcript.read_point().unwrap();
+        let b = transcript.read_point().unwrap();
+        let c = transcript.read_point().unwrap();
+
+        let x = transcript.squeeze_challenge();
+        let y = transcript.squeeze_challenge();
+
+        let avx = transcript.read_scalar().unwrap();
+        let bvx = transcript.read_scalar().unwrap();
+        let cvy = transcript.read_scalar().unwrap();
+
+        let bvx_bad = <Scheme as CommitmentScheme>::Scalar::random(OsRng);
+
+        #[rustfmt::skip]
+        let invalid_queries = std::iter::empty()
+            .chain(Some(VerifierQuery::new_commitment(&a, x.get_scalar(), avx)))
+            .chain(Some(VerifierQuery::new_commitment(&b, x.get_scalar(), bvx)))
+            .chain(Some(VerifierQuery::new_commitment(&b, x.get_scalar(), bvx_bad))) // This is wrong.
+            .chain(Some(VerifierQuery::new_commitment(&c, y.get_scalar(), cvy)));
+
+        let strategy = Strategy::new(params);
+        assert_matches!(
+            strategy.process(|msm_accumulator| {
+                verifier
+                    .verify_proof(&mut transcript, invalid_queries.clone(), msm_accumulator)
+                    .map_err(|_| Error::Opening)
+            }),
+            Err(Error::Opening)
+        );
     }
 }

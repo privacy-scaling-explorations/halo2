@@ -22,10 +22,28 @@ struct CommitmentData<F: Field, Q: Query<F>> {
     _marker: PhantomData<F>,
 }
 
-fn construct_intermediate_sets<F: Field, I, Q: Query<F>>(queries: I) -> Vec<CommitmentData<F, Q>>
+fn construct_intermediate_sets<F: Field, I, Q: Query<F>>(
+    queries: I,
+) -> Option<Vec<CommitmentData<F, Q>>>
 where
     I: IntoIterator<Item = Q> + Clone,
 {
+    let queries = queries.into_iter().collect::<Vec<_>>();
+
+    // Caller tried to provide two different evaluations for the same
+    // commitment. Permitting this would be unsound.
+    {
+        let mut query_set: Vec<(Q::Commitment, F)> = vec![];
+        for query in queries.iter() {
+            let commitment = query.get_commitment();
+            let rotation = query.get_point();
+            if query_set.contains(&(commitment, rotation)) {
+                return None;
+            }
+            query_set.push((commitment, rotation));
+        }
+    }
+
     let mut point_query_map: Vec<(F, Vec<Q>)> = Vec::new();
     for query in queries {
         if let Some(pos) = point_query_map
@@ -39,12 +57,14 @@ where
         }
     }
 
-    point_query_map
-        .into_iter()
-        .map(|(point, queries)| CommitmentData {
-            queries,
-            point,
-            _marker: PhantomData,
-        })
-        .collect()
+    Some(
+        point_query_map
+            .into_iter()
+            .map(|(point, queries)| CommitmentData {
+                queries,
+                point,
+                _marker: PhantomData,
+            })
+            .collect(),
+    )
 }
