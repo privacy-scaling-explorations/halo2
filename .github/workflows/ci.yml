@@ -25,19 +25,16 @@ jobs:
           args: --all -- --check
 
   typos-check:
-    needs: [skip_check]
-    if: |
-      github.event.pull_request.draft == false &&
-      (github.event.action == 'ready_for_review' || needs.skip_check.outputs.should_skip != 'true')
-    name: TyposCheck
+    name: Spell Check with Typos
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: crate-ci/typos@v1.28.2
+      - uses: crate-ci/typos@v1.33.1
         with:
           config: ./typos.toml
           isolated: true
+
   test:
     name: Test on ${{ matrix.os }} with ${{ matrix.feature_set }} features
     runs-on: ${{ matrix.os }}
@@ -55,6 +52,21 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           override: false
+      - name: Install fontconfig system dependency
+        run: |
+          if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
+            sudo apt-get update && sudo apt-get install -y libfontconfig1-dev pkg-config
+          elif [[ "${{ matrix.os }}" == "macOS-latest" ]]; then
+            brew update && brew install fontconfig pkg-config
+          elif [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            choco install -y pkgconfiglite
+            echo "PKG_CONFIG_PATH=\"C:/ProgramData/chocolatey/lib/pkgconfiglite/tools/$env:VCPKG_INSTANCE_NAME/lib/pkgconfig\"" >> "$GITHUB_ENV"
+          fi
+        shell: bash
+      - name: Configure environment variables
+        run: |
+          echo "PKG_CONFIG_ALLOW_CROSS=1" >> "$GITHUB_ENV"
+          echo "RUST_FONTCONFIG_DLOPEN=on" >> "$GITHUB_ENV"
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
@@ -99,6 +111,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev pkg-config
+      - name: Set up env
+        run: |
+          echo "PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "RUST_FONTCONFIG_DLOPEN=on" >> $GITHUB_ENV
       - uses: actions-rs/toolchain@v1
         with:
           override: false
@@ -130,5 +148,3 @@ jobs:
         with:
           command: doc
           args: --all --document-private-items
-
-
