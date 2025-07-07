@@ -53,7 +53,12 @@ where
         R: RngCore,
     {
         let v: ChallengeV<_> = transcript.squeeze_challenge_scalar();
-        let commitment_data = construct_intermediate_sets(queries);
+        let commitment_data = construct_intermediate_sets(queries).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "queries iterator contains mismatching evaluations",
+            )
+        })?;
 
         for commitment_at_a_point in commitment_data.iter() {
             let z = commitment_at_a_point.point;
